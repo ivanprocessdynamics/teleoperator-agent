@@ -45,11 +45,12 @@ export function CreateWorkspaceModal({ children }: { children?: React.ReactNode 
 
             setOpen(false);
             setName("");
-            router.refresh();
-            // Optional: Force reload or context update if real-time listener isn't set up yet
-            window.location.reload();
+            // Router refresh might not be enough if the dashboard page doesn't fetch data yet
+            // But once we add the listener to Dashboard, this won't be needed either.
+            // window.location.reload(); 
         } catch (error) {
             console.error("Error creating workspace:", error);
+            alert("Failed to create workspace. Check console for details.");
         } finally {
             setLoading(false);
         }
