@@ -66,29 +66,33 @@ export function CreateWorkspaceModal({ children }: { children?: React.ReactNode 
                     </Button>
                 )}
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[425px]">
+            <DialogContent className="sm:max-w-[425px] bg-white text-gray-900 border-gray-200 shadow-xl">
                 <DialogHeader>
-                    <DialogTitle>Crear Agente</DialogTitle>
-                    <DialogDescription>
+                    <DialogTitle className="text-xl font-bold tracking-tight text-gray-900">Crear Agente</DialogTitle>
+                    <DialogDescription className="text-gray-500">
                         Crea un nuevo agente para gestionar tus campañas.
                     </DialogDescription>
                 </DialogHeader>
                 <div className="grid gap-4 py-4">
                     <div className="grid grid-cols-4 items-center gap-4">
-                        <Label htmlFor="name" className="text-right">
+                        <Label htmlFor="name" className="text-right text-gray-700 font-medium">
                             Nombre
                         </Label>
                         <Input
                             id="name"
                             value={name}
                             onChange={(e) => setName(e.target.value)}
-                            className="col-span-3"
+                            className="col-span-3 bg-white border-gray-300 text-gray-900 focus:border-blue-500 focus:ring-blue-500"
                             placeholder="Ej: Agente de Ventas"
                         />
                     </div>
                 </div>
                 <DialogFooter>
-                    <Button onClick={handleCreate} disabled={loading}>
+                    <Button
+                        onClick={handleCreate}
+                        disabled={loading}
+                        className="bg-gray-900 text-white hover:bg-gray-800"
+                    >
                         {loading ? "Creando..." : "Crear Agente"}
                     </Button>
                 </DialogFooter>
