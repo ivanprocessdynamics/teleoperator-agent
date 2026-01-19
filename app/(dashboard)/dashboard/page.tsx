@@ -56,7 +56,7 @@ export default function DashboardPage() {
 
             <div className="rounded-xl border border-gray-200 bg-white p-8 shadow-sm">
                 <h2 className="text-lg font-semibold mb-4 text-gray-900">Activity Overview</h2>
-                <div className="h-[200px] flex items-center justify-center text-gray-500 bg-gray-50 border border-dashed border-gray-300 rounded-lg">
+                <div className="h-[200px] flex items-center justify-center text-gray-600 bg-gray-50 border border-dashed border-gray-300 rounded-lg">
                     Chart Placeholder
                 </div>
             </div>

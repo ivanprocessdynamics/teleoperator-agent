@@ -141,8 +141,8 @@ export default function AgentsPage() {
                                 <h3 className="text-lg font-semibold text-gray-900 group-hover:text-blue-600 transition-colors">{ws.name}</h3>
                                 {/* Removed subtitle as requested */}
 
-                                <div className="mt-8 flex items-center justify-between border-t border-gray-50 pt-4">
-                                    <span className="text-xs font-medium text-gray-400 group-hover:text-gray-600">
+                                <div className="mt-8 flex items-center justify-between border-t border-gray-100 pt-4">
+                                    <span className="text-xs font-medium text-gray-500 group-hover:text-gray-700">
                                         {ws.created_at ? new Date(ws.created_at.seconds * 1000).toLocaleDateString() : 'Just now'}
                                     </span>
                                 </div>
@@ -158,11 +158,11 @@ export default function AgentsPage() {
                                         </Button>
                                     </DropdownMenuTrigger>
                                     <DropdownMenuContent align="end">
-                                        <DropdownMenuItem onClick={(e) => handleDuplicate(e, ws)}>
+                                        <DropdownMenuItem onClick={(e) => handleDuplicate(e, ws)} className="text-gray-900 font-medium cursor-pointer">
                                             <Copy className="mr-2 h-4 w-4" />
                                             Duplicar
                                         </DropdownMenuItem>
-                                        <DropdownMenuItem onClick={(e) => handleDelete(e, ws)} className="text-red-600 focus:text-red-600">
+                                        <DropdownMenuItem onClick={(e) => handleDelete(e, ws)} className="text-red-600 font-medium cursor-pointer focus:text-red-600">
                                             <Trash className="mr-2 h-4 w-4" />
                                             Eliminar
                                         </DropdownMenuItem>
