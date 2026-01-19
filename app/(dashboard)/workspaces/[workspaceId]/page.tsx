@@ -106,7 +106,8 @@ export default function WorkspacePage() {
                             <Pencil className="h-5 w-5 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity" />
                         </div>
                     )}
-                    <p className="text-gray-500 mt-1">Manage your agents and campaigns.</p>
+                    )}
+                    <p className="text-gray-500 mt-1">Gestiona tus agentes y campañas.</p>
                 </div>
                 <CreateSubworkspaceModal workspaceId={workspaceId} />
             </div>
@@ -122,13 +123,13 @@ export default function WorkspacePage() {
                                 <Mic className="h-5 w-5" />
                             </div>
                             <h3 className="text-lg font-semibold text-gray-900">{sub.name}</h3>
-                            <p className="text-sm text-gray-500">Click to manage contacts and prompts.</p>
+                            <p className="text-sm text-gray-500">Clic para gestionar contactos y prompts.</p>
                         </div>
 
                         <div className="mt-6 flex items-center justify-end">
                             <Link href={`/workspaces/${workspaceId}/sub/${sub.id}`}>
                                 <Button variant="ghost" className="gap-2 text-blue-600 hover:text-blue-700 hover:bg-blue-50">
-                                    Open Agent <ArrowRight className="h-4 w-4" />
+                                    Abrir Agente <ArrowRight className="h-4 w-4" />
                                 </Button>
                             </Link>
                         </div>
@@ -137,7 +138,7 @@ export default function WorkspacePage() {
 
                 {subworkspaces.length === 0 && (
                     <div className="col-span-full py-12 text-center text-gray-400 border-dashed border-2 bg-gray-50 rounded-xl">
-                        <p>No agents created yet. Create one to start calling.</p>
+                        <p>No hay agentes creados. Crea uno para empezar a llamar.</p>
                     </div>
                 )}
             </div>

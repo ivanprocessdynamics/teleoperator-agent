@@ -58,7 +58,7 @@ export function Sidebar() {
                                 )}
                             >
                                 <item.icon className="h-4 w-4" />
-                                {item.label}
+                                {item.label === "Agents" ? "Agentes" : item.label === "Settings" ? "Configuración" : item.label}
                             </Link>
                         );
                     })}
@@ -89,7 +89,7 @@ export function Sidebar() {
                     }}
                 >
                     <LogOut className="mr-2 h-4 w-4" />
-                    Log out
+                    Cerrar Sesión
                 </Button>
             </div>
         </div>

@@ -113,19 +113,19 @@ export default function AgentsPage() {
 
             <div className="flex items-center justify-between">
                 <div>
-                    <h1 className="text-2xl font-bold tracking-tight text-gray-900">Agents</h1>
-                    <p className="text-sm text-gray-500">Manage your Retell AI agents.</p>
+                    <h1 className="text-2xl font-bold tracking-tight text-gray-900">Agentes</h1>
+                    <p className="text-sm text-gray-500">Gestiona tus agentes de Retell AI.</p>
                 </div>
                 <CreateWorkspaceModal />
             </div>
 
             {workspaces.length === 0 ? (
                 <div className="rounded-lg border border-gray-200 bg-gray-50/50 p-8 text-center text-gray-500">
-                    <p className="mb-4">No agents found. Create one to get started.</p>
+                    <p className="mb-4">No hay agentes. Crea uno para empezar.</p>
                     <CreateWorkspaceModal>
                         <Button variant="outline">
                             <Plus className="mr-2 h-4 w-4" />
-                            Create Agent
+                            Crear Agente
                         </Button>
                     </CreateWorkspaceModal>
                 </div>
