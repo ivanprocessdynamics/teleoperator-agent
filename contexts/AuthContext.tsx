@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useContext, useEffect, useState } from "react";
-import { User, signInWithPopup, signOut } from "firebase/auth";
+import { User, signInWithPopup, signOut, onAuthStateChanged } from "firebase/auth";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { auth, db, googleProvider } from "@/lib/firebase";
 
@@ -30,7 +30,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        const unsubscribe = auth.onAuthStateChanged(async (currentUser: User | null) => {
+        // Guard against uninitialized auth (e.g. missing env vars during build/dev)
+        if (!auth || (typeof auth === 'object' && Object.keys(auth).length === 0)) {
+             setTimeout(() => setLoading(false), 0);
+             return;
+        }
+
+        const unsubscribe = onAuthStateChanged(auth, async (currentUser: User | null) => {
             setUser(currentUser);
             if (currentUser) {
                 // Sync user with Firestore
