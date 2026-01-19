@@ -23,8 +23,7 @@ export default function DashboardPage() {
 
         const q = query(
             collection(db, "workspaces"),
-            where("owner_uid", "==", user.uid),
-            orderBy("created_at", "desc")
+            where("owner_uid", "==", user.uid)
         );
 
         const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -32,6 +31,8 @@ export default function DashboardPage() {
                 id: doc.id,
                 ...doc.data()
             }));
+            // Sort client-side to avoid needing a composite index
+            spaces.sort((a: any, b: any) => (b.created_at?.seconds || 0) - (a.created_at?.seconds || 0));
             setWorkspaces(spaces);
         });
 
@@ -58,9 +59,26 @@ export default function DashboardPage() {
             ) : (
                 <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
                     {workspaces.map((ws) => (
-                        <Link key={ws.id} href={`/workspaces/${ws.id}`} className="group relative rounded-lg border border-gray-200 bg-white p-6 shadow-sm transition-all hover:shadow-md">
-                            <h3 className="text-lg font-semibold text-gray-900 group-hover:text-blue-600">{ws.name}</h3>
-                            <p className="text-sm text-gray-500 mt-2">ID: {ws.id}</p>
+                        <Link
+                            key={ws.id}
+                            href={`/workspaces/${ws.id}`}
+                            className="group relative flex flex-col justify-between rounded-xl border border-gray-100 bg-white p-6 shadow-sm transition-all hover:shadow-md hover:border-gray-200"
+                        >
+                            <div>
+                                <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-lg bg-blue-50 text-blue-600 group-hover:bg-blue-100 transition-colors">
+                                    <span className="font-semibold text-lg">{ws.name.charAt(0).toUpperCase()}</span>
+                                </div>
+                                <h3 className="text-lg font-semibold text-gray-900 group-hover:text-blue-600 transition-colors">{ws.name}</h3>
+                                <p className="text-sm text-gray-500 mt-1 line-clamp-2">
+                                    Manage campaigns and agents for {ws.name}.
+                                </p>
+                            </div>
+                            <div className="mt-4 flex items-center justify-between border-t border-gray-50 pt-4">
+                                <span className="text-xs text-gray-400 font-mono">ID: {ws.id.substring(0, 8)}...</span>
+                                <span className="text-xs font-medium text-gray-400 group-hover:text-gray-600">
+                                    {ws.created_at ? new Date(ws.created_at.seconds * 1000).toLocaleDateString() : 'Just now'}
+                                </span>
+                            </div>
                         </Link>
                     ))}
                 </div>
