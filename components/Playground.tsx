@@ -19,7 +19,7 @@ export function Playground({ subworkspaceId }: PlaygroundProps) {
 
     // Mock Agent ID for demo purposes if not passed or fetched
     // In real app, we would fetch the 'retell_agent_id' stored in subworkspace
-    const agentId = "agent_123456";
+    const agentId = process.env.NEXT_PUBLIC_RETELL_AGENT_ID || "agent_123456";
 
     useEffect(() => {
         // Setup listeners
