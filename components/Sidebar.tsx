@@ -83,7 +83,10 @@ export function Sidebar() {
                     variant="ghost"
                     size="sm"
                     className="w-full justify-start text-gray-500 hover:text-red-600"
-                    onClick={() => logout()}
+                    onClick={async () => {
+                        await logout();
+                        window.location.href = "/";
+                    }}
                 >
                     <LogOut className="mr-2 h-4 w-4" />
                     Log out

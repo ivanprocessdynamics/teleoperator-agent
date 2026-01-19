@@ -45,19 +45,31 @@ export default function AgentsPage() {
         return () => unsubscribe();
     }, [user]);
 
-    const handleDelete = async (e: React.MouseEvent, id: string) => {
-        e.preventDefault(); // Prevent navigation
-        if (confirm("Are you sure you want to delete this agent? This action cannot be undone.")) {
-            try {
-                await deleteDoc(doc(db, "workspaces", id));
-            } catch (error) {
-                console.error("Error deleting document: ", error);
-            }
+    const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+    const [agentToDelete, setAgentToDelete] = useState<any>(null);
+
+    const confirmDelete = async () => {
+        if (!agentToDelete) return;
+
+        try {
+            await deleteDoc(doc(db, "workspaces", agentToDelete.id));
+            setDeleteDialogOpen(false);
+            setAgentToDelete(null);
+        } catch (error) {
+            console.error("Error deleting document: ", error);
         }
     };
 
+    const handleDelete = (e: React.MouseEvent, agent: any) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setAgentToDelete(agent);
+        setDeleteDialogOpen(true);
+    };
+
     const handleDuplicate = async (e: React.MouseEvent, ws: any) => {
-        e.preventDefault(); // Prevent navigation
+        e.preventDefault();
+        e.stopPropagation();
         if (!user) return;
 
         try {
@@ -72,7 +84,35 @@ export default function AgentsPage() {
     };
 
     return (
-        <div className="flex flex-col gap-6">
+        <div className="flex flex-col gap-6 relative">
+            {/* Custom Delete Confirmation Modal */}
+            {deleteDialogOpen && agentToDelete && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+                    <div className="w-full max-w-md scale-100 transform rounded-lg bg-gray-900 p-6 text-white shadow-xl transition-all">
+                        <h3 className="mb-2 text-lg font-semibold">Confirm Deletion</h3>
+                        <p className="mb-6 text-gray-300">
+                            ¿Estás seguro de eliminar <span className="font-bold text-white">{agentToDelete.name}</span>?
+                        </p>
+                        <div className="flex justify-end gap-3">
+                            <Button
+                                variant="secondary"
+                                className="bg-gray-700 hover:bg-gray-600 text-white border-0"
+                                onClick={() => setDeleteDialogOpen(false)}
+                            >
+                                Cancelar
+                            </Button>
+                            <Button
+                                variant="destructive"
+                                className="bg-red-600 hover:bg-red-700 text-white"
+                                onClick={confirmDelete}
+                            >
+                                Confirmar
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             <div className="flex items-center justify-between">
                 <div>
                     <h1 className="text-2xl font-bold tracking-tight text-gray-900">Agents</h1>
@@ -94,30 +134,29 @@ export default function AgentsPage() {
             ) : (
                 <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
                     {workspaces.map((ws) => (
-                        <div key={ws.id} className="group relative rounded-xl border border-gray-100 bg-white shadow-sm transition-all hover:shadow-md hover:border-gray-200">
+                        <div key={ws.id} className="group relative rounded-xl border border-gray-200 bg-white shadow-sm transition-all hover:shadow-md hover:border-blue-200">
                             {/* Card Content (Clickable) */}
                             <Link href={`/workspaces/${ws.id}`} className="block p-6">
                                 <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-lg bg-blue-50 text-blue-600 group-hover:bg-blue-100 transition-colors">
                                     <span className="font-semibold text-lg">{ws.name.charAt(0).toUpperCase()}</span>
                                 </div>
                                 <h3 className="text-lg font-semibold text-gray-900 group-hover:text-blue-600 transition-colors">{ws.name}</h3>
-                                <p className="text-sm text-gray-500 mt-1 line-clamp-2">
-                                    Agent configuration and campaigns.
-                                </p>
-                                <div className="mt-4 flex items-center justify-between border-t border-gray-50 pt-4">
+                                {/* Removed subtitle as requested */}
+
+                                <div className="mt-8 flex items-center justify-between border-t border-gray-50 pt-4">
                                     <span className="text-xs font-medium text-gray-400 group-hover:text-gray-600">
                                         {ws.created_at ? new Date(ws.created_at.seconds * 1000).toLocaleDateString() : 'Just now'}
                                     </span>
                                 </div>
                             </Link>
 
-                            {/* Actions Menu (Absolute Position) */}
+                            {/* Actions Menu (Absolute Position) - Always visible or highly visible on hover */}
                             <div className="absolute top-4 right-4 z-10">
                                 <DropdownMenu>
                                     <DropdownMenuTrigger asChild>
-                                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-gray-400 hover:text-gray-700 hover:bg-gray-100">
                                             <span className="sr-only">Open menu</span>
-                                            <MoreHorizontal className="h-4 w-4" />
+                                            <MoreHorizontal className="h-5 w-5" />
                                         </Button>
                                     </DropdownMenuTrigger>
                                     <DropdownMenuContent align="end">
@@ -125,7 +164,7 @@ export default function AgentsPage() {
                                             <Copy className="mr-2 h-4 w-4" />
                                             Duplicate
                                         </DropdownMenuItem>
-                                        <DropdownMenuItem onClick={(e) => handleDelete(e, ws.id)} className="text-red-600 focus:text-red-600">
+                                        <DropdownMenuItem onClick={(e) => handleDelete(e, ws)} className="text-red-600 focus:text-red-600">
                                             <Trash className="mr-2 h-4 w-4" />
                                             Delete
                                         </DropdownMenuItem>

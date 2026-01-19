@@ -2,11 +2,12 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { collection, query, where, getDocs, doc, getDoc } from "firebase/firestore";
+import { collection, query, where, getDocs, doc, getDoc, updateDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { CreateSubworkspaceModal } from "@/components/CreateSubworkspaceModal";
 import { Button } from "@/components/ui/button";
-import { Mic, Users, ArrowRight } from "lucide-react";
+import { Mic, Users, ArrowRight, Pencil, Check, X } from "lucide-react";
+import { Input } from "@/components/ui/input";
 import Link from "next/link";
 
 interface Subworkspace {
@@ -21,6 +22,21 @@ export default function WorkspacePage() {
     const [subworkspaces, setSubworkspaces] = useState<Subworkspace[]>([]);
     const [loading, setLoading] = useState(true);
     const [workspaceName, setWorkspaceName] = useState("");
+    const [isEditingName, setIsEditingName] = useState(false);
+    const [tempName, setTempName] = useState("");
+
+    const handleSaveName = async () => {
+        if (!tempName.trim()) return;
+        try {
+            await updateDoc(doc(db, "workspaces", workspaceId), {
+                name: tempName
+            });
+            setWorkspaceName(tempName);
+            setIsEditingName(false);
+        } catch (error) {
+            console.error("Error updating name:", error);
+        }
+    };
 
     useEffect(() => {
         async function fetchData() {
@@ -61,8 +77,36 @@ export default function WorkspacePage() {
         <div className="flex flex-col gap-8">
             <div className="flex items-center justify-between border-b pb-4">
                 <div>
-                    <h1 className="text-3xl font-bold tracking-tight text-gray-900">{workspaceName || "Workspace"}</h1>
-                    <p className="text-gray-500">Manage your agents and campaigns.</p>
+                    {isEditingName ? (
+                        <div className="flex items-center gap-2">
+                            <Input
+                                value={tempName}
+                                onChange={(e) => setTempName(e.target.value)}
+                                className="text-2xl font-bold h-10 w-[300px]"
+                                autoFocus
+                            />
+                            <Button size="icon" variant="ghost" onClick={handleSaveName} className="text-green-600">
+                                <Check className="h-5 w-5" />
+                            </Button>
+                            <Button size="icon" variant="ghost" onClick={() => setIsEditingName(false)} className="text-red-500">
+                                <X className="h-5 w-5" />
+                            </Button>
+                        </div>
+                    ) : (
+                        <div
+                            className="flex items-center gap-2 group cursor-pointer"
+                            onClick={() => {
+                                setTempName(workspaceName);
+                                setIsEditingName(true);
+                            }}
+                        >
+                            <h1 className="text-3xl font-bold tracking-tight text-gray-900 group-hover:text-gray-700 transition-colors">
+                                {workspaceName || "Workspace"}
+                            </h1>
+                            <Pencil className="h-5 w-5 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+                        </div>
+                    )}
+                    <p className="text-gray-500 mt-1">Manage your agents and campaigns.</p>
                 </div>
                 <CreateSubworkspaceModal workspaceId={workspaceId} />
             </div>
