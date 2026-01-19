@@ -11,9 +11,29 @@ const firebaseConfig = {
     appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
 };
 
-const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
-const auth = getAuth(app);
-const db = getFirestore(app);
-const googleProvider = new GoogleAuthProvider();
+const app = !getApps().length
+    ? initializeApp(firebaseConfig.apiKey ? firebaseConfig : {})
+    : getApp();
+
+// Prevent build errors if env vars are missing
+let auth: any;
+let db: any;
+let googleProvider: any;
+
+try {
+    if (firebaseConfig.apiKey) {
+        auth = getAuth(app);
+        db = getFirestore(app);
+        googleProvider = new GoogleAuthProvider();
+    } else {
+        console.warn("Firebase API Key missing. Services not initialized. (OK for build time)");
+        // Mock objects to satisfy exports during build
+        auth = {};
+        db = {};
+        googleProvider = {};
+    }
+} catch (e) {
+    console.warn("Error initializing Firebase services:", e);
+}
 
 export { app, auth, db, googleProvider };
