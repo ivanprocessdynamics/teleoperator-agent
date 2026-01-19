@@ -1,9 +1,8 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
 import { RetellWebClient } from "retell-client-js-sdk";
-import { Button } from "@/components/ui/button";
-import { Mic, MicOff, PhoneOff } from "lucide-react";
+import { Mic, PhoneOff } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const retellWebClient = new RetellWebClient();
@@ -91,11 +90,15 @@ export function Playground({ subworkspaceId }: PlaygroundProps) {
                 )} />
 
                 {/* Orb */}
-                <div
+                <button
+                    type="button"
+                    aria-label={isCalling ? "End call" : "Start call"}
+                    aria-pressed={isCalling}
                     className={cn(
-                        "relative z-10 flex h-32 w-32 cursor-pointer items-center justify-center rounded-full bg-gradient-to-br from-blue-400 to-indigo-600 shadow-lg transition-all duration-500 hover:scale-105",
-                        isCalling ? "animate-pulse" : "opacity-80",
-                        activeSpeaker === 'agent' && "scale-110 shadow-blue-500/50"
+                        "relative z-10 flex h-32 w-32 cursor-pointer items-center justify-center rounded-full bg-gradient-to-br from-blue-400 to-indigo-600 shadow-lg transition-all duration-500 hover:scale-105 focus:outline-none focus:ring-4 focus:ring-blue-300",
+                        !isCalling && "opacity-80 hover:opacity-100",
+                        isCalling && !activeSpeaker && "ring-4 ring-blue-400/30 animate-pulse",
+                        activeSpeaker === 'agent' && "scale-110 shadow-blue-500/50 shadow-xl"
                     )}
                     onClick={toggleCall}
                 >
@@ -104,11 +107,11 @@ export function Playground({ subworkspaceId }: PlaygroundProps) {
                     ) : (
                         <Mic className="h-10 w-10 text-white" />
                     )}
-                </div>
+                </button>
 
                 {/* Status Text */}
-                <div className="mt-8 text-center">
-                    <div className="text-xl font-medium text-white">
+                <div className="mt-8 text-center" aria-live="polite" aria-atomic="true">
+                    <div className="text-xl font-medium text-white transition-all duration-300">
                         {isCalling ? (activeSpeaker === 'agent' ? "Agent Speaking..." : "Listening...") : "Tap to Speak"}
                     </div>
                     {isCalling && <div className="mt-2 text-sm text-gray-400 font-mono">00:15</div>}
@@ -122,8 +125,13 @@ export function Playground({ subworkspaceId }: PlaygroundProps) {
                 </div>
                 <div className="flex-1 overflow-y-auto p-4 space-y-4">
                     {transcript.length === 0 ? (
-                        <div className="text-center text-sm text-gray-400 mt-10">
-                            Transcript will appear here...
+                        <div className="flex flex-col items-center justify-center h-full text-center text-gray-400 space-y-2">
+                            <div className="h-8 w-8 rounded-full bg-gray-100 flex items-center justify-center">
+                                <span className="h-1.5 w-1.5 rounded-full bg-gray-300" />
+                                <span className="h-1.5 w-1.5 rounded-full bg-gray-300 mx-0.5" />
+                                <span className="h-1.5 w-1.5 rounded-full bg-gray-300" />
+                            </div>
+                            <p className="text-sm">Start talking to see the transcript...</p>
                         </div>
                     ) : (
                         transcript.map((msg, i) => (
