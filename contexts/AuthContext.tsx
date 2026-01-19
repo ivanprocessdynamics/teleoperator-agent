@@ -30,7 +30,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        const unsubscribe = auth.onAuthStateChanged(async (currentUser) => {
+        const unsubscribe = auth.onAuthStateChanged(async (currentUser: User | null) => {
             setUser(currentUser);
             if (currentUser) {
                 // Sync user with Firestore
