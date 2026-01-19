@@ -28,7 +28,7 @@ export default function Home() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-white bg-[radial-gradient(#cbd5e1_1px,transparent_1px)] [background-size:16px_16px]">
+    <div className="flex min-h-screen items-center justify-center bg-white bg-[radial-gradient(#9ca3af_1px,transparent_1px)] [background-size:16px_16px]">
       {/* Subtle white glow behind the card - slightly stronger to contrast with darker dots */}
       <div className="absolute inset-0 bg-white/40 bg-[radial-gradient(ellipse_at_center,transparent_0%,white_100%)] pointer-events-none" />
 
@@ -42,7 +42,7 @@ export default function Home() {
           <div className="space-y-3 mb-10">
             <h1 className="text-2xl font-semibold tracking-tight text-gray-900">Bienvenido a VoiceCRM</h1>
             <p className="text-sm text-gray-500 leading-relaxed max-w-[280px] mx-auto">
-              La plataforma definitiva para gestionar tus agentes de voz con IA.
+              La plataforma para gestionar tus teleoperadores de IA.
             </p>
           </div>
 
