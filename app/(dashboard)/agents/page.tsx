@@ -61,15 +61,13 @@ export default function AgentsPage() {
     };
 
     const handleDelete = (e: React.MouseEvent, agent: any) => {
-        e.preventDefault();
-        e.stopPropagation();
+        // Do not prevent default/propagation to allow Dropdown to close
         setAgentToDelete(agent);
         setDeleteDialogOpen(true);
     };
 
     const handleDuplicate = async (e: React.MouseEvent, ws: any) => {
-        e.preventDefault();
-        e.stopPropagation();
+        // Do not prevent default/propagation to allow Dropdown to close
         if (!user) return;
 
         try {
@@ -96,7 +94,7 @@ export default function AgentsPage() {
                         <div className="flex justify-end gap-3">
                             <Button
                                 variant="outline"
-                                className="border-gray-200 text-gray-700 hover:bg-gray-50 hover:text-gray-900"
+                                className="bg-white border-gray-200 text-gray-700 hover:bg-gray-50 hover:text-gray-900"
                                 onClick={() => setDeleteDialogOpen(false)}
                             >
                                 Cancelar
