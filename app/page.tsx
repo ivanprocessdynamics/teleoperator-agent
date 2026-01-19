@@ -28,11 +28,11 @@ export default function Home() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-white bg-[radial-gradient(#e5e7eb_1px,transparent_1px)] [background-size:16px_16px]">
-      {/* Subtle white glow behind the card */}
+    <div className="flex min-h-screen items-center justify-center bg-white bg-[radial-gradient(#cbd5e1_1px,transparent_1px)] [background-size:16px_16px]">
+      {/* Subtle white glow behind the card - slightly stronger to contrast with darker dots */}
       <div className="absolute inset-0 bg-white/40 bg-[radial-gradient(ellipse_at_center,transparent_0%,white_100%)] pointer-events-none" />
 
-      <div className="relative w-full max-w-[420px] p-10 md:p-12 bg-white border border-gray-100 shadow-[0_8px_30px_rgb(0,0,0,0.04)] rounded-2xl">
+      <div className="relative w-full max-w-[420px] p-10 md:p-12 bg-white border border-gray-100 shadow-[0_8px_30px_rgb(0,0,0,0.08)] rounded-2xl transition-all duration-500 hover:shadow-[0_20px_40px_rgb(0,0,0,0.12)] hover:-translate-y-1">
         <div className="flex flex-col items-center text-center">
           {/* Logo / Icon */}
           <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-gray-900 shadow-sm transition-transform hover:scale-105 duration-300 mb-8">
@@ -49,7 +49,7 @@ export default function Home() {
           <div className="w-full">
             <Button
               onClick={() => signInWithGoogle()}
-              className="w-full h-11 bg-gray-900 text-white hover:bg-gray-800 transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5 flex items-center justify-center gap-3 text-sm font-medium rounded-lg"
+              className="w-full h-11 bg-gray-900 text-white hover:bg-black transition-all duration-300 transform hover:scale-[1.03] hover:shadow-xl flex items-center justify-center gap-3 text-sm font-medium rounded-lg"
               size="default"
             >
               <svg className="h-5 w-5" viewBox="0 0 24 24">
