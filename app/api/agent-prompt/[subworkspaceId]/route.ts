@@ -4,9 +4,9 @@ import { doc, getDoc } from "firebase/firestore";
 
 export async function GET(
     request: Request,
-    { params }: { params: { subworkspaceId: string } }
+    { params }: { params: Promise<{ subworkspaceId: string }> }
 ) {
-    const subworkspaceId = params.subworkspaceId;
+    const { subworkspaceId } = await params;
 
     if (!subworkspaceId) {
         return new NextResponse("Missing Subworkspace ID", { status: 400 });
