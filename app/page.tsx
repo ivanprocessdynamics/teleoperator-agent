@@ -28,7 +28,7 @@ export default function Home() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-white bg-[radial-gradient(#797c82_1px,transparent_1px)] [background-size:16px_16px]">
+    <div className="flex min-h-screen items-center justify-center bg-white bg-[radial-gradient(#868a91_1px,transparent_1px)] [background-size:16px_16px]">
       {/* Subtle white glow behind the card - slightly stronger to contrast with darker dots */}
       <div className="absolute inset-0 bg-white/40 bg-[radial-gradient(ellipse_at_center,transparent_0%,white_100%)] pointer-events-none" />
 
