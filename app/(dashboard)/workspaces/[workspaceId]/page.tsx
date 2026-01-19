@@ -106,7 +106,6 @@ export default function WorkspacePage() {
                             <Pencil className="h-5 w-5 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity" />
                         </div>
                     )}
-                    )}
                     <p className="text-gray-500 mt-1">Gestiona tus agentes y campañas.</p>
                 </div>
                 <CreateSubworkspaceModal workspaceId={workspaceId} />
