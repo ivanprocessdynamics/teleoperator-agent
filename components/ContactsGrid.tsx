@@ -157,7 +157,7 @@ export function ContactsGrid({ subworkspaceId }: ContactsGridProps) {
 
                 {isManualEntryMode && (
                     <div className="flex gap-2">
-                        <Button variant="ghost" size="sm" onClick={() => setIsManualEntryMode(false)}>
+                        <Button variant="ghost" size="sm" onClick={() => setIsManualEntryMode(false)} className="text-gray-900 hover:bg-gray-100 font-medium">
                             Cancelar
                         </Button>
                     </div>
@@ -182,15 +182,15 @@ export function ContactsGrid({ subworkspaceId }: ContactsGridProps) {
                                         <tr key={row.id} className="hover:bg-gray-50/50">
                                             <td className="p-0 border-r border-gray-100">
                                                 <input
-                                                    className="w-full px-4 py-3 border-none focus:ring-2 focus:ring-inset focus:ring-blue-500 outline-none bg-transparent"
-                                                    placeholder="Nombre..."
+                                                    className="w-full px-4 py-3 border-none focus:ring-2 focus:ring-inset focus:ring-gray-900 outline-none bg-transparent text-black placeholder:text-gray-500 font-medium"
+                                                    placeholder="Escribe el nombre..."
                                                     value={row.name}
                                                     onChange={(e) => handleManualRowChange(row.id, 'name', e.target.value)}
                                                 />
                                             </td>
                                             <td className="p-0">
                                                 <input
-                                                    className="w-full px-4 py-3 border-none focus:ring-2 focus:ring-inset focus:ring-blue-500 outline-none bg-transparent font-mono"
+                                                    className="w-full px-4 py-3 border-none focus:ring-2 focus:ring-inset focus:ring-gray-900 outline-none bg-transparent font-mono text-black placeholder:text-gray-500 font-medium"
                                                     placeholder="+34..."
                                                     value={row.phone}
                                                     onChange={(e) => handleManualRowChange(row.id, 'phone', e.target.value)}
