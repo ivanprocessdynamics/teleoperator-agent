@@ -25,12 +25,12 @@ export function Sidebar() {
             icon: LayoutDashboard,
         },
         {
-            label: "Workspaces",
-            href: "/workspaces", // Placeholder or modal trigger
-            icon: Box,
+            label: "Agents",
+            href: "/agents",
+            icon: Users, // Changed icon to Users for Agents
         },
         {
-            label: "Settings", // Admin only usually, but generic for now
+            label: "Settings",
             href: "/settings",
             icon: Settings,
         },
