@@ -51,12 +51,16 @@ export default function AgentsPage() {
     const confirmDelete = async () => {
         if (!agentToDelete) return;
 
+        // Optimistic UI: Remove immediately from view
+        setWorkspaces(prev => prev.filter(w => w.id !== agentToDelete.id));
+        setDeleteDialogOpen(false);
+
         try {
             await deleteDoc(doc(db, "workspaces", agentToDelete.id));
-            setDeleteDialogOpen(false);
             setAgentToDelete(null);
         } catch (error) {
             console.error("Error deleting document: ", error);
+            // In a real app we might revert here, but onSnapshot will eventually correct it
         }
     };
 
