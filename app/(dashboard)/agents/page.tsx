@@ -132,7 +132,7 @@ export default function AgentsPage() {
             ) : (
                 <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
                     {workspaces.map((ws) => (
-                        <div key={ws.id} className="group relative rounded-xl border border-gray-200 bg-white shadow-sm transition-all hover:shadow-md hover:border-blue-200">
+                        <div key={ws.id} className="group relative rounded-xl border border-gray-200 bg-white shadow-sm transition-all duration-300 hover:shadow-lg hover:border-blue-200 hover:-translate-y-1">
                             {/* Card Content (Clickable) */}
                             <Link href={`/workspaces/${ws.id}`} className="block p-6">
                                 <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-lg bg-blue-50 text-blue-600 group-hover:bg-blue-100 transition-colors">

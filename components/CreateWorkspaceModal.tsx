@@ -26,8 +26,15 @@ export function CreateWorkspaceModal({ children }: { children?: React.ReactNode 
     const { user } = useAuth();
     const router = useRouter();
 
+    const [error, setError] = useState(false);
+
     const handleCreate = async () => {
-        if (!name.trim() || !user) return;
+        if (!user) return;
+
+        if (!name.trim()) {
+            setError(true);
+            return;
+        }
 
         setLoading(true);
         try {
@@ -45,9 +52,7 @@ export function CreateWorkspaceModal({ children }: { children?: React.ReactNode 
 
             setOpen(false);
             setName("");
-            // Router refresh might not be enough if the dashboard page doesn't fetch data yet
-            // But once we add the listener to Dashboard, this won't be needed either.
-            // window.location.reload(); 
+            setError(false);
         } catch (error) {
             console.error("Error creating workspace:", error);
             alert("Failed to create workspace. Check console for details.");
@@ -56,11 +61,24 @@ export function CreateWorkspaceModal({ children }: { children?: React.ReactNode 
         }
     };
 
+    const handleKeyDown = (e: React.KeyboardEvent) => {
+        if (e.key === "Enter") {
+            e.preventDefault();
+            handleCreate();
+        }
+    };
+
     return (
-        <Dialog open={open} onOpenChange={setOpen}>
+        <Dialog open={open} onOpenChange={(val) => {
+            setOpen(val);
+            if (!val) {
+                setName("");
+                setError(false);
+            }
+        }}>
             <DialogTrigger asChild>
                 {children || (
-                    <Button>
+                    <Button variant="outline" className="bg-white text-gray-900 border-gray-200 hover:bg-gray-50">
                         <Plus className="mr-2 h-4 w-4" />
                         Nuevo Agente
                     </Button>
@@ -74,24 +92,28 @@ export function CreateWorkspaceModal({ children }: { children?: React.ReactNode 
                     </DialogDescription>
                 </DialogHeader>
                 <div className="grid gap-4 py-4">
-                    <div className="grid grid-cols-4 items-center gap-4">
-                        <Label htmlFor="name" className="text-right text-gray-700 font-medium">
-                            Nombre
-                        </Label>
+                    <div className="flex flex-col gap-4">
                         <Input
                             id="name"
                             value={name}
-                            onChange={(e) => setName(e.target.value)}
-                            className="col-span-3 bg-white border-gray-300 text-gray-900 focus:border-blue-500 focus:ring-blue-500"
+                            onChange={(e) => {
+                                setName(e.target.value);
+                                if (e.target.value.trim()) setError(false);
+                            }}
+                            onKeyDown={handleKeyDown}
+                            className={`col-span-3 bg-white text-gray-900 focus:ring-blue-500 ${error
+                                    ? "border-red-500 focus:border-red-500 ring-red-500 placeholder:text-red-300"
+                                    : "border-gray-300 focus:border-blue-500"
+                                }`}
                             placeholder="Ej: Agente de Ventas"
                         />
                     </div>
                 </div>
-                <DialogFooter>
+                <DialogFooter className="sm:justify-center">
                     <Button
                         onClick={handleCreate}
                         disabled={loading}
-                        className="bg-gray-900 text-white hover:bg-gray-800"
+                        className="w-full bg-gray-900 text-white hover:bg-gray-800"
                     >
                         {loading ? "Creando..." : "Crear Agente"}
                     </Button>
