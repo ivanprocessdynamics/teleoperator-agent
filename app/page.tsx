@@ -29,29 +29,30 @@ export default function Home() {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-white bg-[radial-gradient(#e5e7eb_1px,transparent_1px)] [background-size:16px_16px]">
-      <div className="absolute inset-0 bg-white/50 bg-[radial-gradient(circle_at_center,transparent_0%,white_100%)] pointer-events-none" />
+      {/* Subtle white glow behind the card */}
+      <div className="absolute inset-0 bg-white/40 bg-[radial-gradient(ellipse_at_center,transparent_0%,white_100%)] pointer-events-none" />
 
-      <div className="relative w-full max-w-[400px] p-8 bg-white border border-gray-200 shadow-sm rounded-xl">
-        <div className="flex flex-col items-center space-y-6 text-center">
+      <div className="relative w-full max-w-[420px] p-10 md:p-12 bg-white border border-gray-100 shadow-[0_8px_30px_rgb(0,0,0,0.04)] rounded-2xl">
+        <div className="flex flex-col items-center text-center">
           {/* Logo / Icon */}
-          <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-gray-900 shadow-sm transition-transform hover:scale-105 duration-300">
-            <LayoutDashboard className="h-6 w-6 text-white" />
+          <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-gray-900 shadow-sm transition-transform hover:scale-105 duration-300 mb-8">
+            <LayoutDashboard className="h-7 w-7 text-white" />
           </div>
 
-          <div className="space-y-2">
-            <h1 className="text-xl font-semibold tracking-tight text-gray-900">Bienvenido a VoiceCRM</h1>
-            <p className="text-sm text-gray-500 leading-relaxed">
+          <div className="space-y-3 mb-10">
+            <h1 className="text-2xl font-semibold tracking-tight text-gray-900">Bienvenido a VoiceCRM</h1>
+            <p className="text-sm text-gray-500 leading-relaxed max-w-[280px] mx-auto">
               La plataforma definitiva para gestionar tus agentes de voz con IA.
             </p>
           </div>
 
-          <div className="w-full pt-2">
+          <div className="w-full">
             <Button
               onClick={() => signInWithGoogle()}
-              className="w-full h-10 bg-gray-900 text-white hover:bg-gray-800 transition-all duration-200 hover:shadow-md flex items-center justify-center gap-2 text-sm font-medium"
+              className="w-full h-11 bg-gray-900 text-white hover:bg-gray-800 transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5 flex items-center justify-center gap-3 text-sm font-medium rounded-lg"
               size="default"
             >
-              <svg className="h-4 w-4" viewBox="0 0 24 24">
+              <svg className="h-5 w-5" viewBox="0 0 24 24">
                 <path
                   d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
                   fill="#4285F4"
@@ -71,7 +72,7 @@ export default function Home() {
               </svg>
               Continuar con Google
             </Button>
-            <p className="mt-4 text-[10px] text-gray-400">
+            <p className="mt-5 text-[10px] text-gray-400">
               Al continuar, aceptas nuestros términos y condiciones.
             </p>
           </div>
