@@ -1,0 +1,32 @@
+import { NextResponse } from "next/server";
+import Retell from "retell-sdk";
+
+const retell = new Retell({
+    apiKey: process.env.RETELL_API_KEY || "",
+});
+
+export async function POST(req: Request) {
+    try {
+        const { agent_id } = await req.json();
+
+        if (!process.env.RETELL_API_KEY) {
+            return NextResponse.json(
+                { error: "RETELL_API_KEY not set" },
+                { status: 500 }
+            );
+        }
+
+        // Create a Web Call to get the access token
+        const webCallResponse = await retell.call.createWebCall({
+            agent_id: agent_id,
+        });
+
+        return NextResponse.json(webCallResponse, { status: 200 });
+    } catch (error) {
+        console.error("Error creating web call:", error);
+        return NextResponse.json(
+            { error: "Failed to create web call" },
+            { status: 500 }
+        );
+    }
+}
