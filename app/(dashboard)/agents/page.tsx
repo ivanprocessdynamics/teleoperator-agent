@@ -87,23 +87,23 @@ export default function AgentsPage() {
         <div className="flex flex-col gap-6 relative">
             {/* Custom Delete Confirmation Modal */}
             {deleteDialogOpen && agentToDelete && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-                    <div className="w-full max-w-md scale-100 transform rounded-lg bg-gray-900 p-6 text-white shadow-xl transition-all">
-                        <h3 className="mb-2 text-lg font-semibold">Confirm Deletion</h3>
-                        <p className="mb-6 text-gray-300">
-                            ¿Estás seguro de eliminar <span className="font-bold text-white">{agentToDelete.name}</span>?
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20 backdrop-blur-sm">
+                    <div className="w-full max-w-md scale-100 transform rounded-2xl bg-white p-8 text-gray-900 shadow-2xl transition-all border border-gray-100">
+                        <h3 className="mb-2 text-xl font-bold tracking-tight">Confirmar Eliminación</h3>
+                        <p className="mb-8 text-gray-500 leading-relaxed">
+                            ¿Estás seguro de eliminar <span className="font-bold text-gray-900">{agentToDelete.name}</span>? Esta acción no se puede deshacer.
                         </p>
                         <div className="flex justify-end gap-3">
                             <Button
-                                variant="secondary"
-                                className="bg-gray-700 hover:bg-gray-600 text-white border-0"
+                                variant="outline"
+                                className="border-gray-200 text-gray-700 hover:bg-gray-50 hover:text-gray-900"
                                 onClick={() => setDeleteDialogOpen(false)}
                             >
                                 Cancelar
                             </Button>
                             <Button
                                 variant="destructive"
-                                className="bg-red-600 hover:bg-red-700 text-white"
+                                className="bg-red-600 text-white hover:bg-red-700 shadow-sm"
                                 onClick={confirmDelete}
                             >
                                 Confirmar
@@ -162,11 +162,11 @@ export default function AgentsPage() {
                                     <DropdownMenuContent align="end">
                                         <DropdownMenuItem onClick={(e) => handleDuplicate(e, ws)}>
                                             <Copy className="mr-2 h-4 w-4" />
-                                            Duplicate
+                                            Duplicar
                                         </DropdownMenuItem>
                                         <DropdownMenuItem onClick={(e) => handleDelete(e, ws)} className="text-red-600 focus:text-red-600">
                                             <Trash className="mr-2 h-4 w-4" />
-                                            Delete
+                                            Eliminar
                                         </DropdownMenuItem>
                                     </DropdownMenuContent>
                                 </DropdownMenu>

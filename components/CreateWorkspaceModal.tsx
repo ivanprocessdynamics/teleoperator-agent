@@ -62,34 +62,34 @@ export function CreateWorkspaceModal({ children }: { children?: React.ReactNode 
                 {children || (
                     <Button>
                         <Plus className="mr-2 h-4 w-4" />
-                        New Workspace
+                        Nuevo Agente
                     </Button>
                 )}
             </DialogTrigger>
             <DialogContent className="sm:max-w-[425px]">
                 <DialogHeader>
-                    <DialogTitle>Create Workspace</DialogTitle>
+                    <DialogTitle>Crear Agente</DialogTitle>
                     <DialogDescription>
-                        Create a new workspace to organize your campaigns and agents.
+                        Crea un nuevo agente para gestionar tus campañas.
                     </DialogDescription>
                 </DialogHeader>
                 <div className="grid gap-4 py-4">
                     <div className="grid grid-cols-4 items-center gap-4">
                         <Label htmlFor="name" className="text-right">
-                            Name
+                            Nombre
                         </Label>
                         <Input
                             id="name"
                             value={name}
                             onChange={(e) => setName(e.target.value)}
                             className="col-span-3"
-                            placeholder="My Agency"
+                            placeholder="Ej: Agente de Ventas"
                         />
                     </div>
                 </div>
                 <DialogFooter>
                     <Button onClick={handleCreate} disabled={loading}>
-                        {loading ? "Creating..." : "Create Workspace"}
+                        {loading ? "Creando..." : "Crear Agente"}
                     </Button>
                 </DialogFooter>
             </DialogContent>

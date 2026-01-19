@@ -59,34 +59,34 @@ export function CreateSubworkspaceModal({ workspaceId, children }: CreateSubwork
                 {children || (
                     <Button>
                         <Plus className="mr-2 h-4 w-4" />
-                        New Agent
+                        Nuevo Agente
                     </Button>
                 )}
             </DialogTrigger>
             <DialogContent className="sm:max-w-[425px]">
                 <DialogHeader>
-                    <DialogTitle>Create Agent (Subworkspace)</DialogTitle>
+                    <DialogTitle>Crear Agente (Sub-espacio)</DialogTitle>
                     <DialogDescription>
-                        Create a new agent environment with its own contacts and prompt.
+                        Crea un nuevo entorno de agente con sus propios contactos y prompts.
                     </DialogDescription>
                 </DialogHeader>
                 <div className="grid gap-4 py-4">
                     <div className="grid grid-cols-4 items-center gap-4">
                         <Label htmlFor="name" className="text-right">
-                            Name
+                            Nombre
                         </Label>
                         <Input
                             id="name"
                             value={name}
                             onChange={(e) => setName(e.target.value)}
                             className="col-span-3"
-                            placeholder="Sales Agent 1"
+                            placeholder="Ej: Agente de Soporte"
                         />
                     </div>
                 </div>
                 <DialogFooter>
                     <Button onClick={handleCreate} disabled={loading}>
-                        {loading ? "Creating..." : "Create Agent"}
+                        {loading ? "Creando..." : "Crear Agente"}
                     </Button>
                 </DialogFooter>
             </DialogContent>
