@@ -5,7 +5,7 @@ import { collection, query, where, onSnapshot, addDoc, serverTimestamp, doc, upd
 import { db } from "@/lib/firebase";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Play, Plus, Upload, Phone, AlertCircle } from "lucide-react";
+import { Play, Plus, Upload, Phone, AlertCircle, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface Contact {
@@ -97,40 +97,43 @@ export function ContactsGrid({ subworkspaceId }: ContactsGridProps) {
     return (
         <div className="flex flex-col gap-4">
             <div className="flex items-center justify-between">
-                <h2 className="text-lg font-semibold">Contacts</h2>
+                <div>
+                    <h2 className="text-lg font-semibold text-gray-900">Lista de Contactos</h2>
+                    <p className="text-sm text-gray-500">Gestiona los clientes potenciales para este agente.</p>
+                </div>
                 <div className="flex gap-2">
-                    <Button variant="outline" size="sm">
-                        <Upload className="mr-2 h-4 w-4" /> Import CSV
+                    <Button variant="outline" size="sm" className="bg-white hover:bg-gray-50 text-gray-700 border-gray-200">
+                        <Upload className="mr-2 h-4 w-4" /> Importar CSV
                     </Button>
-                    <Button size="sm" onClick={launchCampaign} className="bg-emerald-600 hover:bg-emerald-700 text-white">
-                        <Play className="mr-2 h-4 w-4" /> Launch Campaign
+                    <Button size="sm" onClick={launchCampaign} className="bg-gray-900 hover:bg-black text-white shadow-sm transition-all hover:scale-105">
+                        <Play className="mr-2 h-4 w-4" /> Lanzar Campaña
                     </Button>
                 </div>
             </div>
 
-            <div className="rounded-md border border-gray-200 overflow-hidden">
+            <div className="rounded-xl border border-gray-200 overflow-hidden bg-white shadow-sm">
                 <table className="w-full text-sm">
-                    <thead className="bg-gray-50 text-left text-gray-500 font-medium">
+                    <thead className="bg-gray-50/50 border-b border-gray-100">
                         <tr>
-                            <th className="px-4 py-3">Name</th>
-                            <th className="px-4 py-3">Phone</th>
-                            <th className="px-4 py-3">Status</th>
-                            <th className="px-4 py-3">Actions</th>
+                            <th className="px-6 py-3 text-left text-xs font-bold text-gray-900 uppercase tracking-wider">Nombre</th>
+                            <th className="px-6 py-3 text-left text-xs font-bold text-gray-900 uppercase tracking-wider">Teléfono</th>
+                            <th className="px-6 py-3 text-left text-xs font-bold text-gray-900 uppercase tracking-wider">Estado</th>
+                            <th className="px-6 py-3 text-right text-xs font-bold text-gray-900 uppercase tracking-wider">Acciones</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
                         {contacts.map((contact) => (
-                            <tr key={contact.id} className="group hover:bg-gray-50/50">
-                                <td className="px-4 py-3 font-medium text-gray-900">{contact.name}</td>
-                                <td className="px-4 py-3 text-gray-500 font-mono">{contact.phone}</td>
-                                <td className="px-4 py-3">
-                                    <span className={cn("px-2 py-1 rounded-full text-xs font-medium border", getStatusColor(contact.status))}>
-                                        {contact.status}
+                            <tr key={contact.id} className="group hover:bg-gray-50/50 transition-colors">
+                                <td className="px-6 py-3 font-medium text-gray-900">{contact.name}</td>
+                                <td className="px-6 py-3 text-gray-500 font-mono">{contact.phone}</td>
+                                <td className="px-6 py-3">
+                                    <span className={cn("px-2.5 py-0.5 rounded-full text-[10px] font-semibold border uppercase tracking-wide", getStatusColor(contact.status))}>
+                                        {contact.status.replace('_', ' ')}
                                     </span>
                                 </td>
-                                <td className="px-4 py-3">
-                                    <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100">
-                                        <Phone className="h-3 w-3 text-gray-400" />
+                                <td className="px-6 py-3 text-right">
+                                    <Button variant="ghost" size="icon" className="h-8 w-8 opacity-0 group-hover:opacity-100 hover:bg-gray-100 text-gray-400 hover:text-gray-900 transition-all">
+                                        <Phone className="h-3.5 w-3.5" />
                                     </Button>
                                 </td>
                             </tr>
@@ -138,31 +141,31 @@ export function ContactsGrid({ subworkspaceId }: ContactsGridProps) {
 
                         {/* Add Row */}
                         <tr className="bg-gray-50/30">
-                            <td className="px-4 py-2">
+                            <td className="px-6 py-2">
                                 <Input
-                                    placeholder="New Name"
-                                    className="h-8 border-transparent bg-transparent hover:bg-white focus:bg-white focus:border-input transition-all"
+                                    placeholder="Nombre nuevo..."
+                                    className="h-9 border-transparent bg-transparent hover:bg-white focus:bg-white focus:border-gray-200 focus:ring-0 transition-all placeholder:text-gray-600 font-medium text-gray-900"
                                     value={newName}
                                     onChange={e => setNewName(e.target.value)}
                                 />
                             </td>
-                            <td className="px-4 py-2">
+                            <td className="px-6 py-2">
                                 <Input
-                                    placeholder="+1..."
-                                    className="h-8 border-transparent bg-transparent hover:bg-white focus:bg-white focus:border-input transition-all font-mono"
+                                    placeholder="+34 600..."
+                                    className="h-9 border-transparent bg-transparent hover:bg-white focus:bg-white focus:border-gray-200 focus:ring-0 transition-all font-mono placeholder:text-gray-600 font-medium text-gray-900"
                                     value={newPhone}
                                     onChange={e => setNewPhone(e.target.value)}
                                 />
                             </td>
-                            <td colSpan={2} className="px-4 py-2">
+                            <td colSpan={2} className="px-6 py-2">
                                 <Button
                                     size="sm"
                                     variant="ghost"
-                                    className="h-8 w-full justify-start text-muted-foreground hover:text-primary"
+                                    className="h-9 w-full justify-start text-gray-700 hover:text-black hover:bg-gray-100 font-medium"
                                     onClick={handleAddContact}
                                     disabled={!newName || !newPhone}
                                 >
-                                    <Plus className="mr-2 h-3 w-3" /> Add Row
+                                    <Plus className="mr-2 h-3.5 w-3.5" /> Añadir Fila
                                 </Button>
                             </td>
                         </tr>
@@ -170,8 +173,12 @@ export function ContactsGrid({ subworkspaceId }: ContactsGridProps) {
                 </table>
 
                 {contacts.length === 0 && !loading && (
-                    <div className="p-8 text-center text-gray-400">
-                        No contacts yet. Add one above or import.
+                    <div className="py-16 text-center">
+                        <div className="h-12 w-12 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                            <Users className="h-6 w-6 text-gray-900" />
+                        </div>
+                        <p className="text-gray-900 font-bold text-lg">No hay contactos todavía</p>
+                        <p className="text-gray-600 mt-1 font-medium">Añade uno manualmente arriba o importa un CSV.</p>
                     </div>
                 )}
             </div>
