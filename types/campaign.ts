@@ -28,4 +28,8 @@ export interface Campaign {
 
     // Prompt Configuration
     prompt_template: string; // "Hola {{nombre}}, tienes una deuda de {{deuda}}"
+
+    // Visual Customization
+    icon?: string;
+    color?: string;
 }

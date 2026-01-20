@@ -1,11 +1,11 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { collection, query, where, orderBy, onSnapshot, addDoc, serverTimestamp, deleteDoc, doc, getDocs, writeBatch } from "firebase/firestore";
+import { collection, query, where, orderBy, onSnapshot, addDoc, serverTimestamp, deleteDoc, doc, getDocs, writeBatch, updateDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { Campaign, CampaignRow } from "@/types/campaign";
 import { Button } from "@/components/ui/button";
-import { Plus, ArrowRight, PlayCircle, FileText, CheckCircle2, MoreVertical, Trash2, Copy } from "lucide-react";
+import { Plus, ArrowRight, PlayCircle, FileText, CheckCircle2, MoreVertical, Trash2, Copy, Phone, Users, Target, Zap, Star, MessageCircle, Mail, Megaphone, Globe } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -21,6 +21,101 @@ interface CampaignListProps {
     onSelectCampaign: (campaignId: string) => void;
 }
 
+const ICONS = [
+    { name: 'FileText', icon: FileText },
+    { name: 'Phone', icon: Phone },
+    { name: 'Users', icon: Users },
+    { name: 'Target', icon: Target },
+    { name: 'Zap', icon: Zap },
+    { name: 'Star', icon: Star },
+    { name: 'MessageCircle', icon: MessageCircle },
+    { name: 'Mail', icon: Mail },
+];
+
+const COLORS = [
+    { name: 'gray', class: 'bg-gray-100 text-gray-600', hover: 'hover:bg-gray-200' },
+    { name: 'blue', class: 'bg-blue-50 text-blue-600', hover: 'hover:bg-blue-100' },
+    { name: 'green', class: 'bg-green-50 text-green-600', hover: 'hover:bg-green-100' },
+    { name: 'yellow', class: 'bg-yellow-50 text-yellow-600', hover: 'hover:bg-yellow-100' },
+    { name: 'red', class: 'bg-red-50 text-red-600', hover: 'hover:bg-red-100' },
+    { name: 'purple', class: 'bg-purple-50 text-purple-600', hover: 'hover:bg-purple-100' },
+    { name: 'pink', class: 'bg-pink-50 text-pink-600', hover: 'hover:bg-pink-100' },
+    { name: 'orange', class: 'bg-orange-50 text-orange-600', hover: 'hover:bg-orange-100' },
+];
+
+function IconVisualSelector({
+    icon,
+    color,
+    onChange
+}: {
+    icon: string;
+    color: string;
+    onChange: (icon: string, color: string) => void;
+}) {
+    const SelectedIcon = ICONS.find(i => i.name === icon)?.icon || FileText;
+    const selectedColorClass = COLORS.find(c => c.name === color)?.class || COLORS[0].class;
+
+    return (
+        <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+                <div
+                    onClick={(e) => e.stopPropagation()}
+                    className={cn(
+                        "flex h-10 w-10 cursor-pointer items-center justify-center rounded-lg transition-transform hover:scale-105 active:scale-95",
+                        selectedColorClass
+                    )}
+                >
+                    <SelectedIcon className="h-5 w-5" />
+                </div>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent className="w-64 p-3 bg-white border-gray-200" align="start">
+                <div className="space-y-4">
+                    <div>
+                        <span className="text-xs font-semibold text-gray-500 uppercase mb-2 block">Icono</span>
+                        <div className="grid grid-cols-4 gap-2">
+                            {ICONS.map((item) => (
+                                <div
+                                    key={item.name}
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        onChange(item.name, color);
+                                    }}
+                                    className={cn(
+                                        "flex items-center justify-center p-2 rounded-md hover:bg-gray-100 cursor-pointer transition-colors",
+                                        icon === item.name && "bg-gray-100 ring-1 ring-gray-900"
+                                    )}
+                                >
+                                    <item.icon className="h-4 w-4 text-gray-700" />
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                    <div>
+                        <span className="text-xs font-semibold text-gray-500 uppercase mb-2 block">Color</span>
+                        <div className="grid grid-cols-4 gap-2">
+                            {COLORS.map((item) => (
+                                <div
+                                    key={item.name}
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        onChange(icon, item.name);
+                                    }}
+                                    className={cn(
+                                        "h-8 w-full rounded-md cursor-pointer border border-transparent hover:scale-105 transition-all flex items-center justify-center",
+                                        item.class,
+                                        color === item.name && "ring-1 ring-offset-1 ring-gray-900 border-gray-300"
+                                    )}
+                                >
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            </DropdownMenuContent>
+        </DropdownMenu>
+    );
+}
+
 function CreateCampaignDialog({
     subworkspaceId,
     onSelectCampaign,
@@ -32,6 +127,8 @@ function CreateCampaignDialog({
 }) {
     const [open, setOpen] = useState(false);
     const [name, setName] = useState("");
+    const [selectedIcon, setSelectedIcon] = useState("FileText");
+    const [selectedColor, setSelectedColor] = useState("gray");
     const [creating, setCreating] = useState(false);
 
     const handleCreate = async () => {
@@ -48,6 +145,8 @@ function CreateCampaignDialog({
             const docRef = await addDoc(collection(db, "campaigns"), {
                 subworkspace_id: subworkspaceId,
                 name: name,
+                icon: selectedIcon,
+                color: selectedColor,
                 status: 'draft',
                 columns: defaultColumns,
                 prompt_template: "",
@@ -57,6 +156,8 @@ function CreateCampaignDialog({
 
             setOpen(false);
             setName("");
+            setSelectedIcon("FileText");
+            setSelectedColor("gray");
             onSelectCampaign(docRef.id);
         } catch (error) {
             console.error("Error creating campaign:", error);
@@ -74,14 +175,25 @@ function CreateCampaignDialog({
                 <DialogHeader>
                     <DialogTitle className="text-gray-900">Crear Nueva Campaña</DialogTitle>
                 </DialogHeader>
-                <div className="py-4">
-                    <Input
-                        value={name}
-                        onChange={(e) => setName(e.target.value)}
-                        onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
-                        className="bg-white border-gray-300 text-gray-900 focus-visible:ring-gray-900"
-                        autoFocus
-                    />
+                <div className="py-4 gap-4 flex flex-col">
+                    <div className="flex gap-3">
+                        <IconVisualSelector
+                            icon={selectedIcon}
+                            color={selectedColor}
+                            onChange={(i, c) => {
+                                setSelectedIcon(i);
+                                setSelectedColor(c);
+                            }}
+                        />
+                        <Input
+                            value={name}
+                            onChange={(e) => setName(e.target.value)}
+                            onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
+                            className="bg-white border-gray-300 text-gray-900 focus-visible:ring-gray-900 flex-1"
+                            autoFocus
+                            placeholder="Nombre de la campaña"
+                        />
+                    </div>
                 </div>
                 <DialogFooter>
                     <Button variant="ghost" onClick={() => setOpen(false)} className="text-gray-700 hover:bg-gray-100 hover:text-gray-900">Cancelar</Button>
@@ -166,6 +278,17 @@ export function CampaignList({ subworkspaceId, onSelectCampaign }: CampaignListP
             console.error("Error deleting campaign:", error);
         } finally {
             setDeleting(false);
+        }
+    };
+
+    const handleUpdateVisuals = async (campaignId: string, icon: string, color: string) => {
+        try {
+            await updateDoc(doc(db, "campaigns", campaignId), {
+                icon,
+                color
+            });
+        } catch (error) {
+            console.error("Error updating visuals:", error);
         }
     };
 
@@ -315,11 +438,11 @@ export function CampaignList({ subworkspaceId, onSelectCampaign }: CampaignListP
                                 <div className="space-y-4">
                                     <div className="flex items-start justify-between">
                                         <div className="flex items-center gap-3">
-                                            <div className={cn("flex h-10 w-10 items-center justify-center rounded-lg bg-gray-50 transition-colors group-hover:bg-gray-100",
-                                                camp.status === 'running' && "bg-blue-50 text-blue-600 group-hover:bg-blue-100"
-                                            )}>
-                                                {getStatusIcon(camp.status)}
-                                            </div>
+                                            <IconVisualSelector
+                                                icon={camp.icon || 'FileText'}
+                                                color={camp.color || 'gray'}
+                                                onChange={(i, c) => handleUpdateVisuals(camp.id, i, c)}
+                                            />
                                             <div>
                                                 <h3 className="font-semibold text-gray-900 line-clamp-1">{camp.name}</h3>
                                                 <span className={cn("inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-gray-100 text-gray-600",
