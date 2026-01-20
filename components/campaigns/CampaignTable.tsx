@@ -55,15 +55,30 @@ const CampaignCell = memo(({
     rowId, colId, initialValue, isSelected, isDragging, onMouseDown, onMouseEnter, onChange, onFocus, onBlur, onPaste
 }: CellProps) => {
     const [value, setValue] = useState(initialValue);
+    const [isFocused, setIsFocused] = useState(false);
 
+    // CRITICAL FIX: Only sync external changes if NOT focused.
+    // This prevents "overwrite" if a snapshot arrives while typing.
     useEffect(() => {
-        setValue(initialValue);
-    }, [initialValue]);
+        if (!isFocused) {
+            setValue(initialValue);
+        }
+    }, [initialValue, isFocused]);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const newVal = e.target.value;
         setValue(newVal);
         onChange(rowId, colId, newVal);
+    };
+
+    const handleFocus = (e: React.FocusEvent) => {
+        setIsFocused(true);
+        onFocus(rowId, colId, value);
+    };
+
+    const handleBlur = (e: React.FocusEvent) => {
+        setIsFocused(false);
+        onBlur(rowId, colId, value);
     };
 
     return (
@@ -82,8 +97,8 @@ const CampaignCell = memo(({
                 )}
                 value={value}
                 onChange={handleChange}
-                onFocus={() => onFocus(rowId, colId, value)}
-                onBlur={() => onBlur(rowId, colId, value)}
+                onFocus={handleFocus}
+                onBlur={handleBlur}
                 onPaste={(e) => onPaste(e, rowId, colId)}
                 style={{ pointerEvents: isDragging ? 'none' : 'auto' }}
             />
@@ -114,10 +129,7 @@ export function CampaignTable({ campaign, onColumnsChange }: CampaignTableProps)
     const saveTimeoutsRef = useRef<{ [key: string]: NodeJS.Timeout }>({});
     const isDraggingRef = useRef(false);
 
-    // History Ref (We use ref for history to avoid re-renders on every undo push, 
-    // though we might want state to enable/disable Undo button in UI if we had one)
     const historyRef = useRef<{ past: HistoryAction[], future: HistoryAction[] }>({ past: [], future: [] });
-    // Temporary storage for cell focus value
     const focusValueRef = useRef<{ rowId: string, colId: string, val: string } | null>(null);
 
     // Sync Refs
@@ -132,8 +144,6 @@ export function CampaignTable({ campaign, onColumnsChange }: CampaignTableProps)
         const q = query(collection(db, "campaign_rows"), where("campaign_id", "==", campaign.id));
         const unsubscribe = onSnapshot(q, (snapshot) => {
             const fetched: CampaignRow[] = [];
-            // We ignore remote updates if we have pending writes? 
-            // Actually, for simplicity, we ingest them. If "Undo" conflicts, it might be weird, but acceptable for now.
             snapshot.forEach((doc) => {
                 fetched.push({ id: doc.id, ...doc.data() } as CampaignRow);
             });
@@ -153,8 +163,7 @@ export function CampaignTable({ campaign, onColumnsChange }: CampaignTableProps)
     const addToHistory = useCallback((action: HistoryAction) => {
         if (action.changes.length === 0) return;
         historyRef.current.past.push(action);
-        historyRef.current.future = []; // Clear redo stack on new action
-        // Optional: limit history size?
+        historyRef.current.future = []; // Clear redo stack
         if (historyRef.current.past.length > 50) historyRef.current.past.shift();
     }, []);
 
@@ -165,31 +174,28 @@ export function CampaignTable({ campaign, onColumnsChange }: CampaignTableProps)
         const action = past.pop();
         if (!action) return;
 
-        historyRef.current.future.push(action); // Move to future
+        historyRef.current.future.push(action);
 
         const batch = writeBatch(db);
         const newRows = [...rowsRef.current];
         let batchCount = 0;
 
         action.changes.forEach(change => {
-            // Find row
             const rIndex = newRows.findIndex(r => r.id === change.rowId);
             if (rIndex === -1) return;
 
-            // Revert value
             const targetRow = newRows[rIndex];
             const newDataMap = { ...targetRow.data };
             newDataMap[change.colId] = change.oldValue;
             newRows[rIndex] = { ...targetRow, data: newDataMap };
 
-            // Queue DB update
             const rowRef = doc(db, "campaign_rows", change.rowId);
             batch.update(rowRef, { [`data.${change.colId}`]: change.oldValue });
             batchCount++;
         });
 
         if (batchCount > 0) {
-            setRows(newRows); // Optimistic
+            setRows(newRows);
             await batch.commit();
         }
     }, []);
@@ -201,7 +207,7 @@ export function CampaignTable({ campaign, onColumnsChange }: CampaignTableProps)
         const action = future.pop();
         if (!action) return;
 
-        historyRef.current.past.push(action); // Move back to past
+        historyRef.current.past.push(action);
 
         const batch = writeBatch(db);
         const newRows = [...rowsRef.current];
@@ -265,16 +271,15 @@ export function CampaignTable({ campaign, onColumnsChange }: CampaignTableProps)
 
     // --- Cell Handlers ---
 
-    // 1. Focus: Capture initial value
+    // 1. Focus
     const handleCellFocus = useCallback((rowId: string, colId: string, val: string) => {
         focusValueRef.current = { rowId, colId, val };
     }, []);
 
-    // 2. Blur: Commit to history if changed
+    // 2. Blur
     const handleCellBlur = useCallback((rowId: string, colId: string, val: string) => {
         const prev = focusValueRef.current;
         if (prev && prev.rowId === rowId && prev.colId === colId && prev.val !== val) {
-            // Value changed during this focus session -> Add to history
             addToHistory({
                 type: 'edit',
                 changes: [{ rowId, colId, oldValue: prev.val, newValue: val }]
@@ -283,7 +288,7 @@ export function CampaignTable({ campaign, onColumnsChange }: CampaignTableProps)
         focusValueRef.current = null;
     }, [addToHistory]);
 
-    // 3. Change: Live Typing (Debounced Save)
+    // 3. Change (Input)
     const handleCellChange = useCallback((rowId: string, colId: string, newValue: string) => {
         // Silent Ref Update
         const rowIndex = rowsRef.current.findIndex(r => r.id === rowId);
@@ -292,7 +297,7 @@ export function CampaignTable({ campaign, onColumnsChange }: CampaignTableProps)
             rowsRef.current[rowIndex].data[colId] = newValue;
         }
 
-        // Debounced Firestore Save
+        // Debounced Save
         const timeoutKey = `${rowId}-${colId}`;
         if (saveTimeoutsRef.current[timeoutKey]) clearTimeout(saveTimeoutsRef.current[timeoutKey]);
 
@@ -301,7 +306,7 @@ export function CampaignTable({ campaign, onColumnsChange }: CampaignTableProps)
             await updateDoc(rowRef, { [`data.${colId}`]: newValue });
             delete saveTimeoutsRef.current[timeoutKey];
         }, 1000);
-    }, []); // We don't push to history here, we do it on Blur
+    }, []);
 
 
     // --- Paste Logic ---
@@ -359,7 +364,8 @@ export function CampaignTable({ campaign, onColumnsChange }: CampaignTableProps)
                 addToHistory({ type: 'paste', changes: historyChanges });
             }
         }
-    }, [addToHistory]); // getCoordinates is stable via wrapping? Wait, need to fix deps.
+    }, [addToHistory]); // getCoordinates needs to be stable or used via ref?
+    // Note: getCoordinates defined below uses Callback. 
 
     // Helper functions
     const getCoordinates = useCallback((rowId: string, colId: string) => {
@@ -414,14 +420,12 @@ export function CampaignTable({ campaign, onColumnsChange }: CampaignTableProps)
         const handleKeyDown = async (e: KeyboardEvent) => {
             const sel = selectionRef.current;
 
-            // CTRL+Z (Undo)
+            // CTRL+Z / Y
             if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !e.shiftKey) {
                 e.preventDefault();
                 await performUndo();
                 return;
             }
-
-            // CTRL+Y or CTRL+SHIFT+Z (Redo)
             if (
                 ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') ||
                 ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'z')
@@ -450,6 +454,11 @@ export function CampaignTable({ campaign, onColumnsChange }: CampaignTableProps)
             // Backspace / Delete
             if (sel && (e.key === 'Backspace' || e.key === 'Delete')) {
                 const isMulti = sel.startRowId !== sel.endRowId || sel.startColId !== sel.endColId;
+                // If single selection AND active element is not the input (somehow)
+                // But usually with single selection, focus is in input.
+                // We should only clear IF we are strictly in "Navigation Mode" (Cell selected but not Editing).
+                // But we don't have separate modes. 
+                // So default to: If Multiselect -> Clear. If Single -> Default (Delete char).
                 if (isMulti) {
                     e.preventDefault();
 
@@ -491,7 +500,7 @@ export function CampaignTable({ campaign, onColumnsChange }: CampaignTableProps)
                 }
             }
 
-            // Ctrl+C
+            // Ctrl+C already covered in previous logical block or browser default
             if ((e.ctrlKey || e.metaKey) && e.key === 'c') {
                 if (!sel) return;
                 const isMulti = sel.startRowId !== sel.endRowId || sel.startColId !== sel.endColId;
