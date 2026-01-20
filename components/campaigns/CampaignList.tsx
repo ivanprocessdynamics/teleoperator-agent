@@ -30,7 +30,7 @@ export function CampaignList({ subworkspaceId, onSelectCampaign }: CampaignListP
 
     // Delete confirmation dialog state
     const [isDeleteOpen, setIsDeleteOpen] = useState(false);
-    const [campaignToDelete, setCampaignToDelete] = useState<string | null>(null);
+    const [campaignToDelete, setCampaignToDelete] = useState<Campaign | null>(null);
     const [deleting, setDeleting] = useState(false);
 
     useEffect(() => {
@@ -96,9 +96,9 @@ export function CampaignList({ subworkspaceId, onSelectCampaign }: CampaignListP
         }
     };
 
-    const openDeleteConfirmation = (e: React.MouseEvent, campaignId: string) => {
+    const openDeleteConfirmation = (e: React.MouseEvent, campaign: Campaign) => {
         e.stopPropagation(); // Prevent card click
-        setCampaignToDelete(campaignId);
+        setCampaignToDelete(campaign);
         setIsDeleteOpen(true);
     };
 
@@ -108,7 +108,7 @@ export function CampaignList({ subworkspaceId, onSelectCampaign }: CampaignListP
 
         try {
             // 1. Delete rows (batch)
-            const rowsQ = query(collection(db, "campaign_rows"), where("campaign_id", "==", campaignToDelete));
+            const rowsQ = query(collection(db, "campaign_rows"), where("campaign_id", "==", campaignToDelete.id));
             const rowsSnap = await getDocs(rowsQ);
 
             const batch = writeBatch(db);
@@ -117,7 +117,7 @@ export function CampaignList({ subworkspaceId, onSelectCampaign }: CampaignListP
             });
 
             // 2. Delete campaign
-            batch.delete(doc(db, "campaigns", campaignToDelete));
+            batch.delete(doc(db, "campaigns", campaignToDelete.id));
 
             await batch.commit();
             setIsDeleteOpen(false);
@@ -292,7 +292,7 @@ export function CampaignList({ subworkspaceId, onSelectCampaign }: CampaignListP
                                                 <DropdownMenuItem onClick={(e) => handleDuplicateCampaign(e, camp)}>
                                                     <Copy className="mr-2 h-4 w-4" /> Duplicar
                                                 </DropdownMenuItem>
-                                                <DropdownMenuItem onClick={(e) => openDeleteConfirmation(e, camp.id)} className="text-red-600 focus:text-red-600">
+                                                <DropdownMenuItem onClick={(e) => openDeleteConfirmation(e, camp)} className="text-red-600 focus:text-red-600">
                                                     <Trash2 className="mr-2 h-4 w-4" /> Eliminar
                                                 </DropdownMenuItem>
                                             </DropdownMenuContent>
@@ -319,12 +319,12 @@ export function CampaignList({ subworkspaceId, onSelectCampaign }: CampaignListP
             <Dialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>
                 <DialogContent className="bg-white text-gray-900 border-gray-200 sm:max-w-[425px]">
                     <DialogHeader>
-                        <DialogTitle className="text-gray-900">Eliminar Campaña</DialogTitle>
-                        <DialogDescription className="text-gray-500">
-                            ¿Estás seguro de que quieres eliminar esta campaña? Se borrarán todos los datos asociados. Esta acción no se puede deshacer.
+                        <DialogTitle className="text-gray-900">Confirmar Eliminación</DialogTitle>
+                        <DialogDescription className="text-gray-500 pt-2">
+                            ¿Estás seguro de eliminar <span className="font-bold text-gray-900">{campaignToDelete?.name}</span>? Esta acción no se puede deshacer.
                         </DialogDescription>
                     </DialogHeader>
-                    <DialogFooter className="gap-2 sm:gap-0">
+                    <DialogFooter className="gap-2 sm:gap-0 mt-4">
                         <Button
                             variant="outline"
                             onClick={() => setIsDeleteOpen(false)}
@@ -335,9 +335,9 @@ export function CampaignList({ subworkspaceId, onSelectCampaign }: CampaignListP
                         <Button
                             onClick={handleDeleteCampaign}
                             disabled={deleting}
-                            className="bg-red-600 text-white hover:bg-red-700"
+                            className="bg-red-600 text-white hover:bg-red-700 hover:scale-105 transition-all"
                         >
-                            {deleting ? "Eliminando..." : "Eliminar"}
+                            {deleting ? "Eliminando..." : "Confirmar"}
                         </Button>
                     </DialogFooter>
                 </DialogContent>
