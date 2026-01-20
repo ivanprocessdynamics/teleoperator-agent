@@ -33,10 +33,10 @@ export default function SubworkspacePage() {
             {!selectedCampaignId && (
                 <div className="flex flex-col gap-2">
                     <Link
-                        href="/dashboard"
+                        href="/workspaces"
                         className="text-sm text-gray-500 hover:text-gray-900 transition-colors flex items-center gap-2 w-fit px-2 py-1 -ml-2 rounded-md hover:bg-gray-100"
                     >
-                        ←&nbsp; Volver al Dashboard
+                        ←&nbsp; Volver a Workspaces
                     </Link>
                     <div className="flex items-center justify-between">
                         <h1 className="text-3xl font-bold tracking-tight text-gray-900">
