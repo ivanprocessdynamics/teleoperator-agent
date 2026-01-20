@@ -86,8 +86,8 @@ const CampaignCell = memo(({
     return (
         <td
             className={cn(
-                "border-r border-b border-gray-200 p-0 relative cursor-cell",
-                isSelected && "bg-blue-100"
+                "border-r border-b border-gray-300 p-0 relative cursor-cell",
+                isSelected && "bg-blue-50/70"
             )}
             onMouseDown={() => onMouseDown(rowId, colId)}
             onMouseEnter={() => onMouseEnter(rowId, colId)}
@@ -139,12 +139,79 @@ export function CampaignTable({ campaign, onColumnsChange }: CampaignTableProps)
     const selectionRef = useRef<SelectionRange | null>(null);
     const isDraggingRef = useRef(false);
     const historyRef = useRef<{ past: HistoryAction[], future: HistoryAction[] }>({ past: [], future: [] });
+    const tableContainerRef = useRef<HTMLDivElement>(null);
+    const mousePositionRef = useRef<{ x: number, y: number }>({ x: 0, y: 0 });
+    const autoScrollRef = useRef<number | null>(null);
 
     // Sync Refs
     useEffect(() => { rowsRef.current = rows; }, [rows]);
     useEffect(() => { colsRef.current = campaign.columns; }, [campaign.columns]);
     useEffect(() => { selectionRef.current = selection; }, [selection]);
     useEffect(() => { isDraggingRef.current = isDragging; }, [isDragging]);
+
+    // -------------------- AUTO-SCROLL ON DRAG --------------------
+    useEffect(() => {
+        const handleMouseMove = (e: MouseEvent) => {
+            mousePositionRef.current = { x: e.clientX, y: e.clientY };
+        };
+        window.addEventListener('mousemove', handleMouseMove);
+        return () => window.removeEventListener('mousemove', handleMouseMove);
+    }, []);
+
+    useEffect(() => {
+        if (!isDragging) {
+            if (autoScrollRef.current) {
+                cancelAnimationFrame(autoScrollRef.current);
+                autoScrollRef.current = null;
+            }
+            return;
+        }
+
+        const EDGE_THRESHOLD = 50; // pixels from edge to start scrolling
+        const MAX_SPEED = 20; // max pixels per frame
+
+        const autoScroll = () => {
+            const container = tableContainerRef.current;
+            if (!container || !isDraggingRef.current) return;
+
+            const rect = container.getBoundingClientRect();
+            const { x, y } = mousePositionRef.current;
+
+            let scrollX = 0;
+            let scrollY = 0;
+
+            // Calculate scroll speed based on distance from edge
+            if (y < rect.top + EDGE_THRESHOLD) {
+                const distance = rect.top + EDGE_THRESHOLD - y;
+                scrollY = -Math.min(MAX_SPEED, distance * 0.5);
+            } else if (y > rect.bottom - EDGE_THRESHOLD) {
+                const distance = y - (rect.bottom - EDGE_THRESHOLD);
+                scrollY = Math.min(MAX_SPEED, distance * 0.5);
+            }
+
+            if (x < rect.left + EDGE_THRESHOLD) {
+                const distance = rect.left + EDGE_THRESHOLD - x;
+                scrollX = -Math.min(MAX_SPEED, distance * 0.5);
+            } else if (x > rect.right - EDGE_THRESHOLD) {
+                const distance = x - (rect.right - EDGE_THRESHOLD);
+                scrollX = Math.min(MAX_SPEED, distance * 0.5);
+            }
+
+            if (scrollX !== 0 || scrollY !== 0) {
+                container.scrollBy(scrollX, scrollY);
+            }
+
+            autoScrollRef.current = requestAnimationFrame(autoScroll);
+        };
+
+        autoScrollRef.current = requestAnimationFrame(autoScroll);
+
+        return () => {
+            if (autoScrollRef.current) {
+                cancelAnimationFrame(autoScrollRef.current);
+            }
+        };
+    }, [isDragging]);
 
     // -------------------- DATA FETCHING --------------------
     useEffect(() => {
@@ -524,7 +591,7 @@ export function CampaignTable({ campaign, onColumnsChange }: CampaignTableProps)
             </div>
 
             {/* Table */}
-            <div className="flex-1 overflow-auto relative">
+            <div ref={tableContainerRef} className="flex-1 overflow-auto relative">
                 <table className="w-full text-sm border-collapse table-fixed">
                     <thead className="bg-gray-50 z-10 sticky top-0">
                         <tr>
