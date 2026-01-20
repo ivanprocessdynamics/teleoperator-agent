@@ -58,13 +58,13 @@ export default function SubworkspacePage() {
                     <TabsList className="grid w-full max-w-[400px] grid-cols-2 bg-gray-100 p-1 rounded-lg">
                         <TabsTrigger
                             value="contacts"
-                            className="gap-2 data-[state=active]:bg-white data-[state=active]:text-gray-900 data-[state=active]:shadow-sm transition-all"
+                            className="gap-2 text-gray-900 data-[state=active]:bg-white data-[state=active]:text-gray-900 data-[state=active]:shadow-sm transition-all"
                         >
                             <Users className="h-4 w-4" /> Campañas
                         </TabsTrigger>
                         <TabsTrigger
                             value="test"
-                            className="gap-2 data-[state=active]:bg-white data-[state=active]:text-gray-900 data-[state=active]:shadow-sm transition-all"
+                            className="gap-2 text-gray-900 data-[state=active]:bg-white data-[state=active]:text-gray-900 data-[state=active]:shadow-sm transition-all"
                         >
                             <Mic className="h-4 w-4" /> Configuración (Próximamente)
                         </TabsTrigger>
