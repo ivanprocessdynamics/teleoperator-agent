@@ -366,21 +366,20 @@ export function CampaignTable({ campaign, onColumnsChange }: CampaignTableProps)
 
 
     // -------------------- KEYBOARD SHORTCUTS (with Sticky Ctrl) --------------------
-    // Track Ctrl key state with grace period for Excel-like tolerance
-    const ctrlActiveRef = useRef(false);
-    const ctrlTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-    const CTRL_GRACE_PERIOD = 300; // ms
+    // Track when Ctrl was last pressed for Excel-like timing tolerance
+    const ctrlPressedAtRef = useRef<number>(0);
+    const CTRL_GRACE_PERIOD = 500; // ms - increased for better tolerance
 
     useEffect(() => {
         const handleKeyDown = async (e: KeyboardEvent) => {
-            // Track Ctrl press
+            // Track Ctrl press timestamp
             if (e.key === 'Control' || e.key === 'Meta') {
-                ctrlActiveRef.current = true;
-                if (ctrlTimeoutRef.current) clearTimeout(ctrlTimeoutRef.current);
+                ctrlPressedAtRef.current = Date.now();
             }
 
-            // Check if Ctrl is active (either held now OR within grace period)
-            const isCtrlActive = e.ctrlKey || e.metaKey || ctrlActiveRef.current;
+            // Check if Ctrl is active: currently held OR was pressed within grace period
+            const ctrlWasRecentlyPressed = (Date.now() - ctrlPressedAtRef.current) < CTRL_GRACE_PERIOD;
+            const isCtrlActive = e.ctrlKey || e.metaKey || ctrlWasRecentlyPressed;
 
             const sel = selectionRef.current;
 
@@ -477,22 +476,9 @@ export function CampaignTable({ campaign, onColumnsChange }: CampaignTableProps)
             }
         };
 
-        // Handle Ctrl key release - start grace period
-        const handleKeyUp = (e: KeyboardEvent) => {
-            if (e.key === 'Control' || e.key === 'Meta') {
-                // Start grace period timeout
-                ctrlTimeoutRef.current = setTimeout(() => {
-                    ctrlActiveRef.current = false;
-                }, CTRL_GRACE_PERIOD);
-            }
-        };
-
         window.addEventListener('keydown', handleKeyDown);
-        window.addEventListener('keyup', handleKeyUp);
         return () => {
             window.removeEventListener('keydown', handleKeyDown);
-            window.removeEventListener('keyup', handleKeyUp);
-            if (ctrlTimeoutRef.current) clearTimeout(ctrlTimeoutRef.current);
         };
     }, [getRange, performUndo, performRedo, addToHistory]);
 
