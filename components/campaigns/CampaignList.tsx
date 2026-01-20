@@ -246,16 +246,15 @@ export function CampaignList({ subworkspaceId, onSelectCampaign }: CampaignListP
                             </DialogHeader>
                             <div className="py-4">
                                 <Input
-                                    placeholder="Nombre de la campaña (ej. Ventas Enero)"
                                     value={newCampaignName}
                                     onChange={(e) => setNewCampaignName(e.target.value)}
                                     onKeyDown={(e) => e.key === 'Enter' && handleCreateCampaign()}
-                                    className="bg-white border-gray-200 text-gray-900 placeholder:text-gray-500 focus-visible:ring-gray-900"
+                                    className="bg-white border-gray-300 text-gray-900 focus-visible:ring-gray-900"
                                 />
                             </div>
                             <DialogFooter>
-                                <Button variant="outline" onClick={() => setIsCreateOpen(false)} className="border-gray-200 text-gray-700 hover:bg-gray-50 hover:text-gray-900">Cancelar</Button>
-                                <Button onClick={handleCreateCampaign} disabled={!newCampaignName.trim() || creating} className="bg-gray-900 text-white hover:bg-black">
+                                <Button variant="ghost" onClick={() => setIsCreateOpen(false)} className="text-gray-700 hover:bg-gray-100 hover:text-gray-900">Cancelar</Button>
+                                <Button onClick={handleCreateCampaign} disabled={!newCampaignName.trim() || creating} className="bg-gray-900 text-white hover:bg-gray-700">
                                     {creating ? "Creando..." : "Crear"}
                                 </Button>
                             </DialogFooter>
