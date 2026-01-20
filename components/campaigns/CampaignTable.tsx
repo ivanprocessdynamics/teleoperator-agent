@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, memo, useCallback } from "react";
+import { useState, useEffect, useRef, memo, useCallback, useMemo } from "react";
 import { Campaign, CampaignColumn, CampaignRow } from "@/types/campaign";
 import { Button } from "@/components/ui/button";
 import { Plus, Trash2, MoreHorizontal, ArrowDown } from "lucide-react";
@@ -86,22 +86,28 @@ const CampaignCell = memo(({
     return (
         <td
             className={cn(
-                "border-r border-gray-100 p-0 relative cursor-cell",
-                isSelected && "bg-blue-50 ring-1 ring-inset ring-blue-500 z-10"
+                "border-r border-b border-gray-200 p-0 relative cursor-cell",
+                isSelected && "bg-blue-100"
             )}
             onMouseDown={() => onMouseDown(rowId, colId)}
             onMouseEnter={() => onMouseEnter(rowId, colId)}
         >
             <input
                 className={cn(
-                    "w-full h-full px-3 py-2.5 border-none outline-none bg-transparent text-gray-900 text-sm",
-                    isSelected && "bg-transparent text-blue-900 font-medium"
+                    "w-full h-full px-2 py-2 border-none outline-none bg-transparent text-gray-900 text-sm",
+                    isSelected && "bg-transparent"
                 )}
                 value={localValue}
                 onChange={handleChange}
                 onFocus={handleFocus}
                 onBlur={handleBlur}
                 onPaste={(e) => onPaste(e, rowId, colId)}
+                onKeyDown={(e) => {
+                    // Let Ctrl+A propagate to window handler for select-all
+                    if ((e.ctrlKey || e.metaKey) && e.key === 'a') {
+                        e.preventDefault();
+                    }
+                }}
                 style={{ pointerEvents: isDragging ? 'none' : 'auto' }}
             />
         </td>
@@ -346,23 +352,38 @@ export function CampaignTable({ campaign, onColumnsChange }: CampaignTableProps)
         };
     }, []);
 
-    const isSelected = useCallback((rowId: string, colId: string) => {
-        if (!selection) return false;
+    // Precompute selected cell IDs as a Set for O(1) lookups (performance optimization)
+    const selectedCellIds = useMemo(() => {
+        const set = new Set<string>();
+        if (!selection) return set;
 
-        // Single cell selection
-        if (selection.startRowId === selection.endRowId && selection.startColId === selection.endColId) {
-            return rowId === selection.startRowId && colId === selection.startColId;
+        const r1 = rows.findIndex(r => r.id === selection.startRowId);
+        const r2 = rows.findIndex(r => r.id === selection.endRowId);
+        const c1 = campaign.columns.findIndex(c => c.id === selection.startColId);
+        const c2 = campaign.columns.findIndex(c => c.id === selection.endColId);
+
+        if (r1 === -1 || r2 === -1 || c1 === -1 || c2 === -1) return set;
+
+        const minRow = Math.min(r1, r2);
+        const maxRow = Math.max(r1, r2);
+        const minCol = Math.min(c1, c2);
+        const maxCol = Math.max(c1, c2);
+
+        for (let i = minRow; i <= maxRow; i++) {
+            for (let j = minCol; j <= maxCol; j++) {
+                const rowId = rows[i]?.id;
+                const colId = campaign.columns[j]?.id;
+                if (rowId && colId) {
+                    set.add(`${rowId}-${colId}`);
+                }
+            }
         }
+        return set;
+    }, [selection, rows, campaign.columns]);
 
-        const range = getRange();
-        if (!range) return false;
-
-        const rowIndex = rowsRef.current.findIndex(r => r.id === rowId);
-        const colIndex = colsRef.current.findIndex(c => c.id === colId);
-
-        return rowIndex >= range.minRow && rowIndex <= range.maxRow &&
-            colIndex >= range.minCol && colIndex <= range.maxCol;
-    }, [selection, getRange]);
+    const isSelected = useCallback((rowId: string, colId: string) => {
+        return selectedCellIds.has(`${rowId}-${colId}`);
+    }, [selectedCellIds]);
 
 
     // -------------------- KEYBOARD SHORTCUTS (with Sticky Ctrl) --------------------
