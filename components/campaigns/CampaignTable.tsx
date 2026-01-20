@@ -8,7 +8,7 @@ import {
     DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { db } from "@/lib/firebase";
-import { collection, query, where, onSnapshot, doc, updateDoc, writeBatch, deleteDoc } from "firebase/firestore";
+import { collection, query, where, onSnapshot, doc, updateDoc, writeBatch, deleteDoc, setDoc } from "firebase/firestore";
 import { cn } from "@/lib/utils";
 
 interface CampaignTableProps {
@@ -23,6 +23,19 @@ interface SelectionRange {
     endColId: string;
 }
 
+// --- HISTORY TYPES ---
+type CellChange = {
+    rowId: string;
+    colId: string;
+    oldValue: string;
+    newValue: string;
+};
+
+type HistoryAction = {
+    type: 'edit' | 'batch_edit' | 'clear' | 'paste';
+    changes: CellChange[];
+};
+
 // --- OPTIMIZED CELL COMPONENT ---
 interface CellProps {
     rowId: string;
@@ -33,16 +46,16 @@ interface CellProps {
     onMouseDown: (rowId: string, colId: string) => void;
     onMouseEnter: (rowId: string, colId: string) => void;
     onChange: (rowId: string, colId: string, val: string) => void;
+    onFocus: (rowId: string, colId: string, val: string) => void;
+    onBlur: (rowId: string, colId: string, val: string) => void;
     onPaste: (e: React.ClipboardEvent, rowId: string, colId: string) => void;
 }
 
 const CampaignCell = memo(({
-    rowId, colId, initialValue, isSelected, isDragging, onMouseDown, onMouseEnter, onChange, onPaste
+    rowId, colId, initialValue, isSelected, isDragging, onMouseDown, onMouseEnter, onChange, onFocus, onBlur, onPaste
 }: CellProps) => {
     const [value, setValue] = useState(initialValue);
 
-    // Sync with external changes (e.g. from Batch Paste or Firestore fetch)
-    // We strictly sync if initialValue changes. 
     useEffect(() => {
         setValue(initialValue);
     }, [initialValue]);
@@ -69,6 +82,8 @@ const CampaignCell = memo(({
                 )}
                 value={value}
                 onChange={handleChange}
+                onFocus={() => onFocus(rowId, colId, value)}
+                onBlur={() => onBlur(rowId, colId, value)}
                 onPaste={(e) => onPaste(e, rowId, colId)}
                 style={{ pointerEvents: isDragging ? 'none' : 'auto' }}
             />
@@ -79,8 +94,6 @@ const CampaignCell = memo(({
         prev.initialValue === next.initialValue &&
         prev.isSelected === next.isSelected &&
         prev.isDragging === next.isDragging &&
-        // Important: check function and string identity. 
-        // With useCallback in parent, these functions will be stable.
         prev.rowId === next.rowId &&
         prev.colId === next.colId
     );
@@ -99,11 +112,19 @@ export function CampaignTable({ campaign, onColumnsChange }: CampaignTableProps)
     const colsRef = useRef<CampaignColumn[]>([]);
     const selectionRef = useRef<SelectionRange | null>(null);
     const saveTimeoutsRef = useRef<{ [key: string]: NodeJS.Timeout }>({});
+    const isDraggingRef = useRef(false);
+
+    // History Ref (We use ref for history to avoid re-renders on every undo push, 
+    // though we might want state to enable/disable Undo button in UI if we had one)
+    const historyRef = useRef<{ past: HistoryAction[], future: HistoryAction[] }>({ past: [], future: [] });
+    // Temporary storage for cell focus value
+    const focusValueRef = useRef<{ rowId: string, colId: string, val: string } | null>(null);
 
     // Sync Refs
     useEffect(() => { rowsRef.current = rows; }, [rows]);
     useEffect(() => { colsRef.current = campaign.columns; }, [campaign.columns]);
     useEffect(() => { selectionRef.current = selection; }, [selection]);
+    useEffect(() => { isDraggingRef.current = isDragging; }, [isDragging]);
 
     // Fetch Rows
     useEffect(() => {
@@ -111,6 +132,8 @@ export function CampaignTable({ campaign, onColumnsChange }: CampaignTableProps)
         const q = query(collection(db, "campaign_rows"), where("campaign_id", "==", campaign.id));
         const unsubscribe = onSnapshot(q, (snapshot) => {
             const fetched: CampaignRow[] = [];
+            // We ignore remote updates if we have pending writes? 
+            // Actually, for simplicity, we ingest them. If "Undo" conflicts, it might be weird, but acceptable for now.
             snapshot.forEach((doc) => {
                 fetched.push({ id: doc.id, ...doc.data() } as CampaignRow);
             });
@@ -121,38 +144,97 @@ export function CampaignTable({ campaign, onColumnsChange }: CampaignTableProps)
         return () => unsubscribe();
     }, [campaign.id]);
 
-    // Init rows
     useEffect(() => {
-        if (!loading && rows.length === 0) {
-            handleBatchAddRows(100);
-        }
+        if (!loading && rows.length === 0) handleBatchAddRows(100);
     }, [loading]);
 
-    // Helpers
-    const getCoordinates = useCallback((rowId: string, colId: string) => {
-        // Accessing ref instead of state to avoid dependency on 'rows' in callbacks
-        const rowIndex = rowsRef.current.findIndex(r => r.id === rowId);
-        const colIndex = colsRef.current.findIndex(c => c.id === colId);
-        return { rowIndex, colIndex };
+
+    // --- HISTORY MANAGEMENT ---
+    const addToHistory = useCallback((action: HistoryAction) => {
+        if (action.changes.length === 0) return;
+        historyRef.current.past.push(action);
+        historyRef.current.future = []; // Clear redo stack on new action
+        // Optional: limit history size?
+        if (historyRef.current.past.length > 50) historyRef.current.past.shift();
     }, []);
 
-    const getRange = useCallback(() => {
-        const sel = selectionRef.current;
-        if (!sel) return null;
-        const start = getCoordinates(sel.startRowId, sel.startColId);
-        const end = getCoordinates(sel.endRowId, sel.endColId);
-        // Check if IDs are valid
-        if (start.rowIndex === -1 || end.rowIndex === -1) return null;
+    const performUndo = useCallback(async () => {
+        const past = historyRef.current.past;
+        if (past.length === 0) return;
 
-        return {
-            minRow: Math.min(start.rowIndex, end.rowIndex),
-            maxRow: Math.max(start.rowIndex, end.rowIndex),
-            minCol: Math.min(start.colIndex, end.colIndex),
-            maxCol: Math.max(start.colIndex, end.colIndex),
-        };
-    }, [getCoordinates]);
+        const action = past.pop();
+        if (!action) return;
+
+        historyRef.current.future.push(action); // Move to future
+
+        const batch = writeBatch(db);
+        const newRows = [...rowsRef.current];
+        let batchCount = 0;
+
+        action.changes.forEach(change => {
+            // Find row
+            const rIndex = newRows.findIndex(r => r.id === change.rowId);
+            if (rIndex === -1) return;
+
+            // Revert value
+            const targetRow = newRows[rIndex];
+            const newDataMap = { ...targetRow.data };
+            newDataMap[change.colId] = change.oldValue;
+            newRows[rIndex] = { ...targetRow, data: newDataMap };
+
+            // Queue DB update
+            const rowRef = doc(db, "campaign_rows", change.rowId);
+            batch.update(rowRef, { [`data.${change.colId}`]: change.oldValue });
+            batchCount++;
+        });
+
+        if (batchCount > 0) {
+            setRows(newRows); // Optimistic
+            await batch.commit();
+        }
+    }, []);
+
+    const performRedo = useCallback(async () => {
+        const future = historyRef.current.future;
+        if (future.length === 0) return;
+
+        const action = future.pop();
+        if (!action) return;
+
+        historyRef.current.past.push(action); // Move back to past
+
+        const batch = writeBatch(db);
+        const newRows = [...rowsRef.current];
+        let batchCount = 0;
+
+        action.changes.forEach(change => {
+            const rIndex = newRows.findIndex(r => r.id === change.rowId);
+            if (rIndex === -1) return;
+
+            const targetRow = newRows[rIndex];
+            const newDataMap = { ...targetRow.data };
+            newDataMap[change.colId] = change.newValue;
+            newRows[rIndex] = { ...targetRow, data: newDataMap };
+
+            const rowRef = doc(db, "campaign_rows", change.rowId);
+            batch.update(rowRef, { [`data.${change.colId}`]: change.newValue });
+            batchCount++;
+        });
+
+        if (batchCount > 0) {
+            setRows(newRows);
+            await batch.commit();
+        }
+    }, []);
+
 
     // --- Actions ---
+    const addColumn = () => {
+        const newColId = `col_${Date.now()}`;
+        const newCols = [...campaign.columns, { id: newColId, key: newColId, label: "Nueva Variable" }];
+        onColumnsChange(newCols);
+    };
+
     const updateColumnLabel = (colId: string, newLabel: string) => {
         const newCols = campaign.columns.map(c => {
             if (c.id === colId) {
@@ -161,12 +243,6 @@ export function CampaignTable({ campaign, onColumnsChange }: CampaignTableProps)
             }
             return c;
         });
-        onColumnsChange(newCols);
-    };
-
-    const addColumn = () => {
-        const newColId = `col_${Date.now()}`;
-        const newCols = [...campaign.columns, { id: newColId, key: newColId, label: "Nueva Variable" }];
         onColumnsChange(newCols);
     };
 
@@ -187,10 +263,36 @@ export function CampaignTable({ campaign, onColumnsChange }: CampaignTableProps)
         await batch.commit();
     };
 
-    // --- Optimization Fix: useCallback handlers ---
+    // --- Cell Handlers ---
 
+    // 1. Focus: Capture initial value
+    const handleCellFocus = useCallback((rowId: string, colId: string, val: string) => {
+        focusValueRef.current = { rowId, colId, val };
+    }, []);
+
+    // 2. Blur: Commit to history if changed
+    const handleCellBlur = useCallback((rowId: string, colId: string, val: string) => {
+        const prev = focusValueRef.current;
+        if (prev && prev.rowId === rowId && prev.colId === colId && prev.val !== val) {
+            // Value changed during this focus session -> Add to history
+            addToHistory({
+                type: 'edit',
+                changes: [{ rowId, colId, oldValue: prev.val, newValue: val }]
+            });
+        }
+        focusValueRef.current = null;
+    }, [addToHistory]);
+
+    // 3. Change: Live Typing (Debounced Save)
     const handleCellChange = useCallback((rowId: string, colId: string, newValue: string) => {
-        // Debounced Save
+        // Silent Ref Update
+        const rowIndex = rowsRef.current.findIndex(r => r.id === rowId);
+        if (rowIndex !== -1) {
+            if (!rowsRef.current[rowIndex].data) rowsRef.current[rowIndex].data = {};
+            rowsRef.current[rowIndex].data[colId] = newValue;
+        }
+
+        // Debounced Firestore Save
         const timeoutKey = `${rowId}-${colId}`;
         if (saveTimeoutsRef.current[timeoutKey]) clearTimeout(saveTimeoutsRef.current[timeoutKey]);
 
@@ -199,56 +301,7 @@ export function CampaignTable({ campaign, onColumnsChange }: CampaignTableProps)
             await updateDoc(rowRef, { [`data.${colId}`]: newValue });
             delete saveTimeoutsRef.current[timeoutKey];
         }, 1000);
-
-        // Silent Ref Update for Copy/Paste validity
-        const rowIndex = rowsRef.current.findIndex(r => r.id === rowId);
-        if (rowIndex !== -1) {
-            if (!rowsRef.current[rowIndex].data) rowsRef.current[rowIndex].data = {};
-            rowsRef.current[rowIndex].data[colId] = newValue;
-        }
-    }, []);
-
-    const handleMouseDown = useCallback((rowId: string, colId: string) => {
-        setIsDragging(true);
-        setSelection({ startRowId: rowId, startColId: colId, endRowId: rowId, endColId: colId });
-    }, []);
-
-    const handleMouseEnter = useCallback((rowId: string, colId: string) => {
-        // Helper to check drag state without triggering re-renders from the state itself?
-        // We need 'isDragging' state. But 'setIsDragging' is safe.
-        // We use setSelection updater form to access current selection
-        setSelection((prev) => {
-            // We can't access isDragging here easily without prop dependency or Ref
-            // But we know this function is called only on MouseEnter
-            // To be safe and avoid stale closures, we can assume if mouse is down (tracked globally?)
-            // Actually, we are using the `isDragging` state in parent. 
-            // If we depend on `isDragging`, this function changes when `isDragging` changes.
-            // But `isDragging` changes only on Down/Up (once per drag). So it's fine.
-            if (!prev) return prev;
-            return {
-                ...prev,
-                endRowId: rowId,
-                endColId: colId
-            };
-        });
-    }, []);
-    // ^ This `handleMouseEnter` is actually tricky. If we rely on `isDragging` in the closure, 
-    // it won't work if we don't include it in deps. If we include it, it's fine.
-    // However, `isDragging` is initially false. When it becomes true, this handler updates.
-    // That's acceptable.
-
-    // Better: Check isDragging in the component `onMouseEnter` logic? 
-    // In `CampaignCell`, we call `onMouseEnter`. 
-    // Let's modify `CampaignCell` to only call `onMouseEnter` if we (the cell) think we should?
-    // No, logic belongs in parent.
-    // Let's just create a `isDraggingRef`?
-    const isDraggingRef = useRef(false);
-    useEffect(() => { isDraggingRef.current = isDragging; }, [isDragging]);
-
-    const handleMouseEnterOptimized = useCallback((rowId: string, colId: string) => {
-        if (!isDraggingRef.current) return;
-        setSelection((prev) => prev ? ({ ...prev, endRowId: rowId, endColId: colId }) : null);
-    }, []);
+    }, []); // We don't push to history here, we do it on Blur
 
 
     // --- Paste Logic ---
@@ -264,7 +317,8 @@ export function CampaignTable({ campaign, onColumnsChange }: CampaignTableProps)
             const batch = writeBatch(db);
             let batchCount = 0;
 
-            const newRows = [...rowsRef.current]; // Use ref for current state
+            const newRows = [...rowsRef.current];
+            const historyChanges: CellChange[] = [];
 
             lines.forEach((line, i) => {
                 const values = line.split('\t');
@@ -272,15 +326,21 @@ export function CampaignTable({ campaign, onColumnsChange }: CampaignTableProps)
 
                 if (targetRowIndex < newRows.length) {
                     const targetRow = newRows[targetRowIndex];
-                    const updates: any = {};
                     const newDataMap = { ...targetRow.data };
+                    const updates: any = {};
 
                     values.forEach((val, j) => {
                         const targetColIndex = startCoords.colIndex + j;
-                        const targetCol = colsRef.current[targetColIndex]; // Use ref
+                        const targetCol = colsRef.current[targetColIndex];
                         if (targetCol) {
-                            updates[`data.${targetCol.id}`] = val.trim();
-                            newDataMap[targetCol.id] = val.trim();
+                            const oldVal = targetRow.data[targetCol.id] || "";
+                            const newVal = val.trim();
+
+                            if (oldVal !== newVal) {
+                                updates[`data.${targetCol.id}`] = newVal;
+                                newDataMap[targetCol.id] = newVal;
+                                historyChanges.push({ rowId: targetRow.id, colId: targetCol.id, oldValue: oldVal, newValue: newVal });
+                            }
                         }
                     });
 
@@ -296,16 +356,82 @@ export function CampaignTable({ campaign, onColumnsChange }: CampaignTableProps)
             if (batchCount > 0) {
                 setRows(newRows);
                 await batch.commit();
+                addToHistory({ type: 'paste', changes: historyChanges });
             }
         }
+    }, [addToHistory]); // getCoordinates is stable via wrapping? Wait, need to fix deps.
+
+    // Helper functions
+    const getCoordinates = useCallback((rowId: string, colId: string) => {
+        const rowIndex = rowsRef.current.findIndex(r => r.id === rowId);
+        const colIndex = colsRef.current.findIndex(c => c.id === colId);
+        return { rowIndex, colIndex };
+    }, []);
+
+    const getRange = useCallback(() => {
+        const sel = selectionRef.current;
+        if (!sel) return null;
+        const start = getCoordinates(sel.startRowId, sel.startColId);
+        const end = getCoordinates(sel.endRowId, sel.endColId);
+        if (start.rowIndex === -1 || end.rowIndex === -1) return null;
+
+        return {
+            minRow: Math.min(start.rowIndex, end.rowIndex),
+            maxRow: Math.max(start.rowIndex, end.rowIndex),
+            minCol: Math.min(start.colIndex, end.colIndex),
+            maxCol: Math.max(start.colIndex, end.colIndex),
+        };
     }, [getCoordinates]);
 
-    // --- Global Keyboard Actions (Ctrl+A, Backspace) ---
+
+    // --- Selection Logic ---
+    const handleMouseDown = useCallback((rowId: string, colId: string) => {
+        setIsDragging(true);
+        setSelection({ startRowId: rowId, startColId: colId, endRowId: rowId, endColId: colId });
+    }, []);
+
+    const handleMouseEnter = useCallback((rowId: string, colId: string) => {
+        if (!isDraggingRef.current) return;
+        setSelection((prev) => prev ? ({ ...prev, endRowId: rowId, endColId: colId }) : null);
+    }, []);
+
+    const isSelected = (rowId: string, colId: string) => {
+        if (!selection) return false;
+        if (selection.startRowId === selection.endRowId && selection.startColId === selection.endColId) {
+            return rowId === selection.startRowId && colId === selection.startColId;
+        }
+        const range = getRange();
+        if (!range) return false;
+
+        const current = getCoordinates(rowId, colId);
+        return current.rowIndex >= range.minRow && current.rowIndex <= range.maxRow &&
+            current.colIndex >= range.minCol && current.colIndex <= range.maxCol;
+    };
+
+
+    // --- Global Keyboard Actions ---
     useEffect(() => {
         const handleKeyDown = async (e: KeyboardEvent) => {
             const sel = selectionRef.current;
 
-            // CTRL+A: Select All
+            // CTRL+Z (Undo)
+            if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !e.shiftKey) {
+                e.preventDefault();
+                await performUndo();
+                return;
+            }
+
+            // CTRL+Y or CTRL+SHIFT+Z (Redo)
+            if (
+                ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') ||
+                ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'z')
+            ) {
+                e.preventDefault();
+                await performRedo();
+                return;
+            }
+
+            // CTRL+A
             if ((e.ctrlKey || e.metaKey) && e.key === 'a') {
                 e.preventDefault();
                 const r = rowsRef.current;
@@ -321,51 +447,54 @@ export function CampaignTable({ campaign, onColumnsChange }: CampaignTableProps)
                 return;
             }
 
-            // Backspace / Delete: Clear Content
+            // Backspace / Delete
             if (sel && (e.key === 'Backspace' || e.key === 'Delete')) {
-                // Heuristic: If multi-selection, CLEAR.
-                // If single selection:
-                // - If active element is INPUT, allow default (delete text).
-                // - If active element is NOT input (rare here), clear cell.
                 const isMulti = sel.startRowId !== sel.endRowId || sel.startColId !== sel.endColId;
-
-                // If multi-select, we prevent default (nav back) and clear cells.
                 if (isMulti) {
                     e.preventDefault();
 
-                    const range = getRange(); // This uses selectionRef and refs
+                    const range = getRange();
                     if (!range) return;
 
                     const batch = writeBatch(db);
                     const newRows = [...rowsRef.current];
+                    const historyChanges: CellChange[] = [];
                     let batchCount = 0;
 
                     for (let i = range.minRow; i <= range.maxRow; i++) {
-                        const updates: any = {};
                         const targetRow = newRows[i];
                         const newDataMap = { ...targetRow.data };
+                        const updates: any = {};
 
                         for (let j = range.minCol; j <= range.maxCol; j++) {
                             const colId = colsRef.current[j].id;
-                            updates[`data.${colId}`] = "";
-                            newDataMap[colId] = "";
+                            const oldVal = targetRow.data[colId] || "";
+                            if (oldVal !== "") {
+                                updates[`data.${colId}`] = "";
+                                newDataMap[colId] = "";
+                                historyChanges.push({ rowId: targetRow.id, colId, oldValue: oldVal, newValue: "" });
+                            }
                         }
 
-                        newRows[i] = { ...targetRow, data: newDataMap };
-                        batch.update(doc(db, "campaign_rows", targetRow.id), updates);
-                        batchCount++;
+                        if (Object.keys(updates).length > 0) {
+                            newRows[i] = { ...targetRow, data: newDataMap };
+                            batch.update(doc(db, "campaign_rows", targetRow.id), updates);
+                            batchCount++;
+                        }
                     }
 
-                    setRows(newRows); // Optimistic UI update
-                    if (batchCount > 0) await batch.commit();
+                    if (batchCount > 0) {
+                        setRows(newRows);
+                        await batch.commit();
+                        addToHistory({ type: 'clear', changes: historyChanges });
+                    }
                 }
             }
 
-            // Copy (Ctrl+C) logic acts on Ref, already correct in previous thought/code
+            // Ctrl+C
             if ((e.ctrlKey || e.metaKey) && e.key === 'c') {
                 if (!sel) return;
                 const isMulti = sel.startRowId !== sel.endRowId || sel.startColId !== sel.endColId;
-                // If single cell and editing, let native copy work
                 if (!isMulti && document.activeElement?.tagName === 'INPUT') return;
 
                 e.preventDefault();
@@ -387,26 +516,8 @@ export function CampaignTable({ campaign, onColumnsChange }: CampaignTableProps)
 
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [getCoordinates, getRange]); // getRange depends on getCoordinates which is useCallback
+    }, [getCoordinates, getRange, performUndo, performRedo, addToHistory]);
 
-
-    // --- Selection Helper ---
-    const isSelected = (rowId: string, colId: string) => {
-        if (!selection) return false;
-        // Optimization: check if we are outside the bounding box first?
-        // Actually, let's just do the range check, it's fast enough math.
-        const start = getCoordinates(selection.startRowId, selection.startColId);
-        const end = getCoordinates(selection.endRowId, selection.endColId);
-        const current = getCoordinates(rowId, colId);
-
-        const minRow = Math.min(start.rowIndex, end.rowIndex);
-        const maxRow = Math.max(start.rowIndex, end.rowIndex);
-        const minCol = Math.min(start.colIndex, end.colIndex);
-        const maxCol = Math.max(start.colIndex, end.colIndex);
-
-        return current.rowIndex >= minRow && current.rowIndex <= maxRow &&
-            current.colIndex >= minCol && current.colIndex <= maxCol;
-    };
 
     return (
         <div
@@ -470,10 +581,11 @@ export function CampaignTable({ campaign, onColumnsChange }: CampaignTableProps)
                                         initialValue={row.data[col.id] || ""}
                                         isSelected={isSelected(row.id, col.id)}
                                         isDragging={isDragging}
-                                        // Pass optimized handlers
                                         onMouseDown={handleMouseDown}
-                                        onMouseEnter={handleMouseEnterOptimized} // Using the localized logic
+                                        onMouseEnter={handleMouseEnter}
                                         onChange={handleCellChange}
+                                        onFocus={handleCellFocus}
+                                        onBlur={handleCellBlur}
                                         onPaste={handlePaste}
                                     />
                                 ))}
