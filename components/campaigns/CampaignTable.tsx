@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useEffect, useRef, memo } from "react";
+import { useState, useEffect, useRef, memo, useCallback } from "react";
 import { Campaign, CampaignColumn, CampaignRow } from "@/types/campaign";
 import { Button } from "@/components/ui/button";
-import { Plus, Trash2, MoreHorizontal, X, ArrowDown } from "lucide-react";
+import { Plus, Trash2, MoreHorizontal, ArrowDown } from "lucide-react";
 import {
     DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
@@ -24,7 +24,6 @@ interface SelectionRange {
 }
 
 // --- OPTIMIZED CELL COMPONENT ---
-// Keeps its own state to prevent re-renders of the whole table from interrupting typing
 interface CellProps {
     rowId: string;
     colId: string;
@@ -39,11 +38,11 @@ interface CellProps {
 
 const CampaignCell = memo(({
     rowId, colId, initialValue, isSelected, isDragging, onMouseDown, onMouseEnter, onChange, onPaste
-}: CellProps) => { // Removed onKeyDown from props as it wasn't used in the component body
+}: CellProps) => {
     const [value, setValue] = useState(initialValue);
 
-    // Sync with external changes ONLY if not focused (to allow remote updates without overwriting typing)
-    // Actually, simply syncing on prop change is usually fine if we debounce the up-propagation
+    // Sync with external changes (e.g. from Batch Paste or Firestore fetch)
+    // We strictly sync if initialValue changes. 
     useEffect(() => {
         setValue(initialValue);
     }, [initialValue]);
@@ -58,7 +57,7 @@ const CampaignCell = memo(({
         <td
             className={cn(
                 "border-r border-gray-100 p-0 relative cursor-cell",
-                isSelected && "bg-blue-50 ring-1 ring-inset ring-blue-500 z-10" // z-10 to show ring above borders
+                isSelected && "bg-blue-50 ring-1 ring-inset ring-blue-500 z-10"
             )}
             onMouseDown={() => onMouseDown(rowId, colId)}
             onMouseEnter={() => onMouseEnter(rowId, colId)}
@@ -71,18 +70,19 @@ const CampaignCell = memo(({
                 value={value}
                 onChange={handleChange}
                 onPaste={(e) => onPaste(e, rowId, colId)}
-                // We do NOT block focus. Excel allows focusing a selected cell to edit it.
-                // But if IS DRAGGING, we disable pointer events on input to allow the TD to capture mouse
                 style={{ pointerEvents: isDragging ? 'none' : 'auto' }}
             />
         </td>
     );
 }, (prev, next) => {
-    // Custom equality check for performance
     return (
         prev.initialValue === next.initialValue &&
         prev.isSelected === next.isSelected &&
-        prev.isDragging === next.isDragging
+        prev.isDragging === next.isDragging &&
+        // Important: check function and string identity. 
+        // With useCallback in parent, these functions will be stable.
+        prev.rowId === next.rowId &&
+        prev.colId === next.colId
     );
 });
 CampaignCell.displayName = "CampaignCell";
@@ -94,7 +94,7 @@ export function CampaignTable({ campaign, onColumnsChange }: CampaignTableProps)
     const [selection, setSelection] = useState<SelectionRange | null>(null);
     const [isDragging, setIsDragging] = useState(false);
 
-    // Refs for heavy lifting without re-renders
+    // Refs
     const rowsRef = useRef<CampaignRow[]>([]);
     const colsRef = useRef<CampaignColumn[]>([]);
     const selectionRef = useRef<SelectionRange | null>(null);
@@ -111,16 +111,9 @@ export function CampaignTable({ campaign, onColumnsChange }: CampaignTableProps)
         const q = query(collection(db, "campaign_rows"), where("campaign_id", "==", campaign.id));
         const unsubscribe = onSnapshot(q, (snapshot) => {
             const fetched: CampaignRow[] = [];
-            let hasPendingWrites = snapshot.metadata.hasPendingWrites;
-
-            // If we have pending writes (local changes), we might want to skip full re-set? 
-            // Better to just merge? For now, standard fetch.
-
             snapshot.forEach((doc) => {
                 fetched.push({ id: doc.id, ...doc.data() } as CampaignRow);
             });
-            // Sort by simple string ID for stability.
-            // Ideally we'd use a numerical index or timestamp.
             fetched.sort((a, b) => a.id.localeCompare(b.id));
             setRows(fetched);
             setLoading(false);
@@ -135,13 +128,31 @@ export function CampaignTable({ campaign, onColumnsChange }: CampaignTableProps)
         }
     }, [loading]);
 
-    // --- Actions ---
-    const addColumn = () => {
-        const newColId = `col_${Date.now()}`;
-        const newCols = [...campaign.columns, { id: newColId, key: newColId, label: "Nueva Variable" }];
-        onColumnsChange(newCols);
-    };
+    // Helpers
+    const getCoordinates = useCallback((rowId: string, colId: string) => {
+        // Accessing ref instead of state to avoid dependency on 'rows' in callbacks
+        const rowIndex = rowsRef.current.findIndex(r => r.id === rowId);
+        const colIndex = colsRef.current.findIndex(c => c.id === colId);
+        return { rowIndex, colIndex };
+    }, []);
 
+    const getRange = useCallback(() => {
+        const sel = selectionRef.current;
+        if (!sel) return null;
+        const start = getCoordinates(sel.startRowId, sel.startColId);
+        const end = getCoordinates(sel.endRowId, sel.endColId);
+        // Check if IDs are valid
+        if (start.rowIndex === -1 || end.rowIndex === -1) return null;
+
+        return {
+            minRow: Math.min(start.rowIndex, end.rowIndex),
+            maxRow: Math.max(start.rowIndex, end.rowIndex),
+            minCol: Math.min(start.colIndex, end.colIndex),
+            maxCol: Math.max(start.colIndex, end.colIndex),
+        };
+    }, [getCoordinates]);
+
+    // --- Actions ---
     const updateColumnLabel = (colId: string, newLabel: string) => {
         const newCols = campaign.columns.map(c => {
             if (c.id === colId) {
@@ -153,8 +164,14 @@ export function CampaignTable({ campaign, onColumnsChange }: CampaignTableProps)
         onColumnsChange(newCols);
     };
 
+    const addColumn = () => {
+        const newColId = `col_${Date.now()}`;
+        const newCols = [...campaign.columns, { id: newColId, key: newColId, label: "Nueva Variable" }];
+        onColumnsChange(newCols);
+    };
+
     const removeColumn = (colId: string) => {
-        if (confirm("¿Estás seguro? Se borrarán los datos de esta columna.")) {
+        if (confirm("Se borrarán los datos de esta columna.")) {
             const newCols = campaign.columns.filter(c => c.id !== colId);
             onColumnsChange(newCols);
         }
@@ -170,10 +187,10 @@ export function CampaignTable({ campaign, onColumnsChange }: CampaignTableProps)
         await batch.commit();
     };
 
+    // --- Optimization Fix: useCallback handlers ---
 
-    // --- Optimized Update ---
-    const handleCellChange = (rowId: string, colId: string, newValue: string) => {
-        // Debounce Firestore Write
+    const handleCellChange = useCallback((rowId: string, colId: string, newValue: string) => {
+        // Debounced Save
         const timeoutKey = `${rowId}-${colId}`;
         if (saveTimeoutsRef.current[timeoutKey]) clearTimeout(saveTimeoutsRef.current[timeoutKey]);
 
@@ -183,113 +200,176 @@ export function CampaignTable({ campaign, onColumnsChange }: CampaignTableProps)
             delete saveTimeoutsRef.current[timeoutKey];
         }, 1000);
 
-        // NOTE: We do NOT update 'rows' state here immediately if we trust the Child component 
-        // to hold the visual state. However, to keep Copy/Paste working with latest data, 
-        // we SHOULD update the Ref at least?
-        // Or we update state but since Child is memoized on 'initialValue', it won't re-render 
-        // unless we change the prop passed to it.
-        // Let's update the state silent-ish? 
-        // Actually, updating state triggers re-render. 
-        // We will update state, but `CampaignCell` checks `prev.initialValue === next.initialValue`.
-        // If we update state, the `initialValue` prop changes.
-        // Wait, if we type 'a', state becomes 'a'. Prop becomes 'a'.
-        // Child has local 'a'. `useEffect` in child sees prop 'a', calls `setValue('a')`. 
-        // This is a loop but stable.
-        // The LAG comes from the React Reconcliation of 100 rows.
-        // We really should avoid `setRows` on every char.
-
-        // BETTER APPROACH: Update `rowsRef.current` silently for logic, 
-        // and ONLY update `rows` state (Firestore) when it comes back or very lazily.
-
-        // We will NOT call setRows here. We rely on the Child to hold the UI state.
-        // But we must update the ref so Copy works.
+        // Silent Ref Update for Copy/Paste validity
         const rowIndex = rowsRef.current.findIndex(r => r.id === rowId);
         if (rowIndex !== -1) {
-            // Mutate ref deep clone-ish just for local logic?
-            // Actually mutation is fine for Ref if we don't depend on immutability for re-renders elsewhere immediately
             if (!rowsRef.current[rowIndex].data) rowsRef.current[rowIndex].data = {};
             rowsRef.current[rowIndex].data[colId] = newValue;
         }
-    };
+    }, []);
 
-
-    // --- Selection Logic ---
-    const getCoordinates = (rowId: string, colId: string) => {
-        const rowIndex = rows.findIndex(r => r.id === rowId);
-        const colIndex = campaign.columns.findIndex(c => c.id === colId);
-        return { rowIndex, colIndex };
-    };
-
-    // Helpers for range math
-    const getRange = () => {
-        if (!selection) return null;
-        const start = getCoordinates(selection.startRowId, selection.startColId);
-        const end = getCoordinates(selection.endRowId, selection.endColId);
-        return {
-            minRow: Math.min(start.rowIndex, end.rowIndex),
-            maxRow: Math.max(start.rowIndex, end.rowIndex),
-            minCol: Math.min(start.colIndex, end.colIndex),
-            maxCol: Math.max(start.colIndex, end.colIndex),
-        };
-    };
-
-    const isSelected = (rowId: string, colId: string) => {
-        if (!selection) return false;
-        // Optimization: Check IDs directly if single cell
-        if (selection.startRowId === selection.endRowId && selection.startColId === selection.endColId) {
-            return rowId === selection.startRowId && colId === selection.startColId;
-        }
-
-        // Full range check
-        const range = getRange();
-        if (!range) return false;
-
-        // We need indices.
-        const current = getCoordinates(rowId, colId);
-        return current.rowIndex >= range.minRow && current.rowIndex <= range.maxRow &&
-            current.colIndex >= range.minCol && current.colIndex <= range.maxCol;
-    };
-
-    const handleMouseDown = (rowId: string, colId: string) => {
+    const handleMouseDown = useCallback((rowId: string, colId: string) => {
         setIsDragging(true);
         setSelection({ startRowId: rowId, startColId: colId, endRowId: rowId, endColId: colId });
-    };
+    }, []);
 
-    const handleMouseEnter = (rowId: string, colId: string) => {
-        if (isDragging && selection) {
-            setSelection({ ...selection, endRowId: rowId, endColId: colId });
+    const handleMouseEnter = useCallback((rowId: string, colId: string) => {
+        // Helper to check drag state without triggering re-renders from the state itself?
+        // We need 'isDragging' state. But 'setIsDragging' is safe.
+        // We use setSelection updater form to access current selection
+        setSelection((prev) => {
+            // We can't access isDragging here easily without prop dependency or Ref
+            // But we know this function is called only on MouseEnter
+            // To be safe and avoid stale closures, we can assume if mouse is down (tracked globally?)
+            // Actually, we are using the `isDragging` state in parent. 
+            // If we depend on `isDragging`, this function changes when `isDragging` changes.
+            // But `isDragging` changes only on Down/Up (once per drag). So it's fine.
+            if (!prev) return prev;
+            return {
+                ...prev,
+                endRowId: rowId,
+                endColId: colId
+            };
+        });
+    }, []);
+    // ^ This `handleMouseEnter` is actually tricky. If we rely on `isDragging` in the closure, 
+    // it won't work if we don't include it in deps. If we include it, it's fine.
+    // However, `isDragging` is initially false. When it becomes true, this handler updates.
+    // That's acceptable.
+
+    // Better: Check isDragging in the component `onMouseEnter` logic? 
+    // In `CampaignCell`, we call `onMouseEnter`. 
+    // Let's modify `CampaignCell` to only call `onMouseEnter` if we (the cell) think we should?
+    // No, logic belongs in parent.
+    // Let's just create a `isDraggingRef`?
+    const isDraggingRef = useRef(false);
+    useEffect(() => { isDraggingRef.current = isDragging; }, [isDragging]);
+
+    const handleMouseEnterOptimized = useCallback((rowId: string, colId: string) => {
+        if (!isDraggingRef.current) return;
+        setSelection((prev) => prev ? ({ ...prev, endRowId: rowId, endColId: colId }) : null);
+    }, []);
+
+
+    // --- Paste Logic ---
+    const handlePaste = useCallback(async (e: React.ClipboardEvent, rowId: string, colId: string) => {
+        const clipboardData = e.clipboardData.getData('text');
+        if (clipboardData.includes('\n') || clipboardData.includes('\t')) {
+            e.preventDefault();
+
+            const lines = clipboardData.split(/\r\n|\n/).filter(line => line.trim() !== "");
+            if (lines.length === 0) return;
+
+            const startCoords = getCoordinates(rowId, colId);
+            const batch = writeBatch(db);
+            let batchCount = 0;
+
+            const newRows = [...rowsRef.current]; // Use ref for current state
+
+            lines.forEach((line, i) => {
+                const values = line.split('\t');
+                const targetRowIndex = startCoords.rowIndex + i;
+
+                if (targetRowIndex < newRows.length) {
+                    const targetRow = newRows[targetRowIndex];
+                    const updates: any = {};
+                    const newDataMap = { ...targetRow.data };
+
+                    values.forEach((val, j) => {
+                        const targetColIndex = startCoords.colIndex + j;
+                        const targetCol = colsRef.current[targetColIndex]; // Use ref
+                        if (targetCol) {
+                            updates[`data.${targetCol.id}`] = val.trim();
+                            newDataMap[targetCol.id] = val.trim();
+                        }
+                    });
+
+                    if (Object.keys(updates).length > 0) {
+                        newRows[targetRowIndex] = { ...targetRow, data: newDataMap };
+                        const rowRef = doc(db, "campaign_rows", targetRow.id);
+                        batch.update(rowRef, updates);
+                        batchCount++;
+                    }
+                }
+            });
+
+            if (batchCount > 0) {
+                setRows(newRows);
+                await batch.commit();
+            }
         }
-    };
+    }, [getCoordinates]);
 
-
-    // --- Clipboard Logic ---
-
-    // 1. Copy (Global Listener)
+    // --- Global Keyboard Actions (Ctrl+A, Backspace) ---
     useEffect(() => {
         const handleKeyDown = async (e: KeyboardEvent) => {
-            // CTRL+C
-            if ((e.ctrlKey || e.metaKey) && e.key === 'c') {
-                const sel = selectionRef.current;
-                if (!sel) return;
+            const sel = selectionRef.current;
 
-                // If user is editing text (cursor in input), default copy behavior handles it
-                // UNLESS we want to copy the whole cell(s)
-                // If range is > 1 cell, we assume table copy intent
-                const isMulti = sel.startRowId !== sel.endRowId || sel.startColId !== sel.endColId;
-                if (!isMulti) {
-                    // Single cell: let browser handle it if focused? 
-                    // Actually, for Excel feel, Ctrl+C on a cell copies the value even if not selecting text inside
-                    // But standard input behavior needs selection.
-                    // Let's force manual write if we are not "editing" (selection range existing usually implies "navigation mode" in Excel)
-                    // But here we are always in "edit mode" (inputs).
-                    // We'll trust browser default for single input.
-                    if (document.activeElement?.tagName === 'INPUT') return;
+            // CTRL+A: Select All
+            if ((e.ctrlKey || e.metaKey) && e.key === 'a') {
+                e.preventDefault();
+                const r = rowsRef.current;
+                const c = colsRef.current;
+                if (r.length > 0 && c.length > 0) {
+                    setSelection({
+                        startRowId: r[0].id,
+                        startColId: c[0].id,
+                        endRowId: r[r.length - 1].id,
+                        endColId: c[c.length - 1].id
+                    });
                 }
+                return;
+            }
 
-                e.preventDefault(); // Intercept
+            // Backspace / Delete: Clear Content
+            if (sel && (e.key === 'Backspace' || e.key === 'Delete')) {
+                // Heuristic: If multi-selection, CLEAR.
+                // If single selection:
+                // - If active element is INPUT, allow default (delete text).
+                // - If active element is NOT input (rare here), clear cell.
+                const isMulti = sel.startRowId !== sel.endRowId || sel.startColId !== sel.endColId;
 
-                // Get data from ref (latest typed)
-                const range = getRangeFromRef(sel);
+                // If multi-select, we prevent default (nav back) and clear cells.
+                if (isMulti) {
+                    e.preventDefault();
+
+                    const range = getRange(); // This uses selectionRef and refs
+                    if (!range) return;
+
+                    const batch = writeBatch(db);
+                    const newRows = [...rowsRef.current];
+                    let batchCount = 0;
+
+                    for (let i = range.minRow; i <= range.maxRow; i++) {
+                        const updates: any = {};
+                        const targetRow = newRows[i];
+                        const newDataMap = { ...targetRow.data };
+
+                        for (let j = range.minCol; j <= range.maxCol; j++) {
+                            const colId = colsRef.current[j].id;
+                            updates[`data.${colId}`] = "";
+                            newDataMap[colId] = "";
+                        }
+
+                        newRows[i] = { ...targetRow, data: newDataMap };
+                        batch.update(doc(db, "campaign_rows", targetRow.id), updates);
+                        batchCount++;
+                    }
+
+                    setRows(newRows); // Optimistic UI update
+                    if (batchCount > 0) await batch.commit();
+                }
+            }
+
+            // Copy (Ctrl+C) logic acts on Ref, already correct in previous thought/code
+            if ((e.ctrlKey || e.metaKey) && e.key === 'c') {
+                if (!sel) return;
+                const isMulti = sel.startRowId !== sel.endRowId || sel.startColId !== sel.endColId;
+                // If single cell and editing, let native copy work
+                if (!isMulti && document.activeElement?.tagName === 'INPUT') return;
+
+                e.preventDefault();
+                const range = getRange();
                 if (!range) return;
 
                 let clipboardText = "";
@@ -305,90 +385,28 @@ export function CampaignTable({ campaign, onColumnsChange }: CampaignTableProps)
             }
         };
 
-        // Helper specifically for Ref reading inside effect
-        const getRangeFromRef = (sel: SelectionRange) => {
-            const rIds = rowsRef.current.map(r => r.id);
-            const cIds = colsRef.current.map(c => c.id);
-            const r1 = rIds.indexOf(sel.startRowId);
-            const r2 = rIds.indexOf(sel.endRowId);
-            const c1 = cIds.indexOf(sel.startColId);
-            const c2 = cIds.indexOf(sel.endColId);
-            if (r1 === -1 || c1 === -1) return null;
-
-            return {
-                minRow: Math.min(r1, r2), maxRow: Math.max(r1, r2),
-                minCol: Math.min(c1, c2), maxCol: Math.max(c1, c2)
-            };
-        };
-
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, []);
+    }, [getCoordinates, getRange]); // getRange depends on getCoordinates which is useCallback
 
-    // 2. Paste (Input Listener + Global)
-    // We pass this handler to EACH input.
-    const handlePaste = async (e: React.ClipboardEvent, rowId: string, colId: string) => {
-        // e.target is the input.
-        const clipboardData = e.clipboardData.getData('text');
 
-        // Heuristic: If contains newline or tab, it's multi-cell paste -> Intercept
-        // If it's simple text and we are just editing one cell -> Let default happen (or handle simply)
-        if (clipboardData.includes('\n') || clipboardData.includes('\t')) {
-            e.preventDefault();
-            performBatchPaste(clipboardData, rowId, colId);
-        }
-        // Else: allow default native paste into the input
+    // --- Selection Helper ---
+    const isSelected = (rowId: string, colId: string) => {
+        if (!selection) return false;
+        // Optimization: check if we are outside the bounding box first?
+        // Actually, let's just do the range check, it's fast enough math.
+        const start = getCoordinates(selection.startRowId, selection.startColId);
+        const end = getCoordinates(selection.endRowId, selection.endColId);
+        const current = getCoordinates(rowId, colId);
+
+        const minRow = Math.min(start.rowIndex, end.rowIndex);
+        const maxRow = Math.max(start.rowIndex, end.rowIndex);
+        const minCol = Math.min(start.colIndex, end.colIndex);
+        const maxCol = Math.max(start.colIndex, end.colIndex);
+
+        return current.rowIndex >= minRow && current.rowIndex <= maxRow &&
+            current.colIndex >= minCol && current.colIndex <= maxCol;
     };
-
-    const performBatchPaste = async (text: string, startRowId: string, startColId: string) => {
-        const lines = text.split(/\r\n|\n/).filter(line => line.trim() !== "");
-        if (lines.length === 0) return;
-
-        const startCoords = getCoordinates(startRowId, startColId);
-        const batch = writeBatch(db);
-        let batchCount = 0;
-
-        // Local Optimistic Update
-        // We need to trigger re-render of affected cells. 
-        // Since we are not using setRows for single typing, we MUST use setRows here for bulk update
-        // This causes a big render but it's acceptable for a Paste action (once).
-
-        const newRows = [...rows]; // Shallow copy
-
-        lines.forEach((line, i) => {
-            const values = line.split('\t');
-            const targetRowIndex = startCoords.rowIndex + i;
-
-            if (targetRowIndex < newRows.length) {
-                const targetRow = newRows[targetRowIndex];
-                const updates: any = {};
-                const newDataMap = { ...targetRow.data };
-
-                values.forEach((val, j) => {
-                    const targetColIndex = startCoords.colIndex + j;
-                    if (targetColIndex < campaign.columns.length) {
-                        const colId = campaign.columns[targetColIndex].id;
-                        updates[`data.${colId}`] = val.trim();
-                        newDataMap[colId] = val.trim();
-                    }
-                });
-
-                if (Object.keys(updates).length > 0) {
-                    // Update Local
-                    newRows[targetRowIndex] = { ...targetRow, data: newDataMap };
-
-                    // Queue Firestore
-                    const rowRef = doc(db, "campaign_rows", targetRow.id);
-                    batch.update(rowRef, updates);
-                    batchCount++;
-                }
-            }
-        });
-
-        setRows(newRows); // Update UI
-        if (batchCount > 0) await batch.commit(); // Update DB
-    };
-
 
     return (
         <div
@@ -452,8 +470,9 @@ export function CampaignTable({ campaign, onColumnsChange }: CampaignTableProps)
                                         initialValue={row.data[col.id] || ""}
                                         isSelected={isSelected(row.id, col.id)}
                                         isDragging={isDragging}
+                                        // Pass optimized handlers
                                         onMouseDown={handleMouseDown}
-                                        onMouseEnter={handleMouseEnter}
+                                        onMouseEnter={handleMouseEnterOptimized} // Using the localized logic
                                         onChange={handleCellChange}
                                         onPaste={handlePaste}
                                     />
