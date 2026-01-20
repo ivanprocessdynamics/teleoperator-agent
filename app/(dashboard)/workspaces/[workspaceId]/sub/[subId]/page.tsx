@@ -5,8 +5,9 @@ import { useParams } from "next/navigation";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import Link from "next/link";
-import { ContactsGrid } from "@/components/ContactsGrid";
-// import { Playground } from "@/components/Playground"; // Temporarily unused
+// import { ContactsGrid } from "@/components/ContactsGrid"; // Deprecated
+import { CampaignList } from "@/components/campaigns/CampaignList";
+import { CampaignDetail } from "@/components/campaigns/CampaignDetail";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Mic, Users, Settings } from "lucide-react";
 
