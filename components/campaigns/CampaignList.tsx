@@ -106,9 +106,9 @@ export function CampaignList({ subworkspaceId, onSelectCampaign }: CampaignListP
                             <Plus className="mr-2 h-4 w-4" /> Nueva Campaña
                         </Button>
                     </DialogTrigger>
-                    <DialogContent>
+                    <DialogContent className="bg-white text-gray-900 border-gray-200 sm:max-w-[425px]">
                         <DialogHeader>
-                            <DialogTitle>Crear Nueva Campaña</DialogTitle>
+                            <DialogTitle className="text-gray-900">Crear Nueva Campaña</DialogTitle>
                         </DialogHeader>
                         <div className="py-4">
                             <Input
@@ -116,11 +116,12 @@ export function CampaignList({ subworkspaceId, onSelectCampaign }: CampaignListP
                                 value={newCampaignName}
                                 onChange={(e) => setNewCampaignName(e.target.value)}
                                 onKeyDown={(e) => e.key === 'Enter' && handleCreateCampaign()}
+                                className="bg-white border-gray-200 text-gray-900 placeholder:text-gray-500 focus-visible:ring-gray-900"
                             />
                         </div>
                         <DialogFooter>
-                            <Button variant="outline" onClick={() => setIsCreateOpen(false)}>Cancelar</Button>
-                            <Button onClick={handleCreateCampaign} disabled={!newCampaignName.trim() || creating}>
+                            <Button variant="outline" onClick={() => setIsCreateOpen(false)} className="border-gray-200 text-gray-700 hover:bg-gray-50 hover:text-gray-900">Cancelar</Button>
+                            <Button onClick={handleCreateCampaign} disabled={!newCampaignName.trim() || creating} className="bg-gray-900 text-white hover:bg-black">
                                 {creating ? "Creando..." : "Crear"}
                             </Button>
                         </DialogFooter>
