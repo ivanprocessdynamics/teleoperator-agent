@@ -59,16 +59,11 @@ export default function SubworkspacePage() {
                                 <Input
                                     value={subName}
                                     onChange={(e) => setSubName(e.target.value)}
-                                    className="text-3xl font-bold h-12 w-[400px]"
+                                    className="text-3xl font-bold h-12 w-[400px] text-gray-900"
                                     autoFocus
+                                    onBlur={handleSaveName}
                                     onKeyDown={(e) => e.key === 'Enter' && handleSaveName()}
                                 />
-                                <Button size="icon" variant="ghost" onClick={handleSaveName} className="text-green-600 hover:text-green-700 hover:bg-green-50">
-                                    <Check className="h-6 w-6" />
-                                </Button>
-                                <Button size="icon" variant="ghost" onClick={() => setIsEditing(false)} className="text-red-500 hover:text-red-600 hover:bg-red-50">
-                                    <X className="h-6 w-6" />
-                                </Button>
                             </div>
                         ) : (
                             <div
