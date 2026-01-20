@@ -48,11 +48,12 @@ export function CampaignList({ subworkspaceId, onSelectCampaign }: CampaignListP
         setCreating(true);
 
         try {
-            // Initialize with default columns
-            const defaultColumns = [
-                { id: "col_name", key: "nombre", label: "Nombre" },
-                { id: "col_phone", key: "telefono", label: "Teléfono" }
-            ];
+            // Initialize with 10 default columns
+            const defaultColumns = Array.from({ length: 10 }).map((_, i) => ({
+                id: `col_${Date.now()}_${i}`,
+                key: `columna_${i + 1}`,
+                label: `Columna ${i + 1}`
+            }));
 
             const docRef = await addDoc(collection(db, "campaigns"), {
                 subworkspace_id: subworkspaceId,
