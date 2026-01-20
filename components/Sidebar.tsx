@@ -25,7 +25,7 @@ export function Sidebar() {
             icon: LayoutDashboard,
         },
         {
-            label: "Agents",
+            label: "Workspaces",
             href: "/workspaces",
             icon: Users, // Changed icon to Users for Agents
         },
