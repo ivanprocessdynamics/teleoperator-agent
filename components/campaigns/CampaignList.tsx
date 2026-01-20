@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Plus, ArrowRight, PlayCircle, FileText, CheckCircle2, MoreVertical, Trash2, Copy } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -27,6 +27,11 @@ export function CampaignList({ subworkspaceId, onSelectCampaign }: CampaignListP
     const [isCreateOpen, setIsCreateOpen] = useState(false);
     const [newCampaignName, setNewCampaignName] = useState("");
     const [creating, setCreating] = useState(false);
+
+    // Delete confirmation dialog state
+    const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+    const [campaignToDelete, setCampaignToDelete] = useState<string | null>(null);
+    const [deleting, setDeleting] = useState(false);
 
     useEffect(() => {
         if (!subworkspaceId) return;
@@ -91,27 +96,36 @@ export function CampaignList({ subworkspaceId, onSelectCampaign }: CampaignListP
         }
     };
 
-    const handleDeleteCampaign = async (e: React.MouseEvent, campaignId: string) => {
+    const openDeleteConfirmation = (e: React.MouseEvent, campaignId: string) => {
         e.stopPropagation(); // Prevent card click
-        if (!confirm("¿Estás seguro de que quieres eliminar esta campaña? Esta acción no se puede deshacer.")) return;
+        setCampaignToDelete(campaignId);
+        setIsDeleteOpen(true);
+    };
+
+    const handleDeleteCampaign = async () => {
+        if (!campaignToDelete) return;
+        setDeleting(true);
 
         try {
             // 1. Delete rows (batch)
-            const rowsQ = query(collection(db, "campaign_rows"), where("campaign_id", "==", campaignId));
+            const rowsQ = query(collection(db, "campaign_rows"), where("campaign_id", "==", campaignToDelete));
             const rowsSnap = await getDocs(rowsQ);
 
             const batch = writeBatch(db);
-            rowsSnap.docs.forEach((doc) => {
-                batch.delete(doc.ref);
+            rowsSnap.docs.forEach((docSnap) => {
+                batch.delete(docSnap.ref);
             });
 
             // 2. Delete campaign
-            batch.delete(doc(db, "campaigns", campaignId));
+            batch.delete(doc(db, "campaigns", campaignToDelete));
 
             await batch.commit();
+            setIsDeleteOpen(false);
+            setCampaignToDelete(null);
         } catch (error) {
             console.error("Error deleting campaign:", error);
-            alert("Error al eliminar la campaña.");
+        } finally {
+            setDeleting(false);
         }
     };
 
@@ -277,7 +291,7 @@ export function CampaignList({ subworkspaceId, onSelectCampaign }: CampaignListP
                                             <DropdownMenuItem onClick={(e) => handleDuplicateCampaign(e, camp)}>
                                                 <Copy className="mr-2 h-4 w-4" /> Duplicar
                                             </DropdownMenuItem>
-                                            <DropdownMenuItem onClick={(e) => handleDeleteCampaign(e, camp.id)} className="text-red-600 focus:text-red-600">
+                                            <DropdownMenuItem onClick={(e) => openDeleteConfirmation(e, camp.id)} className="text-red-600 focus:text-red-600">
                                                 <Trash2 className="mr-2 h-4 w-4" /> Eliminar
                                             </DropdownMenuItem>
                                         </DropdownMenuContent>
@@ -299,5 +313,33 @@ export function CampaignList({ subworkspaceId, onSelectCampaign }: CampaignListP
                 </div>
             )}
         </div>
+
+            {/* Delete Confirmation Dialog */ }
+    <Dialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>
+        <DialogContent className="bg-white text-gray-900 border-gray-200 sm:max-w-[425px]">
+            <DialogHeader>
+                <DialogTitle className="text-gray-900">Eliminar Campaña</DialogTitle>
+                <DialogDescription className="text-gray-500">
+                    ¿Estás seguro de que quieres eliminar esta campaña? Se borrarán todos los datos asociados. Esta acción no se puede deshacer.
+                </DialogDescription>
+            </DialogHeader>
+            <DialogFooter className="gap-2 sm:gap-0">
+                <Button
+                    variant="outline"
+                    onClick={() => setIsDeleteOpen(false)}
+                    className="border-gray-200 text-gray-700 hover:bg-gray-50"
+                >
+                    Cancelar
+                </Button>
+                <Button
+                    onClick={handleDeleteCampaign}
+                    disabled={deleting}
+                    className="bg-red-600 text-white hover:bg-red-700"
+                >
+                    {deleting ? "Eliminando..." : "Eliminar"}
+                </Button>
+            </DialogFooter>
+        </DialogContent>
+    </Dialog>
     );
 }
