@@ -54,31 +54,19 @@ interface CellProps {
 const CampaignCell = memo(({
     rowId, colId, initialValue, isSelected, isDragging, onMouseDown, onMouseEnter, onChange, onFocus, onBlur, onPaste
 }: CellProps) => {
+    // We still keep local state for the input to ensure controlled component behavior
     const [value, setValue] = useState(initialValue);
-    const [isFocused, setIsFocused] = useState(false);
 
-    // CRITICAL FIX: Only sync external changes if NOT focused.
-    // This prevents "overwrite" if a snapshot arrives while typing.
+    // Sync when initialValue changes (from parent optimistic update or remote)
     useEffect(() => {
-        if (!isFocused) {
-            setValue(initialValue);
-        }
-    }, [initialValue, isFocused]);
+        setValue(initialValue);
+    }, [initialValue]);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        // We update local state AND trigger parent change immediately
         const newVal = e.target.value;
         setValue(newVal);
         onChange(rowId, colId, newVal);
-    };
-
-    const handleFocus = (e: React.FocusEvent) => {
-        setIsFocused(true);
-        onFocus(rowId, colId, value);
-    };
-
-    const handleBlur = (e: React.FocusEvent) => {
-        setIsFocused(false);
-        onBlur(rowId, colId, value);
     };
 
     return (
@@ -97,8 +85,8 @@ const CampaignCell = memo(({
                 )}
                 value={value}
                 onChange={handleChange}
-                onFocus={handleFocus}
-                onBlur={handleBlur}
+                onFocus={() => onFocus(rowId, colId, value)}
+                onBlur={() => onBlur(rowId, colId, value)}
                 onPaste={(e) => onPaste(e, rowId, colId)}
                 style={{ pointerEvents: isDragging ? 'none' : 'auto' }}
             />
@@ -143,6 +131,10 @@ export function CampaignTable({ campaign, onColumnsChange }: CampaignTableProps)
         if (!campaign.id) return;
         const q = query(collection(db, "campaign_rows"), where("campaign_id", "==", campaign.id));
         const unsubscribe = onSnapshot(q, (snapshot) => {
+            // Need to merge with local pending updates?
+            // For now, full replace. If we are typing, our local optimistic update should keep us ahead or synced.
+            // If we receive a snapshot that is OLDER than our current typing, it might revert.
+            // But Firestore local cache usually updates instantly.
             const fetched: CampaignRow[] = [];
             snapshot.forEach((doc) => {
                 fetched.push({ id: doc.id, ...doc.data() } as CampaignRow);
@@ -288,16 +280,27 @@ export function CampaignTable({ campaign, onColumnsChange }: CampaignTableProps)
         focusValueRef.current = null;
     }, [addToHistory]);
 
-    // 3. Change (Input)
+    // 3. Change (Input) - OPTIMISTIC UPDATE
     const handleCellChange = useCallback((rowId: string, colId: string, newValue: string) => {
-        // Silent Ref Update
+        // 1. Optimistic UI Update (Immediate)
+        setRows(prevRows => prevRows.map(row => {
+            if (row.id === rowId) {
+                return {
+                    ...row,
+                    data: { ...row.data, [colId]: newValue }
+                };
+            }
+            return row;
+        }));
+
+        // 2. Update Ref (for sync)
         const rowIndex = rowsRef.current.findIndex(r => r.id === rowId);
         if (rowIndex !== -1) {
             if (!rowsRef.current[rowIndex].data) rowsRef.current[rowIndex].data = {};
             rowsRef.current[rowIndex].data[colId] = newValue;
         }
 
-        // Debounced Save
+        // 3. Debounced Save
         const timeoutKey = `${rowId}-${colId}`;
         if (saveTimeoutsRef.current[timeoutKey]) clearTimeout(saveTimeoutsRef.current[timeoutKey]);
 
@@ -454,11 +457,6 @@ export function CampaignTable({ campaign, onColumnsChange }: CampaignTableProps)
             // Backspace / Delete
             if (sel && (e.key === 'Backspace' || e.key === 'Delete')) {
                 const isMulti = sel.startRowId !== sel.endRowId || sel.startColId !== sel.endColId;
-                // If single selection AND active element is not the input (somehow)
-                // But usually with single selection, focus is in input.
-                // We should only clear IF we are strictly in "Navigation Mode" (Cell selected but not Editing).
-                // But we don't have separate modes. 
-                // So default to: If Multiselect -> Clear. If Single -> Default (Delete char).
                 if (isMulti) {
                     e.preventDefault();
 
@@ -500,7 +498,7 @@ export function CampaignTable({ campaign, onColumnsChange }: CampaignTableProps)
                 }
             }
 
-            // Ctrl+C already covered in previous logical block or browser default
+            // Ctrl+C
             if ((e.ctrlKey || e.metaKey) && e.key === 'c') {
                 if (!sel) return;
                 const isMulti = sel.startRowId !== sel.endRowId || sel.startColId !== sel.endColId;
