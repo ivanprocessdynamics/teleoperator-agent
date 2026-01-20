@@ -22,7 +22,7 @@ export function CampaignPrompt({ prompt, columns, onChange }: CampaignPromptProp
     };
 
     return (
-        <div className="flex flex-col h-full border border-gray-200 rounded-xl bg-white shadow-sm overflow-hidden">
+        <div className="flex flex-col border border-gray-200 rounded-xl bg-white shadow-sm overflow-hidden">
             <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 bg-gray-50/50">
                 <div className="flex items-center gap-2">
                     <MessageSquare className="h-4 w-4 text-gray-500" />
@@ -30,12 +30,13 @@ export function CampaignPrompt({ prompt, columns, onChange }: CampaignPromptProp
                 </div>
             </div>
 
-            <div className="flex-1 flex flex-col p-4 gap-4">
+            <div className="flex flex-col p-4 gap-4">
                 <Textarea
                     value={prompt}
                     onChange={(e) => onChange(e.target.value)}
-                    placeholder="Escribe las instrucciones para el agente aquí. Usa las variables de la derecha para personalizar el mensaje..."
-                    className="flex-1 resize-none border-gray-200 focus:border-gray-900 focus:ring-0 text-base leading-relaxed p-4"
+                    placeholder="Escribe las instrucciones para el agente aquí. Usa las variables de abajo para personalizar el mensaje..."
+                    rows={10}
+                    className="resize-none border-gray-200 focus:border-gray-900 focus:ring-0 text-base leading-relaxed p-4"
                 />
 
                 <div className="space-y-2">

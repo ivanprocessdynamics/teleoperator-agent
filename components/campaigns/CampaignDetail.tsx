@@ -139,21 +139,23 @@ export function CampaignDetail({ campaignId, onBack }: CampaignDetailProps) {
 
             {/* Main Split View */}
             <div className="flex-1 grid grid-cols-12 gap-6 min-h-0">
-                {/* Left: Table Editor (7 cols) */}
-                <div className="col-span-12 lg:col-span-7 h-full flex flex-col">
+                {/* Left: Table Editor (7 cols) - Scrollable */}
+                <div className="col-span-12 lg:col-span-7 h-full overflow-y-auto">
                     <CampaignTable
                         campaign={campaign}
                         onColumnsChange={handleUpdateColumns}
                     />
                 </div>
 
-                {/* Right: Prompt Editor (5 cols) */}
-                <div className="col-span-12 lg:col-span-5 h-full flex flex-col">
-                    <CampaignPrompt
-                        prompt={campaign.prompt_template || ""}
-                        columns={campaign.columns || []}
-                        onChange={handleUpdatePrompt}
-                    />
+                {/* Right: Prompt Editor (5 cols) - Sticky */}
+                <div className="col-span-12 lg:col-span-5 h-full overflow-y-auto">
+                    <div className="sticky top-0">
+                        <CampaignPrompt
+                            prompt={campaign.prompt_template || ""}
+                            columns={campaign.columns || []}
+                            onChange={handleUpdatePrompt}
+                        />
+                    </div>
                 </div>
             </div>
         </div>
