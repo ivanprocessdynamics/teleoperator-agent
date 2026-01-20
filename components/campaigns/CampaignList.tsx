@@ -328,7 +328,7 @@ export function CampaignList({ subworkspaceId, onSelectCampaign }: CampaignListP
                         <Button
                             variant="outline"
                             onClick={() => setIsDeleteOpen(false)}
-                            className="border-gray-200 text-gray-700 hover:bg-gray-50"
+                            className="bg-white border-gray-200 text-gray-700 hover:bg-gray-50 hover:text-gray-900"
                         >
                             Cancelar
                         </Button>
