@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, memo, useCallback, useMemo } from "react";
 import { Campaign, CampaignColumn, CampaignRow } from "@/types/campaign";
 import { Button } from "@/components/ui/button";
-import { Plus, Trash2, MoreHorizontal, ArrowDown } from "lucide-react";
+import { Plus, Trash2, MoreHorizontal, ArrowDown, Maximize2, Minimize2 } from "lucide-react";
 import {
     DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
@@ -132,6 +132,7 @@ export function CampaignTable({ campaign, onColumnsChange }: CampaignTableProps)
     const [loading, setLoading] = useState(true);
     const [selection, setSelection] = useState<SelectionRange | null>(null);
     const [isDragging, setIsDragging] = useState(false);
+    const [isFullscreen, setIsFullscreen] = useState(false);
 
     // Refs for stable access in callbacks
     const rowsRef = useRef<CampaignRow[]>([]);
@@ -572,9 +573,14 @@ export function CampaignTable({ campaign, onColumnsChange }: CampaignTableProps)
 
 
     // -------------------- RENDER --------------------
-    return (
+    const tableContent = (
         <div
-            className="flex flex-col h-full border border-gray-200 rounded-xl bg-white shadow-sm overflow-hidden select-none outline-none"
+            className={cn(
+                "flex flex-col bg-white shadow-sm overflow-hidden select-none outline-none",
+                isFullscreen
+                    ? "fixed inset-4 z-50 rounded-2xl border-2 border-gray-300"
+                    : "h-full border border-gray-200 rounded-xl"
+            )}
             onMouseUp={() => setIsDragging(false)}
         >
             {/* Header */}
@@ -586,6 +592,18 @@ export function CampaignTable({ campaign, onColumnsChange }: CampaignTableProps)
                     </Button>
                     <Button size="sm" variant="ghost" onClick={() => handleBatchAddRows(100)} className="text-xs h-8 text-gray-500 hover:text-gray-900">
                         <ArrowDown className="mr-2 h-3.5 w-3.5" /> Añadir más filas
+                    </Button>
+                    <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setIsFullscreen(!isFullscreen)}
+                        className="bg-white text-xs h-8"
+                    >
+                        {isFullscreen ? (
+                            <><Minimize2 className="mr-2 h-3.5 w-3.5" /> Minimizar</>
+                        ) : (
+                            <><Maximize2 className="mr-2 h-3.5 w-3.5" /> Expandir</>
+                        )}
                     </Button>
                 </div>
             </div>
@@ -657,4 +675,19 @@ export function CampaignTable({ campaign, onColumnsChange }: CampaignTableProps)
             </div>
         </div>
     );
+
+    // If fullscreen, wrap in a backdrop
+    if (isFullscreen) {
+        return (
+            <>
+                <div
+                    className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm"
+                    onClick={() => setIsFullscreen(false)}
+                />
+                {tableContent}
+            </>
+        );
+    }
+
+    return tableContent;
 }
