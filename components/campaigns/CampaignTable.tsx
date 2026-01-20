@@ -365,28 +365,42 @@ export function CampaignTable({ campaign, onColumnsChange }: CampaignTableProps)
     }, [selection, getRange]);
 
 
-    // -------------------- KEYBOARD SHORTCUTS --------------------
+    // -------------------- KEYBOARD SHORTCUTS (with Sticky Ctrl) --------------------
+    // Track Ctrl key state with grace period for Excel-like tolerance
+    const ctrlActiveRef = useRef(false);
+    const ctrlTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+    const CTRL_GRACE_PERIOD = 300; // ms
+
     useEffect(() => {
         const handleKeyDown = async (e: KeyboardEvent) => {
+            // Track Ctrl press
+            if (e.key === 'Control' || e.key === 'Meta') {
+                ctrlActiveRef.current = true;
+                if (ctrlTimeoutRef.current) clearTimeout(ctrlTimeoutRef.current);
+            }
+
+            // Check if Ctrl is active (either held now OR within grace period)
+            const isCtrlActive = e.ctrlKey || e.metaKey || ctrlActiveRef.current;
+
             const sel = selectionRef.current;
 
             // Ctrl+Z - Undo
-            if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !e.shiftKey) {
+            if (isCtrlActive && e.key.toLowerCase() === 'z' && !e.shiftKey) {
                 e.preventDefault();
                 await performUndo();
                 return;
             }
 
             // Ctrl+Y or Ctrl+Shift+Z - Redo
-            if (((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') ||
-                ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'z')) {
+            if ((isCtrlActive && e.key.toLowerCase() === 'y') ||
+                (isCtrlActive && e.shiftKey && e.key.toLowerCase() === 'z')) {
                 e.preventDefault();
                 await performRedo();
                 return;
             }
 
             // Ctrl+A - Select All
-            if ((e.ctrlKey || e.metaKey) && e.key === 'a') {
+            if (isCtrlActive && e.key === 'a') {
                 e.preventDefault();
                 const r = rowsRef.current;
                 const c = colsRef.current;
@@ -441,7 +455,7 @@ export function CampaignTable({ campaign, onColumnsChange }: CampaignTableProps)
             }
 
             // Ctrl+C - Copy
-            if ((e.ctrlKey || e.metaKey) && e.key === 'c') {
+            if (isCtrlActive && e.key === 'c') {
                 if (!sel) return;
                 const isMulti = sel.startRowId !== sel.endRowId || sel.startColId !== sel.endColId;
                 if (!isMulti && document.activeElement?.tagName === 'INPUT') return;
@@ -463,8 +477,23 @@ export function CampaignTable({ campaign, onColumnsChange }: CampaignTableProps)
             }
         };
 
+        // Handle Ctrl key release - start grace period
+        const handleKeyUp = (e: KeyboardEvent) => {
+            if (e.key === 'Control' || e.key === 'Meta') {
+                // Start grace period timeout
+                ctrlTimeoutRef.current = setTimeout(() => {
+                    ctrlActiveRef.current = false;
+                }, CTRL_GRACE_PERIOD);
+            }
+        };
+
         window.addEventListener('keydown', handleKeyDown);
-        return () => window.removeEventListener('keydown', handleKeyDown);
+        window.addEventListener('keyup', handleKeyUp);
+        return () => {
+            window.removeEventListener('keydown', handleKeyDown);
+            window.removeEventListener('keyup', handleKeyUp);
+            if (ctrlTimeoutRef.current) clearTimeout(ctrlTimeoutRef.current);
+        };
     }, [getRange, performUndo, performRedo, addToHistory]);
 
 
