@@ -200,6 +200,29 @@ export function CampaignTable({ campaign, onColumnsChange }: CampaignTableProps)
 
             if (scrollX !== 0 || scrollY !== 0) {
                 container.scrollBy(scrollX, scrollY);
+
+                // After scrolling, find which cell is under the cursor and update selection
+                const element = document.elementFromPoint(x, y);
+                if (element) {
+                    // Find the closest td element
+                    const td = element.closest('td');
+                    if (td) {
+                        // Get row and col from the data attributes or by traversing
+                        const row = td.closest('tr');
+                        const tbody = row?.closest('tbody');
+                        if (row && tbody) {
+                            const rowIndex = Array.from(tbody.children).indexOf(row);
+                            const colIndex = Array.from(row.children).indexOf(td) - 1; // -1 for row number column
+
+                            if (rowIndex >= 0 && colIndex >= 0 && rowIndex < rowsRef.current.length && colIndex < colsRef.current.length) {
+                                const newRowId = rowsRef.current[rowIndex].id;
+                                const newColId = colsRef.current[colIndex].id;
+
+                                setSelection(prev => prev ? { ...prev, endRowId: newRowId, endColId: newColId } : null);
+                            }
+                        }
+                    }
+                }
             }
 
             autoScrollRef.current = requestAnimationFrame(autoScroll);
@@ -587,7 +610,7 @@ export function CampaignTable({ campaign, onColumnsChange }: CampaignTableProps)
             <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 bg-gray-50/50">
                 <h3 className="text-sm font-semibold text-gray-900">Datos de la Campaña</h3>
                 <div className="flex gap-2">
-                    <Button size="sm" variant="outline" onClick={addColumn} className="bg-white text-xs h-8 text-gray-900">
+                    <Button size="sm" variant="ghost" onClick={addColumn} className="text-xs h-8 text-gray-900 hover:text-black">
                         <Plus className="mr-2 h-3.5 w-3.5" /> Columna
                     </Button>
                     <Button size="sm" variant="ghost" onClick={() => handleBatchAddRows(100)} className="text-xs h-8 text-gray-900 hover:text-black">
@@ -595,9 +618,9 @@ export function CampaignTable({ campaign, onColumnsChange }: CampaignTableProps)
                     </Button>
                     <Button
                         size="sm"
-                        variant="outline"
+                        variant="ghost"
                         onClick={() => setIsFullscreen(!isFullscreen)}
-                        className="bg-white text-xs h-8 text-gray-900"
+                        className="text-xs h-8 text-gray-900 hover:text-black"
                     >
                         {isFullscreen ? (
                             <><Minimize2 className="mr-2 h-3.5 w-3.5" /> Minimizar</>
