@@ -31,10 +31,11 @@ export function CampaignList({ subworkspaceId, onSelectCampaign }: CampaignListP
     useEffect(() => {
         if (!subworkspaceId) return;
 
+        // Query without orderBy to avoid index requirement
+        // Sorting is done client-side instead
         const q = query(
             collection(db, "campaigns"),
-            where("subworkspace_id", "==", subworkspaceId),
-            orderBy("created_at", "desc")
+            where("subworkspace_id", "==", subworkspaceId)
         );
 
         const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -42,7 +43,16 @@ export function CampaignList({ subworkspaceId, onSelectCampaign }: CampaignListP
             snapshot.forEach((doc) => {
                 fetched.push({ id: doc.id, ...doc.data() } as Campaign);
             });
+            // Sort client-side by created_at (descending)
+            fetched.sort((a, b) => {
+                const dateA = a.created_at?.toDate?.() || new Date(0);
+                const dateB = b.created_at?.toDate?.() || new Date(0);
+                return dateB.getTime() - dateA.getTime();
+            });
             setCampaigns(fetched);
+            setLoading(false);
+        }, (error) => {
+            console.error("Error loading campaigns:", error);
             setLoading(false);
         });
 
