@@ -1,6 +1,6 @@
 import { initializeApp, getApps, getApp } from "firebase/app";
 import { getAuth, GoogleAuthProvider } from "firebase/auth";
-import { getFirestore } from "firebase/firestore";
+import { getFirestore, enableIndexedDbPersistence } from "firebase/firestore";
 
 const firebaseConfig = {
     apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -25,6 +25,17 @@ try {
         auth = getAuth(app);
         db = getFirestore(app);
         googleProvider = new GoogleAuthProvider();
+
+        // Enable offline persistence for faster loads
+        if (typeof window !== "undefined") {
+            enableIndexedDbPersistence(db).catch((err) => {
+                if (err.code === "failed-precondition") {
+                    console.warn("Persistence failed: Multiple tabs open");
+                } else if (err.code === "unimplemented") {
+                    console.warn("Persistence not supported by browser");
+                }
+            });
+        }
     } else {
         console.warn("Firebase API Key missing. Services not initialized. (OK for build time)");
         // Mock objects to satisfy exports during build
