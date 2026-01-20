@@ -2,20 +2,35 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import { doc, getDoc } from "firebase/firestore";
+import { doc, getDoc, updateDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import Link from "next/link";
 import { CampaignList } from "@/components/campaigns/CampaignList";
 import { CampaignDetail } from "@/components/campaigns/CampaignDetail";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Mic, Users, Settings } from "lucide-react";
+import { Users, Settings, FlaskConical, Pencil, Check, X } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
 export default function SubworkspacePage() {
     const params = useParams();
     const subId = params.subId as string;
     const [subName, setSubName] = useState("");
+    const [isEditing, setIsEditing] = useState(false);
     const [activeTab, setActiveTab] = useState("contacts");
     const [selectedCampaignId, setSelectedCampaignId] = useState<string | null>(null);
+
+    const handleSaveName = async () => {
+        if (!subName.trim()) return;
+        try {
+            await updateDoc(doc(db, "subworkspaces", subId), {
+                name: subName
+            });
+            setIsEditing(false);
+        } catch (error) {
+            console.error("Error updating name:", error);
+        }
+    };
 
     useEffect(() => {
         async function fetchName() {
@@ -38,10 +53,34 @@ export default function SubworkspacePage() {
                     >
                         ←&nbsp; Volver a Workspaces
                     </Link>
-                    <div className="flex items-center justify-between">
-                        <h1 className="text-3xl font-bold tracking-tight text-gray-900">
-                            {subName || "Cargando Agente..."}
-                        </h1>
+                    <div className="flex items-center gap-2">
+                        {isEditing ? (
+                            <div className="flex items-center gap-2">
+                                <Input
+                                    value={subName}
+                                    onChange={(e) => setSubName(e.target.value)}
+                                    className="text-3xl font-bold h-12 w-[400px]"
+                                    autoFocus
+                                    onKeyDown={(e) => e.key === 'Enter' && handleSaveName()}
+                                />
+                                <Button size="icon" variant="ghost" onClick={handleSaveName} className="text-green-600 hover:text-green-700 hover:bg-green-50">
+                                    <Check className="h-6 w-6" />
+                                </Button>
+                                <Button size="icon" variant="ghost" onClick={() => setIsEditing(false)} className="text-red-500 hover:text-red-600 hover:bg-red-50">
+                                    <X className="h-6 w-6" />
+                                </Button>
+                            </div>
+                        ) : (
+                            <div
+                                className="flex items-center gap-3 group cursor-pointer"
+                                onClick={() => setIsEditing(true)}
+                            >
+                                <h1 className="text-3xl font-bold tracking-tight text-gray-900 group-hover:text-gray-700 transition-colors">
+                                    {subName || "Cargando Agente..."}
+                                </h1>
+                                <Pencil className="h-5 w-5 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+                            </div>
+                        )}
                     </div>
                 </div>
             )}
@@ -66,7 +105,7 @@ export default function SubworkspacePage() {
                             value="test"
                             className="gap-2 text-gray-900 data-[state=active]:bg-white data-[state=active]:text-gray-900 data-[state=active]:shadow-sm transition-all"
                         >
-                            <Mic className="h-4 w-4" /> Configuración (Próximamente)
+                            <FlaskConical className="h-4 w-4" /> Entorno de Pruebas
                         </TabsTrigger>
                     </TabsList>
 
@@ -80,11 +119,11 @@ export default function SubworkspacePage() {
                     <TabsContent value="test" className="mt-6">
                         <div className="max-w-5xl mx-auto py-12 text-center">
                             <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50 p-12">
-                                <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-lg bg-gray-100 mb-4">
-                                    <Settings className="h-6 w-6 text-gray-400" />
+                                <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600 mb-4">
+                                    <FlaskConical className="h-6 w-6" />
                                 </div>
-                                <h3 className="text-lg font-medium text-gray-900">Configuración en desarrollo</h3>
-                                <p className="text-sm text-gray-500 mt-2">Pronto podrás configurar el prompt y la voz de tu agente aquí.</p>
+                                <h3 className="text-lg font-medium text-gray-900">Entorno de Pruebas</h3>
+                                <p className="text-sm text-gray-500 mt-2">Pronto podrás probar tus prompts y simulaciones aquí.</p>
                             </div>
                         </div>
                     </TabsContent>

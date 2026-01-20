@@ -610,17 +610,17 @@ export function CampaignTable({ campaign, onColumnsChange }: CampaignTableProps)
             <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 bg-gray-50/50">
                 <h3 className="text-sm font-semibold text-gray-900">Datos de la Campaña</h3>
                 <div className="flex gap-2">
-                    <Button size="sm" variant="ghost" onClick={addColumn} className="text-xs h-8 text-gray-900 hover:text-black">
+                    <Button size="sm" variant="ghost" onClick={addColumn} className="text-xs h-8 text-gray-900 hover:text-black transition-all duration-200 hover:bg-gray-200/50 hover:scale-105 active:scale-95">
                         <Plus className="mr-2 h-3.5 w-3.5" /> Columna
                     </Button>
-                    <Button size="sm" variant="ghost" onClick={() => handleBatchAddRows(100)} className="text-xs h-8 text-gray-900 hover:text-black">
+                    <Button size="sm" variant="ghost" onClick={() => handleBatchAddRows(100)} className="text-xs h-8 text-gray-900 hover:text-black transition-all duration-200 hover:bg-gray-200/50 hover:scale-105 active:scale-95">
                         <ArrowDown className="mr-2 h-3.5 w-3.5" /> Añadir más filas
                     </Button>
                     <Button
                         size="sm"
                         variant="ghost"
                         onClick={() => setIsFullscreen(!isFullscreen)}
-                        className="text-xs h-8 text-gray-900 hover:text-black"
+                        className="text-xs h-8 text-gray-900 hover:text-black transition-all duration-200 hover:bg-gray-200/50 hover:scale-105 active:scale-95"
                     >
                         {isFullscreen ? (
                             <><Minimize2 className="mr-2 h-3.5 w-3.5" /> Minimizar</>

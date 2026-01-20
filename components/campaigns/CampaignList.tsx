@@ -21,12 +21,82 @@ interface CampaignListProps {
     onSelectCampaign: (campaignId: string) => void;
 }
 
+function CreateCampaignDialog({
+    subworkspaceId,
+    onSelectCampaign,
+    trigger
+}: {
+    subworkspaceId: string,
+    onSelectCampaign: (id: string) => void,
+    trigger: React.ReactNode
+}) {
+    const [open, setOpen] = useState(false);
+    const [name, setName] = useState("");
+    const [creating, setCreating] = useState(false);
+
+    const handleCreate = async () => {
+        if (!name.trim()) return;
+        setCreating(true);
+
+        try {
+            const defaultColumns = Array.from({ length: 10 }).map((_, i) => ({
+                id: `col_${Date.now()}_${i}`,
+                key: `columna_${i + 1}`,
+                label: `Columna ${i + 1}`
+            }));
+
+            const docRef = await addDoc(collection(db, "campaigns"), {
+                subworkspace_id: subworkspaceId,
+                name: name,
+                status: 'draft',
+                columns: defaultColumns,
+                prompt_template: "",
+                created_at: serverTimestamp(),
+                updated_at: serverTimestamp()
+            });
+
+            setOpen(false);
+            setName("");
+            onSelectCampaign(docRef.id);
+        } catch (error) {
+            console.error("Error creating campaign:", error);
+        } finally {
+            setCreating(false);
+        }
+    };
+
+    return (
+        <Dialog open={open} onOpenChange={setOpen}>
+            <DialogTrigger asChild>
+                {trigger}
+            </DialogTrigger>
+            <DialogContent className="bg-white text-gray-900 border-gray-200 sm:max-w-[425px]">
+                <DialogHeader>
+                    <DialogTitle className="text-gray-900">Crear Nueva Campaña</DialogTitle>
+                </DialogHeader>
+                <div className="py-4">
+                    <Input
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
+                        className="bg-white border-gray-300 text-gray-900 focus-visible:ring-gray-900"
+                        autoFocus
+                    />
+                </div>
+                <DialogFooter>
+                    <Button variant="ghost" onClick={() => setOpen(false)} className="text-gray-700 hover:bg-gray-100 hover:text-gray-900">Cancelar</Button>
+                    <Button onClick={handleCreate} disabled={!name.trim() || creating} className="bg-gray-900 text-white hover:bg-gray-700">
+                        {creating ? "Creando..." : "Crear"}
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
 export function CampaignList({ subworkspaceId, onSelectCampaign }: CampaignListProps) {
     const [campaigns, setCampaigns] = useState<Campaign[]>([]);
     const [loading, setLoading] = useState(true);
-    const [isCreateOpen, setIsCreateOpen] = useState(false);
-    const [newCampaignName, setNewCampaignName] = useState("");
-    const [creating, setCreating] = useState(false);
 
     // Delete confirmation dialog state
     const [isDeleteOpen, setIsDeleteOpen] = useState(false);
@@ -64,37 +134,7 @@ export function CampaignList({ subworkspaceId, onSelectCampaign }: CampaignListP
         return () => unsubscribe();
     }, [subworkspaceId]);
 
-    const handleCreateCampaign = async () => {
-        if (!newCampaignName.trim()) return;
-        setCreating(true);
 
-        try {
-            // Initialize with 10 default columns
-            const defaultColumns = Array.from({ length: 10 }).map((_, i) => ({
-                id: `col_${Date.now()}_${i}`,
-                key: `columna_${i + 1}`,
-                label: `Columna ${i + 1}`
-            }));
-
-            const docRef = await addDoc(collection(db, "campaigns"), {
-                subworkspace_id: subworkspaceId,
-                name: newCampaignName,
-                status: 'draft',
-                columns: defaultColumns,
-                prompt_template: "",
-                created_at: serverTimestamp(),
-                updated_at: serverTimestamp()
-            });
-
-            setIsCreateOpen(false);
-            setNewCampaignName("");
-            onSelectCampaign(docRef.id); // Auto-open new campaign
-        } catch (error) {
-            console.error("Error creating campaign:", error);
-        } finally {
-            setCreating(false);
-        }
-    };
 
     const openDeleteConfirmation = (e: React.MouseEvent, campaign: Campaign) => {
         e.stopPropagation(); // Prevent card click
@@ -234,32 +274,15 @@ export function CampaignList({ subworkspaceId, onSelectCampaign }: CampaignListP
                         <p className="text-sm text-gray-500">Crea campañas, define variables y lanza llamadas.</p>
                     </div>
 
-                    <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-                        <DialogTrigger asChild>
+                    <CreateCampaignDialog
+                        subworkspaceId={subworkspaceId}
+                        onSelectCampaign={onSelectCampaign}
+                        trigger={
                             <Button className="bg-gray-900 text-white hover:bg-black">
                                 <Plus className="mr-2 h-4 w-4" /> Nueva Campaña
                             </Button>
-                        </DialogTrigger>
-                        <DialogContent className="bg-white text-gray-900 border-gray-200 sm:max-w-[425px]">
-                            <DialogHeader>
-                                <DialogTitle className="text-gray-900">Crear Nueva Campaña</DialogTitle>
-                            </DialogHeader>
-                            <div className="py-4">
-                                <Input
-                                    value={newCampaignName}
-                                    onChange={(e) => setNewCampaignName(e.target.value)}
-                                    onKeyDown={(e) => e.key === 'Enter' && handleCreateCampaign()}
-                                    className="bg-white border-gray-300 text-gray-900 focus-visible:ring-gray-900"
-                                />
-                            </div>
-                            <DialogFooter>
-                                <Button variant="ghost" onClick={() => setIsCreateOpen(false)} className="text-gray-700 hover:bg-gray-100 hover:text-gray-900">Cancelar</Button>
-                                <Button onClick={handleCreateCampaign} disabled={!newCampaignName.trim() || creating} className="bg-gray-900 text-white hover:bg-gray-700">
-                                    {creating ? "Creando..." : "Crear"}
-                                </Button>
-                            </DialogFooter>
-                        </DialogContent>
-                    </Dialog>
+                        }
+                    />
                 </div>
 
                 {loading ? (
@@ -271,9 +294,15 @@ export function CampaignList({ subworkspaceId, onSelectCampaign }: CampaignListP
                         </div>
                         <h3 className="text-lg font-medium text-gray-900">No hay campañas</h3>
                         <p className="text-sm text-gray-500 mt-1 mb-6">Empieza creando tu primera campaña de llamadas.</p>
-                        <Button variant="outline" onClick={() => setIsCreateOpen(true)}>
-                            Crear Campaña
-                        </Button>
+                        <CreateCampaignDialog
+                            subworkspaceId={subworkspaceId}
+                            onSelectCampaign={onSelectCampaign}
+                            trigger={
+                                <Button variant="outline">
+                                    Crear Campaña
+                                </Button>
+                            }
+                        />
                     </div>
                 ) : (
                     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -314,7 +343,7 @@ export function CampaignList({ subworkspaceId, onSelectCampaign }: CampaignListP
                                                 </Button>
                                             </DropdownMenuTrigger>
                                             <DropdownMenuContent align="end" className="w-[160px]">
-                                                <DropdownMenuItem onClick={(e) => handleDuplicateCampaign(e, camp)}>
+                                                <DropdownMenuItem onClick={(e) => handleDuplicateCampaign(e, camp)} className="text-gray-900 focus:text-gray-900">
                                                     <Copy className="mr-2 h-4 w-4" /> Duplicar
                                                 </DropdownMenuItem>
                                                 <DropdownMenuItem onClick={(e) => openDeleteConfirmation(e, camp)} className="text-red-600 focus:text-red-600">
