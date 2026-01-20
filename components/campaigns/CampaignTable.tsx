@@ -587,17 +587,17 @@ export function CampaignTable({ campaign, onColumnsChange }: CampaignTableProps)
             <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 bg-gray-50/50">
                 <h3 className="text-sm font-semibold text-gray-900">Datos de la Campaña</h3>
                 <div className="flex gap-2">
-                    <Button size="sm" variant="outline" onClick={addColumn} className="bg-white text-xs h-8">
+                    <Button size="sm" variant="outline" onClick={addColumn} className="bg-white text-xs h-8 text-gray-900">
                         <Plus className="mr-2 h-3.5 w-3.5" /> Columna
                     </Button>
-                    <Button size="sm" variant="ghost" onClick={() => handleBatchAddRows(100)} className="text-xs h-8 text-gray-500 hover:text-gray-900">
+                    <Button size="sm" variant="ghost" onClick={() => handleBatchAddRows(100)} className="text-xs h-8 text-gray-900 hover:text-black">
                         <ArrowDown className="mr-2 h-3.5 w-3.5" /> Añadir más filas
                     </Button>
                     <Button
                         size="sm"
                         variant="outline"
                         onClick={() => setIsFullscreen(!isFullscreen)}
-                        className="bg-white text-xs h-8"
+                        className="bg-white text-xs h-8 text-gray-900"
                     >
                         {isFullscreen ? (
                             <><Minimize2 className="mr-2 h-3.5 w-3.5" /> Minimizar</>
