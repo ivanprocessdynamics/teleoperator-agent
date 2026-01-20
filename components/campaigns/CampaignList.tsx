@@ -1,14 +1,20 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { collection, query, where, orderBy, onSnapshot, addDoc, serverTimestamp } from "firebase/firestore";
+import { collection, query, where, orderBy, onSnapshot, addDoc, serverTimestamp, deleteDoc, doc, getDocs, writeBatch } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { Campaign } from "@/types/campaign";
+import { Campaign, CampaignRow } from "@/types/campaign";
 import { Button } from "@/components/ui/button";
-import { Plus, ArrowRight, PlayCircle, FileText, CheckCircle2, Clock } from "lucide-react";
+import { Plus, ArrowRight, PlayCircle, FileText, CheckCircle2, MoreVertical, Trash2, Copy } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface CampaignListProps {
     subworkspaceId: string;
@@ -72,6 +78,82 @@ export function CampaignList({ subworkspaceId, onSelectCampaign }: CampaignListP
             console.error("Error creating campaign:", error);
         } finally {
             setCreating(false);
+        }
+    };
+
+    const handleDeleteCampaign = async (e: React.MouseEvent, campaignId: string) => {
+        e.stopPropagation(); // Prevent card click
+        if (!confirm("¿Estás seguro de que quieres eliminar esta campaña? Esta acción no se puede deshacer.")) return;
+
+        try {
+            // 1. Delete rows (batch)
+            const rowsQ = query(collection(db, "campaign_rows"), where("campaign_id", "==", campaignId));
+            const rowsSnap = await getDocs(rowsQ);
+
+            const batch = writeBatch(db);
+            rowsSnap.docs.forEach((doc) => {
+                batch.delete(doc.ref);
+            });
+
+            // 2. Delete campaign
+            batch.delete(doc(db, "campaigns", campaignId));
+
+            await batch.commit();
+        } catch (error) {
+            console.error("Error deleting campaign:", error);
+            alert("Error al eliminar la campaña.");
+        }
+    };
+
+    const handleDuplicateCampaign = async (e: React.MouseEvent, campaign: Campaign) => {
+        e.stopPropagation();
+
+        try {
+            const newName = `${campaign.name} (Copia)`;
+
+            // 1. Create new campaign doc
+            const newCampaignRef = await addDoc(collection(db, "campaigns"), {
+                ...campaign,
+                name: newName,
+                status: 'draft',
+                created_at: serverTimestamp(),
+                updated_at: serverTimestamp(),
+                // Exclude ID from spread
+            });
+
+            // 2. Copy rows (Optional: limit to avoiding massive writes if user has 10k rows? 
+            // For now, let's copy them as the user expects a duplicate)
+            const rowsQ = query(collection(db, "campaign_rows"), where("campaign_id", "==", campaign.id));
+            const rowsSnap = await getDocs(rowsQ);
+
+            // Batch writes (chunks of 500)
+            const chunks = [];
+            let currentBatch = writeBatch(db);
+            let count = 0;
+
+            rowsSnap.docs.forEach((rowDoc) => {
+                const rowData = rowDoc.data();
+                const newRowRef = doc(collection(db, "campaign_rows"));
+                currentBatch.set(newRowRef, {
+                    ...rowData,
+                    campaign_id: newCampaignRef.id,
+                    status: 'pending' // Reset status for fresh runs
+                });
+
+                count++;
+                if (count >= 490) {
+                    chunks.push(currentBatch.commit());
+                    currentBatch = writeBatch(db);
+                    count = 0;
+                }
+            });
+            if (count > 0) chunks.push(currentBatch.commit());
+
+            await Promise.all(chunks);
+
+        } catch (error) {
+            console.error("Error duplicating campaign:", error);
+            alert("Error al duplicar la campaña.");
         }
     };
 
@@ -169,6 +251,27 @@ export function CampaignList({ subworkspaceId, onSelectCampaign }: CampaignListP
                                             </span>
                                         </div>
                                     </div>
+
+                                    <DropdownMenu>
+                                        <DropdownMenuTrigger asChild>
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                className="h-8 w-8 -mr-2 text-gray-400 hover:text-gray-700"
+                                                onClick={(e) => e.stopPropagation()}
+                                            >
+                                                <MoreVertical className="h-4 w-4" />
+                                            </Button>
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent align="end" className="w-[160px]">
+                                            <DropdownMenuItem onClick={(e) => handleDuplicateCampaign(e, camp)}>
+                                                <Copy className="mr-2 h-4 w-4" /> Duplicar
+                                            </DropdownMenuItem>
+                                            <DropdownMenuItem onClick={(e) => handleDeleteCampaign(e, camp.id)} className="text-red-600 focus:text-red-600">
+                                                <Trash2 className="mr-2 h-4 w-4" /> Eliminar
+                                            </DropdownMenuItem>
+                                        </DropdownMenuContent>
+                                    </DropdownMenu>
                                 </div>
 
                                 <div className="space-y-1">
