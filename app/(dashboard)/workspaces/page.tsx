@@ -8,6 +8,7 @@ import { useEffect, useState } from "react";
 import { collection, query, where, onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useRouter } from "next/navigation";
+import { SkeletonPage } from "@/components/ui/skeleton";
 
 export default function WorkspacesPage() {
     const { user, loading } = useAuth();
@@ -45,7 +46,7 @@ export default function WorkspacesPage() {
     }, [user, router]);
 
     if (loading || isLoadingData) {
-        return <div className="flex h-full items-center justify-center text-gray-400">Cargando...</div>;
+        return <SkeletonPage />;
     }
 
     // Only show this if there are NO workspaces (empty state)

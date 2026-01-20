@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Mic, Users, ArrowRight, Pencil, Check, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import Link from "next/link";
+import { SkeletonPage } from "@/components/ui/skeleton";
 
 interface Subworkspace {
     id: string;
@@ -71,7 +72,7 @@ export default function WorkspacePage() {
         fetchData();
     }, [workspaceId]);
 
-    if (loading) return <div>Loading workspace...</div>;
+    if (loading) return <SkeletonPage />;
 
     return (
         <div className="flex flex-col gap-8">
