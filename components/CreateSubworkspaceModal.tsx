@@ -99,16 +99,16 @@ export function CreateSubworkspaceModal({ workspaceId, children }: CreateSubwork
         }}>
             <DialogTrigger asChild>
                 {children || (
-                    <Button variant="outline" className="bg-white text-gray-900 border-gray-200 hover:bg-gray-50">
+                    <Button variant="outline" className="bg-white dark:bg-blue-500/10 text-gray-900 dark:text-blue-100 border-gray-200 dark:border-blue-500/30 hover:bg-gray-50 dark:hover:bg-blue-500/20">
                         <Plus className="mr-2 h-4 w-4" />
                         Nuevo Agente
                     </Button>
                 )}
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[425px] bg-white text-gray-900 border-gray-200 shadow-xl">
+            <DialogContent className="sm:max-w-[425px] bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 border-gray-200 dark:border-gray-700 shadow-xl">
                 <DialogHeader>
-                    <DialogTitle className="text-xl font-bold tracking-tight text-gray-900">Crear Agente</DialogTitle>
-                    <DialogDescription className="text-gray-500">
+                    <DialogTitle className="text-xl font-bold tracking-tight text-gray-900 dark:text-white">Crear Agente</DialogTitle>
+                    <DialogDescription className="text-gray-500 dark:text-gray-400">
                         Crea un nuevo agente con su propia configuración y campañas.
                     </DialogDescription>
                 </DialogHeader>
@@ -125,7 +125,7 @@ export function CreateSubworkspaceModal({ workspaceId, children }: CreateSubwork
                                     <Mic className="h-5 w-5" />
                                 </div>
                             </DropdownMenuTrigger>
-                            <DropdownMenuContent className="p-2 w-auto bg-white border-gray-200 shadow-xl" align="start">
+                            <DropdownMenuContent className="p-2 w-auto bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 shadow-xl" align="start">
                                 <div className="grid grid-cols-4 gap-2">
                                     {COLORS.map((color) => (
                                         <div
@@ -134,7 +134,7 @@ export function CreateSubworkspaceModal({ workspaceId, children }: CreateSubwork
                                             className={cn(
                                                 "h-8 w-8 rounded-md cursor-pointer border border-transparent hover:scale-110 transition-all flex items-center justify-center",
                                                 color.class,
-                                                selectedColor === color.name && "ring-1 ring-offset-1 ring-gray-900 border-gray-300"
+                                                selectedColor === color.name && "ring-1 ring-offset-1 ring-gray-900 dark:ring-white border-gray-300 dark:border-gray-500"
                                             )}
                                         />
                                     ))}
@@ -150,9 +150,9 @@ export function CreateSubworkspaceModal({ workspaceId, children }: CreateSubwork
                                 if (e.target.value.trim()) setError(false);
                             }}
                             onKeyDown={handleKeyDown}
-                            className={`flex-1 bg-white text-gray-900 focus:ring-blue-500 placeholder:text-gray-400 ${error
+                            className={`flex-1 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-blue-500 placeholder:text-gray-400 dark:placeholder:text-gray-500 ${error
                                 ? "border-red-500 focus:border-red-500 ring-red-500 placeholder:text-red-300"
-                                : "border-gray-300 focus:border-blue-500"
+                                : "border-gray-300 dark:border-gray-600 focus:border-blue-500"
                                 }`}
                             placeholder="Ej: Agente de Soporte"
                         />
@@ -162,7 +162,7 @@ export function CreateSubworkspaceModal({ workspaceId, children }: CreateSubwork
                     <Button
                         onClick={handleCreate}
                         disabled={loading}
-                        className="w-full bg-gray-900 text-white hover:bg-gray-800"
+                        className="w-full bg-gray-900 dark:bg-blue-600 text-white hover:bg-gray-800 dark:hover:bg-blue-700"
                     >
                         {loading ? "Creando..." : "Crear Agente"}
                     </Button>

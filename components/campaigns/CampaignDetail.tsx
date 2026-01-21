@@ -103,7 +103,7 @@ export function CampaignDetail({ campaignId, onBack }: CampaignDetailProps) {
         debouncedSave({ name: newName });
     };
 
-    if (loading) return <div className="p-10 text-center text-gray-500">Cargando editor...</div>;
+    if (loading) return <div className="p-10 text-center text-gray-500 dark:text-gray-400">Cargando editor...</div>;
     if (!campaign) return <div className="p-10 text-center text-red-500">Campaña no encontrada</div>;
 
     const theme = campaign.color || "gray";
@@ -120,7 +120,7 @@ export function CampaignDetail({ campaignId, onBack }: CampaignDetailProps) {
                     <Input
                         value={campaign.name}
                         onChange={(e) => handleNameChange(e.target.value)}
-                        className="text-xl font-bold text-gray-900 border-none px-0 h-auto focus-visible:ring-0 bg-transparent w-[300px]"
+                        className="text-xl font-bold text-gray-900 dark:text-white border-none px-0 h-auto focus-visible:ring-0 bg-transparent w-[300px]"
                         placeholder="Nombre de la Campaña"
                     />
                     <div className="flex items-center gap-2">
@@ -132,7 +132,7 @@ export function CampaignDetail({ campaignId, onBack }: CampaignDetailProps) {
                         </span>
 
                         {/* Auto-Save Indicator */}
-                        <div className="flex items-center text-xs text-gray-400 ml-2 transition-opacity duration-500">
+                        <div className="flex items-center text-xs text-gray-400 dark:text-gray-500 ml-2 transition-opacity duration-500">
                             {isSaving ? (
                                 <>
                                     <Loader2 className="h-3 w-3 mr-1 animate-spin" /> Guardando...

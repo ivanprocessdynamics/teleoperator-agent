@@ -419,15 +419,15 @@ export function CampaignList({ subworkspaceId, onSelectCampaign }: CampaignListP
             <div className="space-y-6">
                 <div className="flex items-center justify-between">
                     <div>
-                        <h2 className="text-xl font-bold text-gray-900">Campañas</h2>
-                        <p className="text-sm text-gray-500">Crea campañas, define variables y lanza llamadas.</p>
+                        <h2 className="text-xl font-bold text-gray-900 dark:text-white">Campañas</h2>
+                        <p className="text-sm text-gray-500 dark:text-gray-400">Crea campañas, define variables y lanza llamadas.</p>
                     </div>
 
                     <CreateCampaignDialog
                         subworkspaceId={subworkspaceId}
                         onSelectCampaign={onSelectCampaign}
                         trigger={
-                            <Button className="bg-gray-900 text-white hover:bg-black">
+                            <Button className="bg-gray-900 dark:bg-blue-600 text-white hover:bg-black dark:hover:bg-blue-700">
                                 <Plus className="mr-2 h-4 w-4" /> Nueva Campaña
                             </Button>
                         }
@@ -437,12 +437,12 @@ export function CampaignList({ subworkspaceId, onSelectCampaign }: CampaignListP
                 {loading ? (
                     <div className="text-center py-10 text-gray-400">Cargando campañas...</div>
                 ) : campaigns.length === 0 ? (
-                    <div className="rounded-xl border border-dashed border-gray-300 p-10 text-center bg-gray-50/50">
-                        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-gray-100 text-gray-400 mb-4">
+                    <div className="rounded-xl border border-dashed border-gray-300 dark:border-gray-600 p-10 text-center bg-gray-50/50 dark:bg-blue-500/5">
+                        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-gray-100 dark:bg-blue-500/20 text-gray-400 dark:text-blue-400 mb-4">
                             <FileText className="h-6 w-6" />
                         </div>
-                        <h3 className="text-lg font-medium text-gray-900">No hay campañas</h3>
-                        <p className="text-sm text-gray-500 mt-1 mb-6">Empieza creando tu primera campaña de llamadas.</p>
+                        <h3 className="text-lg font-medium text-gray-900 dark:text-white">No hay campañas</h3>
+                        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1 mb-6">Empieza creando tu primera campaña de llamadas.</p>
                         <CreateCampaignDialog
                             subworkspaceId={subworkspaceId}
                             onSelectCampaign={onSelectCampaign}
@@ -459,7 +459,7 @@ export function CampaignList({ subworkspaceId, onSelectCampaign }: CampaignListP
                             <div
                                 key={camp.id}
                                 onClick={() => onSelectCampaign(camp.id)}
-                                className="group relative cursor-pointer flex flex-col justify-between rounded-xl border border-gray-200 bg-white p-6 shadow-sm transition-all hover:shadow-md hover:border-gray-300"
+                                className="group relative cursor-pointer flex flex-col justify-between rounded-xl border border-gray-200 dark:border-blue-500/30 bg-white dark:bg-blue-500/10 p-6 shadow-sm transition-all hover:shadow-md hover:border-gray-300 dark:hover:border-blue-500/50 dark:hover:bg-blue-500/15"
                             >
                                 <div className="space-y-4">
                                     <div className="flex items-start justify-between">
@@ -482,7 +482,7 @@ export function CampaignList({ subworkspaceId, onSelectCampaign }: CampaignListP
                                                     />
                                                 ) : (
                                                     <h3
-                                                        className="font-semibold text-gray-900 line-clamp-1 hover:text-gray-600 transition-colors w-fit max-w-full truncate"
+                                                        className="font-semibold text-gray-900 dark:text-white line-clamp-1 hover:text-gray-600 dark:hover:text-gray-300 transition-colors w-fit max-w-full truncate"
                                                         onClick={(e) => {
                                                             e.stopPropagation();
                                                             setEditingCampaignId(camp.id);
@@ -506,14 +506,14 @@ export function CampaignList({ subworkspaceId, onSelectCampaign }: CampaignListP
                                                 <Button
                                                     variant="ghost"
                                                     size="icon"
-                                                    className="h-8 w-8 -mr-2 text-gray-400 hover:text-gray-700"
+                                                    className="h-8 w-8 -mr-2 text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
                                                     onClick={(e) => e.stopPropagation()}
                                                 >
                                                     <MoreVertical className="h-4 w-4" />
                                                 </Button>
                                             </DropdownMenuTrigger>
                                             <DropdownMenuContent align="end" className="w-[160px]">
-                                                <DropdownMenuItem onClick={(e) => handleDuplicateCampaign(e, camp)} className="text-gray-900 focus:text-gray-900">
+                                                <DropdownMenuItem onClick={(e) => handleDuplicateCampaign(e, camp)} className="text-gray-900 dark:text-gray-100 focus:text-gray-900 dark:focus:text-white">
                                                     <Copy className="mr-2 h-4 w-4" /> Duplicar
                                                 </DropdownMenuItem>
                                                 <DropdownMenuItem onClick={(e) => openDeleteConfirmation(e, camp)} className="text-red-600 focus:text-red-600">
@@ -524,13 +524,13 @@ export function CampaignList({ subworkspaceId, onSelectCampaign }: CampaignListP
                                     </div>
 
                                     <div className="space-y-1">
-                                        <p className="text-xs text-gray-400">
+                                        <p className="text-xs text-gray-400 dark:text-gray-500">
                                             Creada el {camp.created_at?.toDate().toLocaleDateString()}
                                         </p>
                                     </div>
                                 </div>
 
-                                <div className="mt-6 flex items-center text-sm font-medium text-gray-600 group-hover:text-gray-900">
+                                <div className="mt-6 flex items-center text-sm font-medium text-gray-600 dark:text-blue-400 group-hover:text-gray-900 dark:group-hover:text-blue-300">
                                     Gestionar <ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-1" />
                                 </div>
                             </div>
@@ -541,18 +541,18 @@ export function CampaignList({ subworkspaceId, onSelectCampaign }: CampaignListP
 
             {/* Delete Confirmation Dialog */}
             <Dialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>
-                <DialogContent className="bg-white text-gray-900 border-gray-200 sm:max-w-[425px]">
+                <DialogContent className="bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 border-gray-200 dark:border-gray-700 sm:max-w-[425px]">
                     <DialogHeader>
-                        <DialogTitle className="text-gray-900">Confirmar Eliminación</DialogTitle>
-                        <DialogDescription className="text-gray-500 pt-2">
-                            ¿Estás seguro de eliminar <span className="font-bold text-gray-900">{campaignToDelete?.name}</span>? Esta acción no se puede deshacer.
+                        <DialogTitle className="text-gray-900 dark:text-white">Confirmar Eliminación</DialogTitle>
+                        <DialogDescription className="text-gray-500 dark:text-gray-400 pt-2">
+                            ¿Estás seguro de eliminar <span className="font-bold text-gray-900 dark:text-white">{campaignToDelete?.name}</span>? Esta acción no se puede deshacer.
                         </DialogDescription>
                     </DialogHeader>
                     <DialogFooter className="gap-2 sm:gap-0 mt-4">
                         <Button
                             variant="outline"
                             onClick={() => setIsDeleteOpen(false)}
-                            className="bg-white border-gray-200 text-gray-700 hover:bg-gray-50 hover:text-gray-900"
+                            className="bg-white dark:bg-gray-700 border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600 hover:text-gray-900 dark:hover:text-white"
                         >
                             Cancelar
                         </Button>

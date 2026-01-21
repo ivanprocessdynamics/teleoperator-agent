@@ -86,15 +86,15 @@ const CampaignCell = memo(({
     return (
         <td
             className={cn(
-                "border-r border-b border-gray-300 p-0 relative cursor-cell",
-                isSelected && "bg-blue-50/70"
+                "border-r border-b border-gray-300 dark:border-gray-600 p-0 relative cursor-cell",
+                isSelected && "bg-blue-50/70 dark:bg-blue-500/20"
             )}
             onMouseDown={() => onMouseDown(rowId, colId)}
             onMouseEnter={() => onMouseEnter(rowId, colId)}
         >
             <input
                 className={cn(
-                    "w-full h-full px-2 py-2 border-none outline-none bg-transparent text-gray-900 text-sm",
+                    "w-full h-full px-2 py-2 border-none outline-none bg-transparent text-gray-900 dark:text-white text-sm",
                     isSelected && "bg-transparent"
                 )}
                 value={localValue}
@@ -599,28 +599,28 @@ export function CampaignTable({ campaign, onColumnsChange }: CampaignTableProps)
     const tableContent = (
         <div
             className={cn(
-                "flex flex-col bg-white shadow-sm overflow-hidden select-none outline-none",
+                "flex flex-col bg-white dark:bg-blue-500/10 shadow-sm overflow-hidden select-none outline-none",
                 isFullscreen
-                    ? "fixed inset-4 z-50 rounded-2xl border-2 border-gray-300"
-                    : "h-full border border-gray-200 rounded-xl"
+                    ? "fixed inset-4 z-50 rounded-2xl border-2 border-gray-300 dark:border-blue-500/30"
+                    : "h-full border border-gray-200 dark:border-blue-500/30 rounded-xl"
             )}
             onMouseUp={() => setIsDragging(false)}
         >
             {/* Header */}
-            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 bg-gray-50/50">
-                <h3 className="text-sm font-semibold text-gray-900">Datos de la Campaña</h3>
+            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800/50">
+                <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Datos de la Campaña</h3>
                 <div className="flex gap-2">
-                    <Button size="sm" variant="ghost" onClick={addColumn} className="text-xs h-8 text-gray-900 hover:text-black transition-all duration-200 hover:bg-gray-200/50 hover:scale-105 active:scale-95">
+                    <Button size="sm" variant="ghost" onClick={addColumn} className="text-xs h-8 text-gray-900 dark:text-gray-100 hover:text-black dark:hover:text-white transition-all duration-200 hover:bg-gray-200/50 dark:hover:bg-gray-600/50 hover:scale-105 active:scale-95">
                         <Plus className="mr-2 h-3.5 w-3.5" /> Columna
                     </Button>
-                    <Button size="sm" variant="ghost" onClick={() => handleBatchAddRows(100)} className="text-xs h-8 text-gray-900 hover:text-black transition-all duration-200 hover:bg-gray-200/50 hover:scale-105 active:scale-95">
+                    <Button size="sm" variant="ghost" onClick={() => handleBatchAddRows(100)} className="text-xs h-8 text-gray-900 dark:text-gray-100 hover:text-black dark:hover:text-white transition-all duration-200 hover:bg-gray-200/50 dark:hover:bg-gray-600/50 hover:scale-105 active:scale-95">
                         <ArrowDown className="mr-2 h-3.5 w-3.5" /> Añadir más filas
                     </Button>
                     <Button
                         size="sm"
                         variant="ghost"
                         onClick={() => setIsFullscreen(!isFullscreen)}
-                        className="text-xs h-8 text-gray-900 hover:text-black transition-all duration-200 hover:bg-gray-200/50 hover:scale-105 active:scale-95"
+                        className="text-xs h-8 text-gray-900 dark:text-gray-100 hover:text-black dark:hover:text-white transition-all duration-200 hover:bg-gray-200/50 dark:hover:bg-gray-600/50 hover:scale-105 active:scale-95"
                     >
                         {isFullscreen ? (
                             <><Minimize2 className="mr-2 h-3.5 w-3.5" /> Minimizar</>
@@ -634,14 +634,14 @@ export function CampaignTable({ campaign, onColumnsChange }: CampaignTableProps)
             {/* Table */}
             <div ref={tableContainerRef} className="flex-1 overflow-auto relative">
                 <table className="w-full text-sm border-collapse table-fixed">
-                    <thead className="bg-gray-50 z-10 sticky top-0">
+                    <thead className="bg-gray-50 dark:bg-gray-800 z-10 sticky top-0">
                         <tr>
-                            <th className="w-[40px] border-b border-r border-gray-200 bg-gray-50"></th>
+                            <th className="w-[40px] border-b border-r border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-800"></th>
                             {campaign.columns.map((col) => (
-                                <th key={col.id} className="w-[150px] border-b border-r border-gray-200 px-2 py-2 text-left bg-gray-50">
+                                <th key={col.id} className="w-[150px] border-b border-r border-gray-200 dark:border-gray-600 px-2 py-2 text-left bg-gray-50 dark:bg-gray-800">
                                     <div className="flex items-center justify-between group">
                                         <input
-                                            className="bg-transparent border-none focus:ring-0 text-xs font-bold text-gray-700 uppercase tracking-wider w-full cursor-pointer hover:bg-gray-100 rounded px-1 py-0.5 transition-colors"
+                                            className="bg-transparent border-none focus:ring-0 text-xs font-bold text-gray-700 dark:text-gray-200 uppercase tracking-wider w-full cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 rounded px-1 py-0.5 transition-colors"
                                             value={col.label}
                                             onChange={(e) => updateColumnLabel(col.id, e.target.value)}
                                         />
@@ -658,17 +658,17 @@ export function CampaignTable({ campaign, onColumnsChange }: CampaignTableProps)
                                             </DropdownMenuContent>
                                         </DropdownMenu>
                                     </div>
-                                    <div className="text-[10px] text-gray-400 font-mono px-1">
+                                    <div className="text-[10px] text-gray-400 dark:text-gray-500 font-mono px-1">
                                         {'{{' + col.key + '}}'}
                                     </div>
                                 </th>
                             ))}
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-100 bg-white">
+                    <tbody className="divide-y divide-gray-100 dark:divide-gray-700 bg-white dark:bg-gray-900">
                         {rows.map((row, rowIndex) => (
                             <tr key={row.id}>
-                                <td className="text-center text-xs text-gray-400 bg-gray-50 border-r border-b border-gray-200">
+                                <td className="text-center text-xs text-gray-400 dark:text-gray-500 bg-gray-50 dark:bg-gray-800 border-r border-b border-gray-200 dark:border-gray-600">
                                     {rowIndex + 1}
                                 </td>
                                 {campaign.columns.map((col) => (
