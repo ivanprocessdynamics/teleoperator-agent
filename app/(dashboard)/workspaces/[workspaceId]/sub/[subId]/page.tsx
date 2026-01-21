@@ -49,7 +49,7 @@ export default function SubworkspacePage() {
                 <div className="flex flex-col gap-2">
                     <Link
                         href="/workspaces"
-                        className="text-sm text-gray-500 hover:text-gray-900 transition-colors flex items-center gap-2 w-fit px-2 py-1 -ml-2 rounded-md hover:bg-gray-100"
+                        className="text-sm text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors flex items-center gap-2 w-fit px-2 py-1 -ml-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800"
                     >
                         ←&nbsp; Volver a Workspaces
                     </Link>
@@ -59,7 +59,7 @@ export default function SubworkspacePage() {
                                 <Input
                                     value={subName}
                                     onChange={(e) => setSubName(e.target.value)}
-                                    className="text-3xl font-bold h-12 w-[400px] text-gray-900"
+                                    className="text-3xl font-bold h-12 w-[400px] text-gray-900 dark:text-white dark:bg-gray-800 dark:border-gray-600"
                                     autoFocus
                                     onBlur={handleSaveName}
                                     onKeyDown={(e) => e.key === 'Enter' && handleSaveName()}
@@ -70,10 +70,10 @@ export default function SubworkspacePage() {
                                 className="flex items-center gap-3 group cursor-pointer"
                                 onClick={() => setIsEditing(true)}
                             >
-                                <h1 className="text-3xl font-bold tracking-tight text-gray-900 group-hover:text-gray-700 transition-colors">
+                                <h1 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white group-hover:text-gray-700 dark:group-hover:text-gray-300 transition-colors">
                                     {subName || "Cargando Agente..."}
                                 </h1>
-                                <Pencil className="h-5 w-5 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                <Pencil className="h-5 w-5 text-gray-400 dark:text-gray-500 opacity-0 group-hover:opacity-100 transition-opacity" />
                             </div>
                         )}
                     </div>
@@ -89,16 +89,16 @@ export default function SubworkspacePage() {
             ) : (
                 // Tabs containing Campaign List
                 <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-                    <TabsList className="grid w-full max-w-[400px] grid-cols-2 bg-gray-100 p-1 rounded-lg">
+                    <TabsList className="grid w-full max-w-[400px] grid-cols-2 bg-gray-100 dark:bg-gray-800 p-1 rounded-lg">
                         <TabsTrigger
                             value="contacts"
-                            className="gap-2 text-gray-900 data-[state=active]:bg-white data-[state=active]:text-gray-900 data-[state=active]:shadow-sm transition-all"
+                            className="gap-2 text-gray-900 dark:text-gray-300 data-[state=active]:bg-white dark:data-[state=active]:bg-gray-700 data-[state=active]:text-gray-900 dark:data-[state=active]:text-white data-[state=active]:shadow-sm transition-all"
                         >
                             <Users className="h-4 w-4" /> Campañas
                         </TabsTrigger>
                         <TabsTrigger
                             value="test"
-                            className="gap-2 text-gray-900 data-[state=active]:bg-white data-[state=active]:text-gray-900 data-[state=active]:shadow-sm transition-all"
+                            className="gap-2 text-gray-900 dark:text-gray-300 data-[state=active]:bg-white dark:data-[state=active]:bg-gray-700 data-[state=active]:text-gray-900 dark:data-[state=active]:text-white data-[state=active]:shadow-sm transition-all"
                         >
                             <FlaskConical className="h-4 w-4" /> Entorno de Pruebas
                         </TabsTrigger>
