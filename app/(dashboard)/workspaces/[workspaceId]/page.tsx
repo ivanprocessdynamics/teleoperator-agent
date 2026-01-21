@@ -130,14 +130,14 @@ export default function WorkspacePage() {
 
     return (
         <div className="flex flex-col gap-8">
-            <div className="flex items-center justify-between border-b pb-4">
+            <div className="flex items-center justify-between border-b border-gray-200 dark:border-gray-700 pb-4">
                 <div>
                     {isEditingName ? (
                         <div className="flex items-center gap-2">
                             <Input
                                 value={tempName}
                                 onChange={(e) => setTempName(e.target.value)}
-                                className="text-2xl font-bold h-10 w-[300px]"
+                                className="text-2xl font-bold h-10 w-[300px] dark:bg-gray-800 dark:text-white dark:border-gray-600"
                                 autoFocus
                             />
                             <Button size="icon" variant="ghost" onClick={handleSaveName} className="text-green-600">
@@ -155,13 +155,13 @@ export default function WorkspacePage() {
                                 setIsEditingName(true);
                             }}
                         >
-                            <h1 className="text-3xl font-bold tracking-tight text-gray-900 group-hover:text-gray-700 transition-colors">
+                            <h1 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white group-hover:text-gray-700 dark:group-hover:text-gray-300 transition-colors">
                                 {workspaceName || "Workspace"}
                             </h1>
                             <Pencil className="h-5 w-5 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity" />
                         </div>
                     )}
-                    <p className="text-gray-500 mt-1">Gestiona tus agentes y campañas.</p>
+                    <p className="text-gray-500 dark:text-gray-400 mt-1">Gestiona tus agentes y campañas.</p>
                 </div>
                 <CreateSubworkspaceModal workspaceId={workspaceId} />
             </div>
@@ -171,7 +171,7 @@ export default function WorkspacePage() {
                     <div
                         key={sub.id}
                         onClick={() => router.push(`/workspaces/${workspaceId}/sub/${sub.id}`)}
-                        className="group relative flex flex-col justify-between rounded-2xl border border-gray-200 bg-white p-6 shadow-sm transition-all duration-300 hover:shadow-xl hover:-translate-y-1 hover:border-gray-300 cursor-pointer overflow-hidden"
+                        className="group relative flex flex-col justify-between rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-6 shadow-sm transition-all duration-300 hover:shadow-xl hover:-translate-y-1 hover:border-gray-300 dark:hover:border-gray-600 cursor-pointer overflow-hidden"
                     >
                         {/* Decorative gradient background */}
                         <div className={cn(
@@ -214,9 +214,9 @@ export default function WorkspacePage() {
                                 </DropdownMenu>
 
                                 {/* Active status indicator */}
-                                <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-green-50 border border-green-200">
+                                <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800">
                                     <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
-                                    <span className="text-xs font-medium text-green-700">Activo</span>
+                                    <span className="text-xs font-medium text-green-700 dark:text-green-400">Activo</span>
                                 </div>
                             </div>
 
@@ -224,7 +224,7 @@ export default function WorkspacePage() {
                                 <Input
                                     value={tempSubName}
                                     onChange={(e) => setTempSubName(e.target.value)}
-                                    className="text-xl font-bold text-gray-900 h-9 px-2 -ml-2 w-full bg-white border-gray-300"
+                                    className="text-xl font-bold text-gray-900 dark:text-white h-9 px-2 -ml-2 w-full bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600"
                                     autoFocus
                                     onClick={(e) => e.stopPropagation()}
                                     onBlur={handleUpdateSubName}
@@ -232,7 +232,7 @@ export default function WorkspacePage() {
                                 />
                             ) : (
                                 <h3
-                                    className="text-xl font-bold text-gray-900 hover:text-gray-600 transition-colors w-fit cursor-text"
+                                    className="text-xl font-bold text-gray-900 dark:text-white hover:text-gray-600 dark:hover:text-gray-300 transition-colors w-fit cursor-text"
                                     onClick={(e) => {
                                         e.stopPropagation();
                                         setEditingSubId(sub.id);
@@ -242,21 +242,21 @@ export default function WorkspacePage() {
                                     {sub.name}
                                 </h3>
                             )}
-                            <p className="text-sm text-gray-500 mt-1">Gestiona campañas y contactos</p>
+                            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Gestiona campañas y contactos</p>
                         </div>
 
                         {/* Manage action link */}
-                        <div className="relative z-10 mt-6 pt-4 border-t border-gray-100 flex items-center justify-between">
-                            <span className="text-sm text-gray-400 group-hover:text-gray-600 transition-colors">
+                        <div className="relative z-10 mt-6 pt-4 border-t border-gray-100 dark:border-gray-700 flex items-center justify-between">
+                            <span className="text-sm text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-300 transition-colors">
                                 Haz clic para gestionar
                             </span>
-                            <ArrowRight className="h-4 w-4 text-gray-400 group-hover:text-gray-900 group-hover:translate-x-1 transition-all" />
+                            <ArrowRight className="h-4 w-4 text-gray-400 group-hover:text-gray-900 dark:group-hover:text-white group-hover:translate-x-1 transition-all" />
                         </div>
                     </div>
                 ))}
 
                 {subworkspaces.length === 0 && (
-                    <div className="col-span-full py-12 text-center text-gray-400 border-dashed border-2 bg-gray-50 rounded-xl">
+                    <div className="col-span-full py-12 text-center text-gray-400 dark:text-gray-500 border-dashed border-2 border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800/50 rounded-xl">
                         <p>No hay agentes creados. Crea uno para empezar a llamar.</p>
                     </div>
                 )}
