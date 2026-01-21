@@ -171,9 +171,9 @@ function CreateCampaignDialog({
             <DialogTrigger asChild>
                 {trigger}
             </DialogTrigger>
-            <DialogContent className="bg-white text-gray-900 border-gray-200 sm:max-w-[425px]">
+            <DialogContent className="bg-white dark:bg-gray-800 text-gray-900 dark:text-white border-gray-200 dark:border-gray-700 sm:max-w-[425px]">
                 <DialogHeader>
-                    <DialogTitle className="text-gray-900">Crear Nueva Campaña</DialogTitle>
+                    <DialogTitle className="text-gray-900 dark:text-white">Crear Nueva Campaña</DialogTitle>
                 </DialogHeader>
                 <div className="py-4 gap-4 flex flex-col">
                     <div className="flex gap-3">
@@ -189,15 +189,15 @@ function CreateCampaignDialog({
                             value={name}
                             onChange={(e) => setName(e.target.value)}
                             onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
-                            className="bg-white border-gray-300 text-gray-900 focus-visible:ring-gray-900 flex-1"
+                            className="bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white placeholder:text-gray-500 dark:placeholder:text-gray-400 focus-visible:ring-gray-900 dark:focus-visible:ring-gray-400 flex-1"
                             autoFocus
                             placeholder="Nombre de la campaña"
                         />
                     </div>
                 </div>
                 <DialogFooter>
-                    <Button variant="ghost" onClick={() => setOpen(false)} className="text-gray-700 hover:bg-gray-100 hover:text-gray-900">Cancelar</Button>
-                    <Button onClick={handleCreate} disabled={!name.trim() || creating} className="bg-gray-900 text-white hover:bg-gray-700">
+                    <Button variant="ghost" onClick={() => setOpen(false)} className="text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-white">Cancelar</Button>
+                    <Button onClick={handleCreate} disabled={!name.trim() || creating} className="bg-gray-900 dark:bg-blue-600 text-white hover:bg-gray-700 dark:hover:bg-blue-700">
                         {creating ? "Creando..." : "Crear"}
                     </Button>
                 </DialogFooter>
