@@ -8,7 +8,7 @@ export function Skeleton({ className }: SkeletonProps) {
     return (
         <div
             className={cn(
-                "rounded-md bg-gray-200 animate-skeleton",
+                "rounded-md bg-gray-200 dark:bg-gray-700 animate-skeleton",
                 className
             )}
         />
@@ -18,10 +18,10 @@ export function Skeleton({ className }: SkeletonProps) {
 // Pre-built skeleton patterns for common use cases
 export function SkeletonCard() {
     return (
-        <div className="rounded-xl border border-gray-200 bg-white p-6 space-y-4">
+        <div className="rounded-xl border border-gray-200 dark:border-blue-500/30 bg-white dark:bg-blue-500/10 p-6 space-y-4">
             <Skeleton className="h-10 w-10 rounded-lg" />
             <Skeleton className="h-5 w-3/4" />
-            <div className="pt-4 border-t border-gray-100 mt-4">
+            <div className="pt-4 border-t border-gray-100 dark:border-gray-700 mt-4">
                 <Skeleton className="h-3 w-1/2" />
             </div>
         </div>
@@ -32,7 +32,7 @@ export function SkeletonList({ count = 3 }: { count?: number }) {
     return (
         <div className="space-y-4">
             {Array.from({ length: count }).map((_, i) => (
-                <div key={i} className="flex items-center gap-4 p-4 rounded-lg border border-gray-200">
+                <div key={i} className="flex items-center gap-4 p-4 rounded-lg border border-gray-200 dark:border-gray-700 dark:bg-gray-800/50">
                     <Skeleton className="h-10 w-10 rounded-lg" />
                     <div className="space-y-2 flex-1">
                         <Skeleton className="h-4 w-1/3" />

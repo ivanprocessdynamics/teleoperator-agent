@@ -25,14 +25,14 @@ interface Subworkspace {
 }
 
 const COLORS = [
-    { name: 'gray', class: 'bg-gray-100 text-gray-600', hover: 'hover:bg-gray-200' },
-    { name: 'blue', class: 'bg-blue-50 text-blue-600', hover: 'hover:bg-blue-100' },
-    { name: 'green', class: 'bg-green-50 text-green-600', hover: 'hover:bg-green-100' },
-    { name: 'yellow', class: 'bg-yellow-50 text-yellow-600', hover: 'hover:bg-yellow-100' },
-    { name: 'red', class: 'bg-red-50 text-red-600', hover: 'hover:bg-red-100' },
-    { name: 'purple', class: 'bg-purple-50 text-purple-600', hover: 'hover:bg-purple-100' },
-    { name: 'pink', class: 'bg-pink-50 text-pink-600', hover: 'hover:bg-pink-100' },
-    { name: 'orange', class: 'bg-orange-50 text-orange-600', hover: 'hover:bg-orange-100' },
+    { name: 'gray', class: 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300', hover: 'hover:bg-gray-200', pickerClass: 'bg-gray-500' },
+    { name: 'blue', class: 'bg-blue-50 text-blue-600 dark:bg-blue-500/20 dark:text-blue-400', hover: 'hover:bg-blue-100', pickerClass: 'bg-blue-500' },
+    { name: 'green', class: 'bg-green-50 text-green-600 dark:bg-green-500/20 dark:text-green-400', hover: 'hover:bg-green-100', pickerClass: 'bg-green-500' },
+    { name: 'yellow', class: 'bg-yellow-50 text-yellow-600 dark:bg-yellow-500/20 dark:text-yellow-400', hover: 'hover:bg-yellow-100', pickerClass: 'bg-yellow-500' },
+    { name: 'red', class: 'bg-red-50 text-red-600 dark:bg-red-500/20 dark:text-red-400', hover: 'hover:bg-red-100', pickerClass: 'bg-red-500' },
+    { name: 'purple', class: 'bg-purple-50 text-purple-600 dark:bg-purple-500/20 dark:text-purple-400', hover: 'hover:bg-purple-100', pickerClass: 'bg-purple-500' },
+    { name: 'pink', class: 'bg-pink-50 text-pink-600 dark:bg-pink-500/20 dark:text-pink-400', hover: 'hover:bg-pink-100', pickerClass: 'bg-pink-500' },
+    { name: 'orange', class: 'bg-orange-50 text-orange-600 dark:bg-orange-500/20 dark:text-orange-400', hover: 'hover:bg-orange-100', pickerClass: 'bg-orange-500' },
 ];
 
 export default function WorkspacePage() {
@@ -190,7 +190,7 @@ export default function WorkspacePage() {
                                             <Mic className="h-6 w-6" />
                                         </div>
                                     </DropdownMenuTrigger>
-                                    <DropdownMenuContent className="p-2 w-auto bg-white border-gray-200 shadow-xl" align="start">
+                                    <DropdownMenuContent className="p-2 w-auto bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 shadow-xl" align="start">
                                         <div className="grid grid-cols-4 gap-2">
                                             {COLORS.map((color) => (
                                                 <div
@@ -201,8 +201,8 @@ export default function WorkspacePage() {
                                                     }}
                                                     className={cn(
                                                         "h-8 w-8 rounded-md cursor-pointer border border-transparent hover:scale-110 transition-all flex items-center justify-center",
-                                                        color.class,
-                                                        sub.color === color.name && "ring-1 ring-offset-1 ring-gray-900 border-gray-300"
+                                                        color.pickerClass,
+                                                        sub.color === color.name && "ring-2 ring-offset-2 ring-white dark:ring-gray-300"
                                                     )}
                                                 />
                                             ))}
