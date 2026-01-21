@@ -55,11 +55,11 @@ export default function WorkspacesPage() {
         return (
             <div className="flex flex-col gap-6">
                 <div>
-                    <h1 className="text-2xl font-bold tracking-tight text-gray-900">Workspaces</h1>
-                    <p className="text-sm text-gray-500">No tienes ningun workspace creado.</p>
+                    <h1 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">Workspaces</h1>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">No tienes ningun workspace creado.</p>
                 </div>
 
-                <div className="rounded-lg border border-gray-200 bg-gray-50/50 p-8 text-center text-gray-500">
+                <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800/50 p-8 text-center text-gray-500 dark:text-gray-400">
                     <p className="mb-4">Empieza creando tu primer Workspace.</p>
                     <CreateWorkspaceModal>
                         <Button variant="outline">
@@ -73,5 +73,6 @@ export default function WorkspacesPage() {
     }
 
     // Fallback while redirecting
-    return <div className="flex h-full items-center justify-center text-gray-400">Redirigiendo...</div>;
+    return <div className="flex h-full items-center justify-center text-gray-400 dark:text-gray-500">Redirigiendo...</div>;
 }
+

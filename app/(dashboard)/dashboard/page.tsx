@@ -9,57 +9,58 @@ export default function DashboardPage() {
 
     return (
         <div className="flex flex-col gap-6">
-            <h1 className="text-2xl font-bold tracking-tight text-gray-900">Dashboard</h1>
+            <h1 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">Dashboard</h1>
 
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium text-gray-700">Total Calls</CardTitle>
-                        <Phone className="h-4 w-4 text-gray-900" />
+                        <CardTitle className="text-sm font-medium text-gray-700 dark:text-gray-300">Total Calls</CardTitle>
+                        <Phone className="h-4 w-4 text-gray-900 dark:text-gray-100" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold text-gray-900">0</div>
-                        <p className="text-xs text-gray-600 font-medium">+0% from last month</p>
+                        <div className="text-2xl font-bold text-gray-900 dark:text-white">0</div>
+                        <p className="text-xs text-gray-600 dark:text-gray-400 font-medium">+0% from last month</p>
                     </CardContent>
                 </Card>
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium text-gray-700">Active Agents</CardTitle>
-                        <Users className="h-4 w-4 text-gray-900" />
+                        <CardTitle className="text-sm font-medium text-gray-700 dark:text-gray-300">Active Agents</CardTitle>
+                        <Users className="h-4 w-4 text-gray-900 dark:text-gray-100" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold text-gray-900">0</div>
-                        <p className="text-xs text-gray-600 font-medium">+0 since last hour</p>
+                        <div className="text-2xl font-bold text-gray-900 dark:text-white">0</div>
+                        <p className="text-xs text-gray-600 dark:text-gray-400 font-medium">+0 since last hour</p>
                     </CardContent>
                 </Card>
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium text-gray-700">Success Rate</CardTitle>
-                        <Activity className="h-4 w-4 text-gray-900" />
+                        <CardTitle className="text-sm font-medium text-gray-700 dark:text-gray-300">Success Rate</CardTitle>
+                        <Activity className="h-4 w-4 text-gray-900 dark:text-gray-100" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold text-gray-900">0%</div>
-                        <p className="text-xs text-gray-600 font-medium">+0% from last week</p>
+                        <div className="text-2xl font-bold text-gray-900 dark:text-white">0%</div>
+                        <p className="text-xs text-gray-600 dark:text-gray-400 font-medium">+0% from last week</p>
                     </CardContent>
                 </Card>
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium text-gray-700">Usage Cost</CardTitle>
-                        <BarChart3 className="h-4 w-4 text-gray-900" />
+                        <CardTitle className="text-sm font-medium text-gray-700 dark:text-gray-300">Usage Cost</CardTitle>
+                        <BarChart3 className="h-4 w-4 text-gray-900 dark:text-gray-100" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold text-gray-900">$0.00</div>
-                        <p className="text-xs text-gray-600 font-medium">+0% from last month</p>
+                        <div className="text-2xl font-bold text-gray-900 dark:text-white">$0.00</div>
+                        <p className="text-xs text-gray-600 dark:text-gray-400 font-medium">+0% from last month</p>
                     </CardContent>
                 </Card>
             </div>
 
-            <div className="rounded-xl border border-gray-200 bg-white p-8 shadow-sm">
-                <h2 className="text-lg font-semibold mb-4 text-gray-900">Activity Overview</h2>
-                <div className="h-[200px] flex items-center justify-center text-gray-600 bg-gray-50 border border-dashed border-gray-300 rounded-lg">
+            <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-8 shadow-sm">
+                <h2 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">Activity Overview</h2>
+                <div className="h-[200px] flex items-center justify-center text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-900 border border-dashed border-gray-300 dark:border-gray-600 rounded-lg">
                     Chart Placeholder
                 </div>
             </div>
         </div>
     );
 }
+
