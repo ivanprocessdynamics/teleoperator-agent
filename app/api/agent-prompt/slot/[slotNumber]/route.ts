@@ -14,6 +14,11 @@ export async function GET(
     }
 
     try {
+        // Verify DB is initialized
+        if (!db || (Object.keys(db).length === 0 && db.constructor === Object)) {
+            throw new Error("Database not initialized. Server missing Firebase configuration.");
+        }
+
         // Find the subworkspace assigned to this slot
         const q = query(
             collection(db, "subworkspaces"),
@@ -47,8 +52,11 @@ export async function GET(
             prompt: promptToReturn
         });
 
-    } catch (error) {
+    } catch (error: any) {
         console.error("Error fetching prompt by slot:", error);
-        return new NextResponse("Internal Server Error", { status: 500 });
+        return new NextResponse(JSON.stringify({ error: error.message, stack: error.stack }), {
+            status: 500,
+            headers: { 'Content-Type': 'application/json' }
+        });
     }
 }
