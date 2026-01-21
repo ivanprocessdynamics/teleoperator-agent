@@ -32,7 +32,9 @@ export function getAgentIdBySlot(slotNumber: number): string | undefined {
     return getSlotByNumber(slotNumber)?.agentId;
 }
 
-// Get the prompt space URL for a subworkspace
-export function getPromptSpaceUrl(subworkspaceId: string): string {
-    return `/api/agent-prompt/${subworkspaceId}`;
+// Get the prompt space URL for a slot
+export function getPromptSpaceUrl(slotNumber: number): string {
+    // Ideally this should use the actual domain, but relative URL is fine for internal use
+    // For the user list, we will verify the domain or ask them to prepend their domain
+    return `/api/agent-prompt/slot/${slotNumber}`;
 }

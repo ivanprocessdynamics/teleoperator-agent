@@ -60,10 +60,9 @@ export function CreateSubworkspaceModal({ workspaceId, children }: CreateSubwork
 
         setLoading(true);
         try {
-            // Find the next available Retell slot
+            // Find the next available Retell slot (Globally across all workspaces)
             const existingSubsQuery = query(
-                collection(db, "subworkspaces"),
-                where("workspace_id", "==", workspaceId)
+                collection(db, "subworkspaces")
             );
             const existingSnap = await getDocs(existingSubsQuery);
             const usedSlots = existingSnap.docs

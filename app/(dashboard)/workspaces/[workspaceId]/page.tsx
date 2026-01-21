@@ -2,11 +2,11 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { collection, query, where, getDocs, doc, getDoc, updateDoc } from "firebase/firestore";
+import { collection, query, where, getDocs, doc, getDoc, updateDoc, deleteDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { CreateSubworkspaceModal } from "@/components/CreateSubworkspaceModal";
 import { Button } from "@/components/ui/button";
-import { Mic, Users, ArrowRight, Pencil, Check, X } from "lucide-react";
+import { Mic, Users, ArrowRight, Pencil, Check, X, Trash2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import Link from "next/link";
 import { SkeletonPage } from "@/components/ui/skeleton";
@@ -22,6 +22,7 @@ interface Subworkspace {
     name: string;
     workspace_id: string;
     color?: string;
+    retell_agent_id?: string;
 }
 
 const COLORS = [
@@ -90,6 +91,26 @@ export default function WorkspacePage() {
             });
         } catch (error) {
             console.error("Error updating subworkspace name:", error);
+        }
+    };
+
+    const handleDeleteSubworkspace = async (sub: Subworkspace) => {
+        if (!confirm(`¿Estás seguro de que quieres eliminar el agente "${sub.name}"? Esta acción liberará su Slot de Retell.`)) {
+            return;
+        }
+
+        try {
+            // Optimistic Remove
+            setSubworkspaces(prev => prev.filter(s => s.id !== sub.id));
+
+            await deleteDoc(doc(db, "subworkspaces", sub.id));
+
+        } catch (error) {
+            console.error("Error deleting subworkspace:", error);
+            alert("Error al eliminar el agente");
+            // Revert strictness would require re-fetching or more complex state, 
+            // but for now we assume success or reload.
+            window.location.reload();
         }
     };
 
@@ -210,10 +231,24 @@ export default function WorkspacePage() {
                                     </DropdownMenuContent>
                                 </DropdownMenu>
 
-                                {/* Active status indicator */}
-                                <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800">
-                                    <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
-                                    <span className="text-xs font-medium text-green-700 dark:text-green-400">Activo</span>
+                                {/* Active status and Actions */}
+                                <div className="flex items-center gap-2">
+                                    <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800">
+                                        <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
+                                        <span className="text-xs font-medium text-green-700 dark:text-green-400">Activo</span>
+                                    </div>
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-7 w-7 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-full transition-colors"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleDeleteSubworkspace(sub);
+                                        }}
+                                        title="Eliminar agente"
+                                    >
+                                        <Trash2 className="h-4 w-4" />
+                                    </Button>
                                 </div>
                             </div>
 
@@ -239,7 +274,14 @@ export default function WorkspacePage() {
                                     {sub.name}
                                 </h3>
                             )}
-                            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Gestiona campañas y contactos</p>
+                            <div className="flex flex-col gap-1 mt-1">
+                                <p className="text-sm text-gray-500 dark:text-gray-400">Gestiona campañas y contactos</p>
+                                {sub.retell_agent_id && (
+                                    <p className="text-[10px] font-mono text-gray-400 dark:text-gray-500 truncate bg-gray-50 dark:bg-black/20 px-1.5 py-0.5 rounded w-fit max-w-full">
+                                        ID: {sub.retell_agent_id}
+                                    </p>
+                                )}
+                            </div>
                         </div>
 
                         {/* Manage action link */}
