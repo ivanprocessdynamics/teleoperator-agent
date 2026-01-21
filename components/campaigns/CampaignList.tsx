@@ -196,8 +196,8 @@ function CreateCampaignDialog({
                     </div>
                 </div>
                 <DialogFooter>
-                    <Button variant="ghost" onClick={() => setOpen(false)} className="text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-white">Cancelar</Button>
-                    <Button onClick={handleCreate} disabled={!name.trim() || creating} className="bg-gray-900 dark:bg-blue-600 text-white hover:bg-gray-700 dark:hover:bg-blue-700">
+                    <Button variant="ghost" onClick={() => setOpen(false)} className="text-gray-600 dark:text-white/70 hover:bg-gray-100 dark:hover:bg-white/10 hover:text-gray-900 dark:hover:text-white">Cancelar</Button>
+                    <Button onClick={handleCreate} disabled={!name.trim() || creating} className="bg-gray-200 dark:bg-white/10 text-gray-900 dark:text-white hover:bg-gray-300 dark:hover:bg-white/20">
                         {creating ? "Creando..." : "Crear"}
                     </Button>
                 </DialogFooter>
