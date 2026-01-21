@@ -215,6 +215,34 @@ export function CampaignList({ subworkspaceId, onSelectCampaign }: CampaignListP
     const [campaignToDelete, setCampaignToDelete] = useState<Campaign | null>(null);
     const [deleting, setDeleting] = useState(false);
 
+    // Inline Editing State
+    const [editingCampaignId, setEditingCampaignId] = useState<string | null>(null);
+    const [tempCampaignName, setTempCampaignName] = useState("");
+
+    const handleUpdateCampaignName = async () => {
+        if (!editingCampaignId || !tempCampaignName.trim()) {
+            setEditingCampaignId(null);
+            return;
+        }
+
+        const campId = editingCampaignId;
+        const newName = tempCampaignName;
+
+        // Optimistic update
+        setCampaigns(prev => prev.map(c => c.id === campId ? { ...c, name: newName } : c));
+        setEditingCampaignId(null);
+
+        try {
+            await updateDoc(doc(db, "campaigns", campId), { name: newName });
+        } catch (error) {
+            console.error("Error updating campaign name:", error);
+        }
+    };
+
+    // Inline Editing State
+    const [editingCampaignId, setEditingCampaignId] = useState<string | null>(null);
+    const [tempCampaignName, setTempCampaignName] = useState("");
+
     useEffect(() => {
         if (!subworkspaceId) return;
 
@@ -443,9 +471,30 @@ export function CampaignList({ subworkspaceId, onSelectCampaign }: CampaignListP
                                                 color={camp.color || 'gray'}
                                                 onChange={(i, c) => handleUpdateVisuals(camp.id, i, c)}
                                             />
-                                            <div>
-                                                <h3 className="font-semibold text-gray-900 line-clamp-1">{camp.name}</h3>
-                                                <span className={cn("inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-gray-100 text-gray-600",
+                                            <div className="flex-1 min-w-0">
+                                                {editingCampaignId === camp.id ? (
+                                                    <Input
+                                                        value={tempCampaignName}
+                                                        onChange={(e) => setTempCampaignName(e.target.value)}
+                                                        className="font-semibold text-gray-900 h-7 px-1 -ml-1 text-base w-full bg-white border-gray-300"
+                                                        autoFocus
+                                                        onClick={(e) => e.stopPropagation()}
+                                                        onBlur={handleUpdateCampaignName}
+                                                        onKeyDown={(e) => e.key === 'Enter' && handleUpdateCampaignName()}
+                                                    />
+                                                ) : (
+                                                    <h3
+                                                        className="font-semibold text-gray-900 line-clamp-1 hover:text-gray-600 transition-colors w-fit max-w-full truncate"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            setEditingCampaignId(camp.id);
+                                                            setTempCampaignName(camp.name);
+                                                        }}
+                                                    >
+                                                        {camp.name}
+                                                    </h3>
+                                                )}
+                                                <span className={cn("inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-gray-100 text-gray-600 mt-1",
                                                     camp.status === 'running' && "bg-blue-100 text-blue-700",
                                                     camp.status === 'completed' && "bg-green-100 text-green-700"
                                                 )}>

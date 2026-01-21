@@ -44,6 +44,11 @@ export default function WorkspacePage() {
     const [isEditingName, setIsEditingName] = useState(false);
     const [tempName, setTempName] = useState("");
 
+    // Subworkspace editing state
+    const [editingSubId, setEditingSubId] = useState<string | null>(null);
+    const [tempSubName, setTempSubName] = useState("");
+    const router = useRouter();
+
     const handleSaveName = async () => {
         if (!tempName.trim()) return;
         try {
@@ -63,6 +68,28 @@ export default function WorkspacePage() {
             await updateDoc(doc(db, "subworkspaces", sub.id), { color: newColor });
         } catch (error) {
             console.error("Error updating color:", error);
+        }
+    };
+
+    const handleUpdateSubName = async () => {
+        if (!editingSubId || !tempSubName.trim()) {
+            setEditingSubId(null);
+            return;
+        }
+
+        const subId = editingSubId;
+        const newName = tempSubName;
+
+        // Optimistic update
+        setSubworkspaces(prev => prev.map(s => s.id === subId ? { ...s, name: newName } : s));
+        setEditingSubId(null);
+
+        try {
+            await updateDoc(doc(db, "subworkspaces", subId), {
+                name: newName
+            });
+        } catch (error) {
+            console.error("Error updating subworkspace name:", error);
         }
     };
 
@@ -143,7 +170,8 @@ export default function WorkspacePage() {
                 {subworkspaces.map((sub) => (
                     <div
                         key={sub.id}
-                        className="group relative flex flex-col justify-between rounded-xl border border-gray-200 bg-white p-6 shadow-sm transition-all hover:shadow-md"
+                        onClick={() => router.push(`/workspaces/${workspaceId}/sub/${sub.id}`)}
+                        className="group relative flex flex-col justify-between rounded-xl border border-gray-200 bg-white p-6 shadow-sm transition-all hover:shadow-md cursor-pointer"
                     >
                         <div>
                             <DropdownMenu>
@@ -177,16 +205,29 @@ export default function WorkspacePage() {
                                     </div>
                                 </DropdownMenuContent>
                             </DropdownMenu>
-                            <h3 className="text-lg font-semibold text-gray-900">{sub.name}</h3>
-                            <p className="text-sm text-gray-500">Clic para gestionar contactos y prompts.</p>
-                        </div>
 
-                        <div className="mt-6 flex items-center justify-end">
-                            <Link href={`/workspaces/${workspaceId}/sub/${sub.id}`}>
-                                <Button variant="ghost" className="gap-2 text-blue-600 hover:text-blue-700 hover:bg-blue-50">
-                                    Abrir Agente <ArrowRight className="h-4 w-4" />
-                                </Button>
-                            </Link>
+                            {editingSubId === sub.id ? (
+                                <Input
+                                    value={tempSubName}
+                                    onChange={(e) => setTempSubName(e.target.value)}
+                                    className="text-lg font-semibold text-gray-900 h-8 px-1 -ml-1 w-full"
+                                    autoFocus
+                                    onClick={(e) => e.stopPropagation()}
+                                    onBlur={handleUpdateSubName}
+                                    onKeyDown={(e) => e.key === 'Enter' && handleUpdateSubName()}
+                                />
+                            ) : (
+                                <h3
+                                    className="text-lg font-semibold text-gray-900 hover:text-gray-600 transition-colors w-fit"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        setEditingSubId(sub.id);
+                                        setTempSubName(sub.name);
+                                    }}
+                                >
+                                    {sub.name}
+                                </h3>
+                            )}
                         </div>
                     </div>
                 ))}
