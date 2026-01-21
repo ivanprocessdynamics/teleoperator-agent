@@ -11,9 +11,10 @@ interface CampaignPromptProps {
     prompt: string;
     columns: CampaignColumn[];
     onChange: (newPrompt: string) => void;
+    variableClass?: string;
 }
 
-export function CampaignPrompt({ prompt, columns, onChange }: CampaignPromptProps) {
+export function CampaignPrompt({ prompt, columns, onChange, variableClass }: CampaignPromptProps) {
 
     const insertVariable = (variable: string) => {
         // Simple append for now, ideally insertion at cursor
@@ -46,7 +47,9 @@ export function CampaignPrompt({ prompt, columns, onChange }: CampaignPromptProp
                             <button
                                 key={col.id}
                                 onClick={() => insertVariable(col.key)}
-                                className="inline-flex items-center px-2.5 py-1.5 rounded-md text-xs font-medium bg-blue-50 text-blue-700 hover:bg-blue-100 transition-colors border border-blue-100"
+                                className={cn("inline-flex items-center px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors border",
+                                    variableClass || "bg-blue-50 text-blue-700 hover:bg-blue-100 border-blue-100"
+                                )}
                             >
                                 <Copy className="mr-1.5 h-3 w-3 opacity-50" />
                                 {col.label} <span className="ml-1 opacity-75 font-mono">{'{{' + col.key + '}}'}</span>
