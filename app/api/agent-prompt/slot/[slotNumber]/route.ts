@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { db } from "@/lib/firebase";
+import { signInAnonymously } from "firebase/auth";
+import { db, auth } from "@/lib/firebase";
 import { collection, query, where, getDocs, limit } from "firebase/firestore";
 
 export async function GET(
@@ -17,6 +18,16 @@ export async function GET(
         // Verify DB is initialized
         if (!db || (Object.keys(db).length === 0 && db.constructor === Object)) {
             throw new Error("Database not initialized. Server missing Firebase configuration.");
+        }
+
+        // Attempt anonymous sign-in to satisfying basic security rules (req.auth != null)
+        if (auth) {
+            try {
+                await signInAnonymously(auth);
+            } catch (authError) {
+                console.warn("Anonymous auth failed:", authError);
+                // Continue anyway, maybe rules are public or it was already signed in
+            }
         }
 
         // Find the subworkspace assigned to this slot
