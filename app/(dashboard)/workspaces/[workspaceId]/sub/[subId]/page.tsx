@@ -11,6 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Users, Settings, FlaskConical, Pencil, Check, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { TestingEnvironment } from "@/components/TestingEnvironment";
 
 export default function SubworkspacePage() {
     const params = useParams();
@@ -84,6 +85,7 @@ export default function SubworkspacePage() {
                 // Campaign Detail View
                 <CampaignDetail
                     campaignId={selectedCampaignId}
+                    subworkspaceId={subId}
                     onBack={() => setSelectedCampaignId(null)}
                 />
             ) : (
@@ -112,15 +114,7 @@ export default function SubworkspacePage() {
                     </TabsContent>
 
                     <TabsContent value="test" className="mt-6">
-                        <div className="max-w-5xl mx-auto py-12 text-center">
-                            <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50 p-12">
-                                <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600 mb-4">
-                                    <FlaskConical className="h-6 w-6" />
-                                </div>
-                                <h3 className="text-lg font-medium text-gray-900">Entorno de Pruebas</h3>
-                                <p className="text-sm text-gray-500 mt-2">Pronto podrás probar tus prompts y simulaciones aquí.</p>
-                            </div>
-                        </div>
+                        <TestingEnvironment subworkspaceId={subId} />
                     </TabsContent>
                 </Tabs>
             )}

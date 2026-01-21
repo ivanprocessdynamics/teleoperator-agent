@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef, useCallback } from "react";
-import { doc, onSnapshot, updateDoc } from "firebase/firestore";
+import { doc, onSnapshot, updateDoc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { Campaign, CampaignColumn } from "@/types/campaign";
 import { Button } from "@/components/ui/button";
@@ -18,6 +18,7 @@ import {
 
 interface CampaignDetailProps {
     campaignId: string;
+    subworkspaceId?: string;
     onBack: () => void;
 }
 
@@ -54,13 +55,17 @@ const THEME_STYLES: Record<string, { badge: string; button: string; variable: st
     orange: { badge: "bg-orange-50 text-orange-700 border-orange-200", button: "bg-orange-600 text-white hover:bg-orange-700", variable: "bg-orange-50 dark:bg-orange-500/10 text-orange-700 dark:text-orange-300 hover:bg-orange-100 dark:hover:bg-orange-500/20 border-orange-100 dark:border-orange-500/30" },
 };
 
-export function CampaignDetail({ campaignId, onBack }: CampaignDetailProps) {
+export function CampaignDetail({ campaignId, subworkspaceId, onBack }: CampaignDetailProps) {
     const [campaign, setCampaign] = useState<Campaign | null>(null);
     const [loading, setLoading] = useState(true);
 
     // Saving State
     const [isSaving, setIsSaving] = useState(false);
     const [lastSaved, setLastSaved] = useState<Date | null>(null);
+
+    // Activation State
+    const [isActivating, setIsActivating] = useState(false);
+    const [isActivated, setIsActivated] = useState(false);
 
     // Debounce Refs
     const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -139,6 +144,31 @@ export function CampaignDetail({ campaignId, onBack }: CampaignDetailProps) {
         await updateDoc(doc(db, "campaigns", campaign.id), { icon: newIcon, color: newColor });
         setIsSaving(false);
         setLastSaved(new Date());
+    };
+
+    const handleActivateCampaign = async () => {
+        if (!campaign || !subworkspaceId) return;
+
+        setIsActivating(true);
+        try {
+            // Write the campaign's prompt to the agent's active_prompt
+            await updateDoc(doc(db, "subworkspaces", subworkspaceId), {
+                active_prompt: campaign.prompt_template || ""
+            });
+
+            // Update campaign status to running
+            await updateDoc(doc(db, "campaigns", campaign.id), {
+                status: "running"
+            });
+
+            setIsActivated(true);
+            setTimeout(() => setIsActivated(false), 3000);
+        } catch (error) {
+            console.error("Error activating campaign:", error);
+            alert("Error al activar la campaña");
+        } finally {
+            setIsActivating(false);
+        }
     };
 
     if (loading) return <div className="p-10 text-center text-gray-500 dark:text-gray-400">Cargando editor...</div>;
@@ -239,8 +269,27 @@ export function CampaignDetail({ campaignId, onBack }: CampaignDetailProps) {
                     </div>
                 </div>
                 <div className="flex gap-2">
-                    <Button className={cn("shadow-sm transition-colors", styles.button)}>
-                        <Play className="mr-2 h-4 w-4" /> Lanzar Campaña
+                    <Button
+                        onClick={handleActivateCampaign}
+                        disabled={isActivating || !subworkspaceId}
+                        className={cn("shadow-sm transition-colors", styles.button)}
+                    >
+                        {isActivating ? (
+                            <>
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                Activando...
+                            </>
+                        ) : isActivated ? (
+                            <>
+                                <Check className="mr-2 h-4 w-4" />
+                                Campaña Activa
+                            </>
+                        ) : (
+                            <>
+                                <Play className="mr-2 h-4 w-4" />
+                                Lanzar Campaña
+                            </>
+                        )}
                     </Button>
                 </div>
             </div>

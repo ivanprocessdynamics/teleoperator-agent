@@ -21,17 +21,20 @@ export async function GET(
         }
 
         const data = subSnap.data();
-        // Concatenate prompts
-        const corePrompt = data.prompt_core_text || "";
-        const editablePrompt = data.prompt_editable_text || "";
-        const combinedPrompt = `${corePrompt}\n\n${editablePrompt}`;
 
-        // Return as plain text or JSON as requested by Retell
-        // Usually LLM URL expects just the prompt string or a JSON structure matching the LLM request
-        // The user requirement said "JSON plano o texto plano". Let's return JSON for flexibility or text if specified.
+        // Priority: active_prompt (set by campaigns/testing) > combined prompts
+        let promptToReturn = data.active_prompt;
 
+        if (!promptToReturn) {
+            // Fallback to concatenated prompts
+            const corePrompt = data.prompt_core_text || "";
+            const editablePrompt = data.prompt_editable_text || "";
+            promptToReturn = `${corePrompt}\n\n${editablePrompt}`;
+        }
+
+        // Return as JSON for Retell compatibility
         return NextResponse.json({
-            prompt: combinedPrompt
+            prompt: promptToReturn
         });
 
     } catch (error) {

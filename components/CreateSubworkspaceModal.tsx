@@ -2,8 +2,9 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { addDoc, collection, serverTimestamp } from "firebase/firestore";
+import { addDoc, collection, serverTimestamp, getDocs, query, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { RETELL_AGENT_SLOTS } from "@/lib/retell-agents";
 import { Button } from "@/components/ui/button";
 import {
     Dialog,
@@ -59,10 +60,34 @@ export function CreateSubworkspaceModal({ workspaceId, children }: CreateSubwork
 
         setLoading(true);
         try {
+            // Find the next available Retell slot
+            const existingSubsQuery = query(
+                collection(db, "subworkspaces"),
+                where("workspace_id", "==", workspaceId)
+            );
+            const existingSnap = await getDocs(existingSubsQuery);
+            const usedSlots = existingSnap.docs
+                .map(doc => doc.data().retell_slot)
+                .filter((slot): slot is number => typeof slot === 'number');
+
+            // Find next available slot (1-10)
+            let nextSlot = 1;
+            for (let i = 1; i <= 10; i++) {
+                if (!usedSlots.includes(i)) {
+                    nextSlot = i;
+                    break;
+                }
+            }
+
+            const assignedSlot = RETELL_AGENT_SLOTS.find(s => s.slot === nextSlot);
+
             await addDoc(collection(db, "subworkspaces"), {
                 workspace_id: workspaceId,
                 name: name,
                 color: selectedColor,
+                retell_slot: nextSlot,
+                retell_agent_id: assignedSlot?.agentId || "",
+                active_prompt: "",
                 prompt_core_text: "You are a helpful assistant.",
                 prompt_editable_text: "Your goal is to...",
                 created_at: serverTimestamp(),
