@@ -16,16 +16,34 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Plus } from "lucide-react";
+import { Plus, Mic } from "lucide-react";
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { cn } from "@/lib/utils";
 
 interface CreateSubworkspaceModalProps {
     workspaceId: string;
     children?: React.ReactNode;
 }
 
+const COLORS = [
+    { name: 'gray', class: 'bg-gray-100 text-gray-600', hover: 'hover:bg-gray-200' },
+    { name: 'blue', class: 'bg-blue-50 text-blue-600', hover: 'hover:bg-blue-100' },
+    { name: 'green', class: 'bg-green-50 text-green-600', hover: 'hover:bg-green-100' },
+    { name: 'yellow', class: 'bg-yellow-50 text-yellow-600', hover: 'hover:bg-yellow-100' },
+    { name: 'red', class: 'bg-red-50 text-red-600', hover: 'hover:bg-red-100' },
+    { name: 'purple', class: 'bg-purple-50 text-purple-600', hover: 'hover:bg-purple-100' },
+    { name: 'pink', class: 'bg-pink-50 text-pink-600', hover: 'hover:bg-pink-100' },
+    { name: 'orange', class: 'bg-orange-50 text-orange-600', hover: 'hover:bg-orange-100' },
+];
+
 export function CreateSubworkspaceModal({ workspaceId, children }: CreateSubworkspaceModalProps) {
     const [open, setOpen] = useState(false);
     const [name, setName] = useState("");
+    const [selectedColor, setSelectedColor] = useState("blue");
     const [loading, setLoading] = useState(false);
     const router = useRouter();
 
@@ -44,6 +62,7 @@ export function CreateSubworkspaceModal({ workspaceId, children }: CreateSubwork
             await addDoc(collection(db, "subworkspaces"), {
                 workspace_id: workspaceId,
                 name: name,
+                color: selectedColor,
                 prompt_core_text: "You are a helpful assistant.",
                 prompt_editable_text: "Your goal is to...",
                 created_at: serverTimestamp(),
@@ -51,6 +70,7 @@ export function CreateSubworkspaceModal({ workspaceId, children }: CreateSubwork
 
             setOpen(false);
             setName("");
+            setSelectedColor("blue");
             setError(false);
             router.refresh();
             window.location.reload();
@@ -73,6 +93,7 @@ export function CreateSubworkspaceModal({ workspaceId, children }: CreateSubwork
             setOpen(val);
             if (!val) {
                 setName("");
+                setSelectedColor("blue");
                 setError(false);
             }
         }}>
@@ -86,13 +107,41 @@ export function CreateSubworkspaceModal({ workspaceId, children }: CreateSubwork
             </DialogTrigger>
             <DialogContent className="sm:max-w-[425px] bg-white text-gray-900 border-gray-200 shadow-xl">
                 <DialogHeader>
-                    <DialogTitle className="text-xl font-bold tracking-tight text-gray-900">Crear Agente (Sub-espacio)</DialogTitle>
+                    <DialogTitle className="text-xl font-bold tracking-tight text-gray-900">Crear Agente</DialogTitle>
                     <DialogDescription className="text-gray-500">
-                        Crea un nuevo entorno de agente con sus propios contactos y prompts.
+                        Crea un nuevo agente con su propia configuración y campañas.
                     </DialogDescription>
                 </DialogHeader>
                 <div className="grid gap-4 py-4">
-                    <div className="flex flex-col gap-4">
+                    <div className="flex gap-3">
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <div
+                                    className={cn(
+                                        "flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-lg transition-transform hover:scale-105 active:scale-95 outline-none",
+                                        COLORS.find(c => c.name === selectedColor)?.class
+                                    )}
+                                >
+                                    <Mic className="h-5 w-5" />
+                                </div>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent className="p-2 w-auto bg-white border-gray-200 shadow-xl" align="start">
+                                <div className="grid grid-cols-4 gap-2">
+                                    {COLORS.map((color) => (
+                                        <div
+                                            key={color.name}
+                                            onClick={() => setSelectedColor(color.name)}
+                                            className={cn(
+                                                "h-8 w-8 rounded-md cursor-pointer border border-transparent hover:scale-110 transition-all flex items-center justify-center",
+                                                color.class,
+                                                selectedColor === color.name && "ring-1 ring-offset-1 ring-gray-900 border-gray-300"
+                                            )}
+                                        />
+                                    ))}
+                                </div>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+
                         <Input
                             id="name"
                             value={name}
@@ -101,9 +150,9 @@ export function CreateSubworkspaceModal({ workspaceId, children }: CreateSubwork
                                 if (e.target.value.trim()) setError(false);
                             }}
                             onKeyDown={handleKeyDown}
-                            className={`w-full bg-white text-gray-900 focus:ring-blue-500 ${error
-                                    ? "border-red-500 focus:border-red-500 ring-red-500 placeholder:text-red-300"
-                                    : "border-gray-300 focus:border-blue-500"
+                            className={`flex-1 bg-white text-gray-900 focus:ring-blue-500 placeholder:text-gray-400 ${error
+                                ? "border-red-500 focus:border-red-500 ring-red-500 placeholder:text-red-300"
+                                : "border-gray-300 focus:border-blue-500"
                                 }`}
                             placeholder="Ej: Agente de Soporte"
                         />
