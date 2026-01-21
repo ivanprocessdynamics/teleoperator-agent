@@ -208,7 +208,7 @@ function CreateCampaignDialog({
 
 export function CampaignList({ subworkspaceId, onSelectCampaign }: CampaignListProps) {
     const [campaigns, setCampaigns] = useState<Campaign[]>([]);
-    const [loading, setLoading] = useState(true);
+    const [loading, setLoading] = useState(false);
 
     // Delete confirmation dialog state
     const [isDeleteOpen, setIsDeleteOpen] = useState(false);
