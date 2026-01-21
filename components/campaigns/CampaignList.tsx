@@ -33,14 +33,14 @@ const ICONS = [
 ];
 
 const COLORS = [
-    { name: 'gray', class: 'bg-gray-100 text-gray-600', hover: 'hover:bg-gray-200' },
-    { name: 'blue', class: 'bg-blue-50 text-blue-600', hover: 'hover:bg-blue-100' },
-    { name: 'green', class: 'bg-green-50 text-green-600', hover: 'hover:bg-green-100' },
-    { name: 'yellow', class: 'bg-yellow-50 text-yellow-600', hover: 'hover:bg-yellow-100' },
-    { name: 'red', class: 'bg-red-50 text-red-600', hover: 'hover:bg-red-100' },
-    { name: 'purple', class: 'bg-purple-50 text-purple-600', hover: 'hover:bg-purple-100' },
-    { name: 'pink', class: 'bg-pink-50 text-pink-600', hover: 'hover:bg-pink-100' },
-    { name: 'orange', class: 'bg-orange-50 text-orange-600', hover: 'hover:bg-orange-100' },
+    { name: 'gray', class: 'bg-gray-100 text-gray-600', pickerClass: 'bg-gray-500', hover: 'hover:bg-gray-200' },
+    { name: 'blue', class: 'bg-blue-50 text-blue-600', pickerClass: 'bg-blue-500', hover: 'hover:bg-blue-100' },
+    { name: 'green', class: 'bg-green-50 text-green-600', pickerClass: 'bg-green-500', hover: 'hover:bg-green-100' },
+    { name: 'yellow', class: 'bg-yellow-50 text-yellow-600', pickerClass: 'bg-yellow-500', hover: 'hover:bg-yellow-100' },
+    { name: 'red', class: 'bg-red-50 text-red-600', pickerClass: 'bg-red-500', hover: 'hover:bg-red-100' },
+    { name: 'purple', class: 'bg-purple-50 text-purple-600', pickerClass: 'bg-purple-500', hover: 'hover:bg-purple-100' },
+    { name: 'pink', class: 'bg-pink-50 text-pink-600', pickerClass: 'bg-pink-500', hover: 'hover:bg-pink-100' },
+    { name: 'orange', class: 'bg-orange-50 text-orange-600', pickerClass: 'bg-orange-500', hover: 'hover:bg-orange-100' },
 ];
 
 function IconVisualSelector({
@@ -102,8 +102,8 @@ function IconVisualSelector({
                                     }}
                                     className={cn(
                                         "h-8 w-full rounded-md cursor-pointer border border-transparent hover:scale-105 transition-all flex items-center justify-center",
-                                        item.class,
-                                        color === item.name && "ring-1 ring-offset-1 ring-gray-900 border-gray-300"
+                                        item.pickerClass,
+                                        color === item.name && "ring-2 ring-offset-2 ring-gray-900 border-transparent scale-110"
                                     )}
                                 >
                                 </div>
@@ -427,7 +427,7 @@ export function CampaignList({ subworkspaceId, onSelectCampaign }: CampaignListP
                         subworkspaceId={subworkspaceId}
                         onSelectCampaign={onSelectCampaign}
                         trigger={
-                            <Button className="bg-gray-900 dark:bg-blue-600 text-white hover:bg-black dark:hover:bg-blue-700">
+                            <Button className="bg-gray-900 dark:bg-blue-600 text-white dark:text-white hover:bg-black dark:hover:bg-blue-700">
                                 <Plus className="mr-2 h-4 w-4" /> Nueva Campaña
                             </Button>
                         }

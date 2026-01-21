@@ -48,8 +48,8 @@ export function Sidebar() {
     ];
 
     return (
-        <div className="flex h-screen w-64 flex-col border-r bg-gray-50/40 dark:bg-gray-900/40 dark:border-gray-800 text-sm">
-            <div className="flex h-14 items-center border-b dark:border-gray-800 px-4 lg:h-[60px]">
+        <div className="flex h-screen w-64 flex-col border-r bg-gray-50/40 dark:bg-gray-900/40 border-gray-200 dark:border-white/5 text-sm">
+            <div className="flex h-14 items-center border-b border-gray-200 dark:border-white/5 px-4 lg:h-[60px]">
                 <Link href="/" className="flex items-center gap-2 font-semibold">
                     <span className="text-lg tracking-tight text-gray-900 dark:text-white">VoiceCRM</span>
                 </Link>
@@ -76,7 +76,7 @@ export function Sidebar() {
                 </nav>
             </div>
 
-            <div className="border-t dark:border-gray-800 p-4">
+            <div className="border-t border-gray-200 dark:border-white/5 p-4">
                 <div className="flex items-center gap-3 mb-4">
                     <div className="h-8 w-8 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center text-xs text-gray-600 dark:text-gray-300 font-bold overflow-hidden">
                         {user?.photoURL ? (

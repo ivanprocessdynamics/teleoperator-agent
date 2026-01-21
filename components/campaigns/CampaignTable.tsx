@@ -484,6 +484,17 @@ export function CampaignTable({ campaign, onColumnsChange }: CampaignTableProps)
 
     useEffect(() => {
         const handleKeyDown = async (e: KeyboardEvent) => {
+            // Skip table shortcuts if focus is on textarea or contenteditable (e.g., Prompt editor)
+            const activeElement = document.activeElement;
+            const isInTextarea = activeElement?.tagName === 'TEXTAREA';
+            const isContentEditable = activeElement?.getAttribute('contenteditable') === 'true';
+            const isInTableContainer = tableContainerRef.current?.contains(activeElement as Node);
+
+            // Only handle table shortcuts if focus is within the table or on a table cell input
+            if (isInTextarea || isContentEditable) {
+                return; // Let native behavior handle it
+            }
+
             // Track Ctrl press timestamp
             if (e.key === 'Control' || e.key === 'Meta') {
                 ctrlPressedAtRef.current = Date.now();

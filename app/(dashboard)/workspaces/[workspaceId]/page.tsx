@@ -171,13 +171,10 @@ export default function WorkspacePage() {
                     <div
                         key={sub.id}
                         onClick={() => router.push(`/workspaces/${workspaceId}/sub/${sub.id}`)}
-                        className="group relative flex flex-col justify-between rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-6 shadow-sm transition-all duration-300 hover:shadow-xl hover:-translate-y-1 hover:border-gray-300 dark:hover:border-gray-600 cursor-pointer overflow-hidden"
+                        className="group relative flex flex-col justify-between rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-6 shadow-sm transition-all duration-300 hover:shadow-md hover:border-gray-300 dark:hover:border-gray-500 dark:hover:bg-gray-750 cursor-pointer overflow-hidden"
                     >
                         {/* Decorative gradient background */}
-                        <div className={cn(
-                            "absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500",
-                            "bg-gradient-to-br from-transparent via-transparent to-gray-50"
-                        )} />
+
 
                         <div className="relative z-10">
                             <div className="flex items-start justify-between mb-4">
