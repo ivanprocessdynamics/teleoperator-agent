@@ -5,16 +5,43 @@ import { doc, onSnapshot, updateDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { Campaign, CampaignColumn } from "@/types/campaign";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Play, Save, Check, Loader2 } from "lucide-react";
+import { ArrowLeft, Play, Save, Check, Loader2, FileText, Phone, Users, Target, Zap, Star, MessageCircle, Mail } from "lucide-react";
 import { CampaignTable } from "./CampaignTable";
 import { CampaignPrompt } from "./CampaignPrompt";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface CampaignDetailProps {
     campaignId: string;
     onBack: () => void;
 }
+
+const ICONS = [
+    { name: 'FileText', icon: FileText },
+    { name: 'Phone', icon: Phone },
+    { name: 'Users', icon: Users },
+    { name: 'Target', icon: Target },
+    { name: 'Zap', icon: Zap },
+    { name: 'Star', icon: Star },
+    { name: 'MessageCircle', icon: MessageCircle },
+    { name: 'Mail', icon: Mail },
+];
+
+const COLORS = [
+    { name: 'gray', class: 'bg-gray-100 text-gray-600', pickerClass: 'bg-gray-500' },
+    { name: 'blue', class: 'bg-blue-50 text-blue-600', pickerClass: 'bg-blue-500' },
+    { name: 'green', class: 'bg-green-50 text-green-600', pickerClass: 'bg-green-500' },
+    { name: 'yellow', class: 'bg-yellow-50 text-yellow-600', pickerClass: 'bg-yellow-500' },
+    { name: 'red', class: 'bg-red-50 text-red-600', pickerClass: 'bg-red-500' },
+    { name: 'purple', class: 'bg-purple-50 text-purple-600', pickerClass: 'bg-purple-500' },
+    { name: 'pink', class: 'bg-pink-50 text-pink-600', pickerClass: 'bg-pink-500' },
+    { name: 'orange', class: 'bg-orange-50 text-orange-600', pickerClass: 'bg-orange-500' },
+];
 
 const THEME_STYLES: Record<string, { badge: string; button: string; variable: string }> = {
     gray: { badge: "bg-gray-100 text-gray-700 border-gray-200", button: "bg-gray-900 text-white hover:bg-black", variable: "bg-gray-100 dark:bg-gray-700/50 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 border-gray-200 dark:border-gray-600" },
@@ -103,6 +130,17 @@ export function CampaignDetail({ campaignId, onBack }: CampaignDetailProps) {
         debouncedSave({ name: newName });
     };
 
+    const handleUpdateVisuals = async (newIcon: string, newColor: string) => {
+        if (!campaign) return;
+        // 1. Optimistic Update
+        setCampaign(prev => prev ? ({ ...prev, icon: newIcon, color: newColor }) : null);
+        // 2. Immediate Save (discrete action)
+        setIsSaving(true);
+        await updateDoc(doc(db, "campaigns", campaign.id), { icon: newIcon, color: newColor });
+        setIsSaving(false);
+        setLastSaved(new Date());
+    };
+
     if (loading) return <div className="p-10 text-center text-gray-500 dark:text-gray-400">Cargando editor...</div>;
     if (!campaign) return <div className="p-10 text-center text-red-500">Campaña no encontrada</div>;
 
@@ -117,10 +155,65 @@ export function CampaignDetail({ campaignId, onBack }: CampaignDetailProps) {
                     <Button variant="ghost" size="icon" onClick={onBack}>
                         <ArrowLeft className="h-5 w-5" />
                     </Button>
+
+                    {/* Icon/Color Selector */}
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <div
+                                className={cn(
+                                    "flex h-10 w-10 cursor-pointer items-center justify-center rounded-lg transition-transform hover:scale-105 active:scale-95 shrink-0",
+                                    COLORS.find(c => c.name === (campaign.color || 'gray'))?.class || COLORS[0].class
+                                )}
+                            >
+                                {(() => {
+                                    const IconComponent = ICONS.find(i => i.name === (campaign.icon || 'FileText'))?.icon || FileText;
+                                    return <IconComponent className="h-5 w-5" />;
+                                })()}
+                            </div>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent className="w-64 p-3 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700" align="start">
+                            <div className="space-y-4">
+                                <div>
+                                    <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase mb-2 block">Icono</span>
+                                    <div className="grid grid-cols-4 gap-2">
+                                        {ICONS.map((item) => (
+                                            <div
+                                                key={item.name}
+                                                onClick={() => handleUpdateVisuals(item.name, campaign.color || 'gray')}
+                                                className={cn(
+                                                    "flex items-center justify-center p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer transition-colors",
+                                                    campaign.icon === item.name && "bg-gray-100 dark:bg-gray-700 ring-1 ring-gray-900 dark:ring-white"
+                                                )}
+                                            >
+                                                <item.icon className="h-4 w-4 text-gray-700 dark:text-gray-300" />
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                                <div>
+                                    <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase mb-2 block">Color</span>
+                                    <div className="grid grid-cols-4 gap-2">
+                                        {COLORS.map((item) => (
+                                            <div
+                                                key={item.name}
+                                                onClick={() => handleUpdateVisuals(campaign.icon || 'FileText', item.name)}
+                                                className={cn(
+                                                    "h-8 w-full rounded-md cursor-pointer border border-transparent hover:scale-105 transition-all flex items-center justify-center",
+                                                    item.pickerClass,
+                                                    campaign.color === item.name && "ring-2 ring-offset-2 ring-gray-900 dark:ring-white border-transparent scale-110"
+                                                )}
+                                            />
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+
                     <Input
                         value={campaign.name}
                         onChange={(e) => handleNameChange(e.target.value)}
-                        className="text-xl font-bold text-gray-900 dark:text-white border-none px-0 h-auto focus-visible:ring-0 bg-transparent w-[300px]"
+                        className="text-xl font-bold text-gray-900 dark:text-white border-none px-2 h-auto focus-visible:ring-0 bg-transparent w-[300px]"
                         placeholder="Nombre de la Campaña"
                     />
                     <div className="flex items-center gap-2">
