@@ -38,8 +38,16 @@ try {
         }
     } else {
         console.warn("Firebase API Key missing. Services not initialized. (OK for build time)");
-        // Mock objects to satisfy exports during build
-        auth = {};
+        // Mock objects to satisfy exports during build/runtime when config is missing
+        auth = {
+            onAuthStateChanged: (callback: (user: null) => void) => {
+                callback(null);
+                return () => { }; // unsubscribe function
+            },
+            signInWithPopup: () => Promise.reject(new Error("Firebase not configured")),
+            signOut: () => Promise.resolve(),
+            currentUser: null
+        };
         db = {};
         googleProvider = {};
     }

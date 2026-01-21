@@ -166,51 +166,65 @@ export default function WorkspacePage() {
                 <CreateSubworkspaceModal workspaceId={workspaceId} />
             </div>
 
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+            <div className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">
                 {subworkspaces.map((sub) => (
                     <div
                         key={sub.id}
                         onClick={() => router.push(`/workspaces/${workspaceId}/sub/${sub.id}`)}
-                        className="group relative flex flex-col justify-between rounded-xl border border-gray-200 bg-white p-6 shadow-sm transition-all hover:shadow-md cursor-pointer"
+                        className="group relative flex flex-col justify-between rounded-2xl border border-gray-200 bg-white p-6 shadow-sm transition-all duration-300 hover:shadow-xl hover:-translate-y-1 hover:border-gray-300 cursor-pointer overflow-hidden"
                     >
-                        <div>
-                            <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                    <div
-                                        className={cn(
-                                            "mb-4 flex h-10 w-10 cursor-pointer items-center justify-center rounded-lg transition-transform hover:scale-105 active:scale-95 outline-none",
-                                            COLORS.find(c => c.name === (sub.color || 'blue'))?.class || COLORS[1].class
-                                        )}
-                                        onClick={(e) => e.stopPropagation()}
-                                    >
-                                        <Mic className="h-5 w-5" />
-                                    </div>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent className="p-2 w-auto bg-white border-gray-200 shadow-xl" align="start">
-                                    <div className="grid grid-cols-4 gap-2">
-                                        {COLORS.map((color) => (
-                                            <div
-                                                key={color.name}
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    handleUpdateColor(sub, color.name);
-                                                }}
-                                                className={cn(
-                                                    "h-8 w-8 rounded-md cursor-pointer border border-transparent hover:scale-110 transition-all flex items-center justify-center",
-                                                    color.class,
-                                                    sub.color === color.name && "ring-1 ring-offset-1 ring-gray-900 border-gray-300"
-                                                )}
-                                            />
-                                        ))}
-                                    </div>
-                                </DropdownMenuContent>
-                            </DropdownMenu>
+                        {/* Decorative gradient background */}
+                        <div className={cn(
+                            "absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500",
+                            "bg-gradient-to-br from-transparent via-transparent to-gray-50"
+                        )} />
+
+                        <div className="relative z-10">
+                            <div className="flex items-start justify-between mb-4">
+                                <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                        <div
+                                            className={cn(
+                                                "flex h-12 w-12 cursor-pointer items-center justify-center rounded-xl transition-all duration-300 hover:scale-110 active:scale-95 outline-none shadow-sm",
+                                                COLORS.find(c => c.name === (sub.color || 'blue'))?.class || COLORS[1].class
+                                            )}
+                                            onClick={(e) => e.stopPropagation()}
+                                        >
+                                            <Mic className="h-6 w-6" />
+                                        </div>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent className="p-2 w-auto bg-white border-gray-200 shadow-xl" align="start">
+                                        <div className="grid grid-cols-4 gap-2">
+                                            {COLORS.map((color) => (
+                                                <div
+                                                    key={color.name}
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        handleUpdateColor(sub, color.name);
+                                                    }}
+                                                    className={cn(
+                                                        "h-8 w-8 rounded-md cursor-pointer border border-transparent hover:scale-110 transition-all flex items-center justify-center",
+                                                        color.class,
+                                                        sub.color === color.name && "ring-1 ring-offset-1 ring-gray-900 border-gray-300"
+                                                    )}
+                                                />
+                                            ))}
+                                        </div>
+                                    </DropdownMenuContent>
+                                </DropdownMenu>
+
+                                {/* Active status indicator */}
+                                <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-green-50 border border-green-200">
+                                    <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
+                                    <span className="text-xs font-medium text-green-700">Activo</span>
+                                </div>
+                            </div>
 
                             {editingSubId === sub.id ? (
                                 <Input
                                     value={tempSubName}
                                     onChange={(e) => setTempSubName(e.target.value)}
-                                    className="text-lg font-semibold text-gray-900 h-8 px-1 -ml-1 w-full"
+                                    className="text-xl font-bold text-gray-900 h-9 px-2 -ml-2 w-full bg-white border-gray-300"
                                     autoFocus
                                     onClick={(e) => e.stopPropagation()}
                                     onBlur={handleUpdateSubName}
@@ -218,7 +232,7 @@ export default function WorkspacePage() {
                                 />
                             ) : (
                                 <h3
-                                    className="text-lg font-semibold text-gray-900 hover:text-gray-600 transition-colors w-fit"
+                                    className="text-xl font-bold text-gray-900 hover:text-gray-600 transition-colors w-fit cursor-text"
                                     onClick={(e) => {
                                         e.stopPropagation();
                                         setEditingSubId(sub.id);
@@ -228,6 +242,15 @@ export default function WorkspacePage() {
                                     {sub.name}
                                 </h3>
                             )}
+                            <p className="text-sm text-gray-500 mt-1">Gestiona campañas y contactos</p>
+                        </div>
+
+                        {/* Manage action link */}
+                        <div className="relative z-10 mt-6 pt-4 border-t border-gray-100 flex items-center justify-between">
+                            <span className="text-sm text-gray-400 group-hover:text-gray-600 transition-colors">
+                                Haz clic para gestionar
+                            </span>
+                            <ArrowRight className="h-4 w-4 text-gray-400 group-hover:text-gray-900 group-hover:translate-x-1 transition-all" />
                         </div>
                     </div>
                 ))}

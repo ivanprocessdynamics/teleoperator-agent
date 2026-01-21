@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { LayoutDashboard } from "lucide-react";
+import { InteractiveGridBackground } from "@/components/ui/InteractiveGridBackground";
 
 export default function Home() {
 
@@ -28,11 +29,11 @@ export default function Home() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-white bg-[radial-gradient(868a91_1px,transparent_1px)] [background-size:16px_16px]">
-      {/* Subtle white glow behind the card - slightly stronger to contrast with darker dots */}
-      <div className="absolute inset-0 bg-white/40 bg-[radial-gradient(ellipse_at_center,transparent_0%,white_100%)] pointer-events-none" />
+    <div className="relative flex min-h-screen items-center justify-center bg-white">
+      {/* Interactive dot grid background */}
+      <InteractiveGridBackground />
 
-      <div className="relative w-full max-w-[420px] p-10 md:p-12 bg-white border border-gray-100 shadow-[0_8px_30px_rgb(0,0,0,0.08)] rounded-2xl transition-all duration-500 hover:shadow-[0_20px_40px_rgb(0,0,0,0.12)] hover:-translate-y-1">
+      <div className="relative z-10 w-full max-w-[420px] p-10 md:p-12 bg-white/90 backdrop-blur-sm border border-gray-100 shadow-[0_8px_30px_rgb(0,0,0,0.08)] rounded-2xl transition-all duration-500 hover:shadow-[0_20px_40px_rgb(0,0,0,0.12)] hover:-translate-y-1">
         <div className="flex flex-col items-center text-center">
           {/* Logo / Icon */}
           <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-gray-900 shadow-sm transition-transform hover:scale-105 duration-300 mb-8">
