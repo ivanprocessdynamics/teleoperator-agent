@@ -239,9 +239,7 @@ export function CampaignList({ subworkspaceId, onSelectCampaign }: CampaignListP
         }
     };
 
-    // Inline Editing State
-    const [editingCampaignId, setEditingCampaignId] = useState<string | null>(null);
-    const [tempCampaignName, setTempCampaignName] = useState("");
+
 
     useEffect(() => {
         if (!subworkspaceId) return;
