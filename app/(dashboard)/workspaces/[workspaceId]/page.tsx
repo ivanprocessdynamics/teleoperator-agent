@@ -10,12 +10,30 @@ import { Mic, Users, ArrowRight, Pencil, Check, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import Link from "next/link";
 import { SkeletonPage } from "@/components/ui/skeleton";
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { cn } from "@/lib/utils";
 
 interface Subworkspace {
     id: string;
     name: string;
     workspace_id: string;
+    color?: string;
 }
+
+const COLORS = [
+    { name: 'gray', class: 'bg-gray-100 text-gray-600', hover: 'hover:bg-gray-200' },
+    { name: 'blue', class: 'bg-blue-50 text-blue-600', hover: 'hover:bg-blue-100' },
+    { name: 'green', class: 'bg-green-50 text-green-600', hover: 'hover:bg-green-100' },
+    { name: 'yellow', class: 'bg-yellow-50 text-yellow-600', hover: 'hover:bg-yellow-100' },
+    { name: 'red', class: 'bg-red-50 text-red-600', hover: 'hover:bg-red-100' },
+    { name: 'purple', class: 'bg-purple-50 text-purple-600', hover: 'hover:bg-purple-100' },
+    { name: 'pink', class: 'bg-pink-50 text-pink-600', hover: 'hover:bg-pink-100' },
+    { name: 'orange', class: 'bg-orange-50 text-orange-600', hover: 'hover:bg-orange-100' },
+];
 
 export default function WorkspacePage() {
     const params = useParams();
@@ -36,6 +54,15 @@ export default function WorkspacePage() {
             setIsEditingName(false);
         } catch (error) {
             console.error("Error updating name:", error);
+        }
+    };
+
+    const handleUpdateColor = async (sub: Subworkspace, newColor: string) => {
+        setSubworkspaces(prev => prev.map(s => s.id === sub.id ? { ...s, color: newColor } : s));
+        try {
+            await updateDoc(doc(db, "subworkspaces", sub.id), { color: newColor });
+        } catch (error) {
+            console.error("Error updating color:", error);
         }
     };
 
@@ -119,9 +146,37 @@ export default function WorkspacePage() {
                         className="group relative flex flex-col justify-between rounded-xl border border-gray-200 bg-white p-6 shadow-sm transition-all hover:shadow-md"
                     >
                         <div>
-                            <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-lg bg-blue-50 text-blue-600">
-                                <Mic className="h-5 w-5" />
-                            </div>
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                    <div
+                                        className={cn(
+                                            "mb-4 flex h-10 w-10 cursor-pointer items-center justify-center rounded-lg transition-transform hover:scale-105 active:scale-95 outline-none",
+                                            COLORS.find(c => c.name === (sub.color || 'blue'))?.class || COLORS[1].class
+                                        )}
+                                        onClick={(e) => e.stopPropagation()}
+                                    >
+                                        <Mic className="h-5 w-5" />
+                                    </div>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent className="p-2 w-auto bg-white border-gray-200 shadow-xl" align="start">
+                                    <div className="grid grid-cols-4 gap-2">
+                                        {COLORS.map((color) => (
+                                            <div
+                                                key={color.name}
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    handleUpdateColor(sub, color.name);
+                                                }}
+                                                className={cn(
+                                                    "h-8 w-8 rounded-md cursor-pointer border border-transparent hover:scale-110 transition-all flex items-center justify-center",
+                                                    color.class,
+                                                    sub.color === color.name && "ring-1 ring-offset-1 ring-gray-900 border-gray-300"
+                                                )}
+                                            />
+                                        ))}
+                                    </div>
+                                </DropdownMenuContent>
+                            </DropdownMenu>
                             <h3 className="text-lg font-semibold text-gray-900">{sub.name}</h3>
                             <p className="text-sm text-gray-500">Clic para gestionar contactos y prompts.</p>
                         </div>
