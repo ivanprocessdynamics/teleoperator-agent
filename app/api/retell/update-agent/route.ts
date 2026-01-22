@@ -40,21 +40,32 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: "Agent has no LLM ID assigned" }, { status: 400 });
         }
 
-        // 3. Update the LLM with the new prompt
+        // 3. Retrieve LLM to check structure
+        const currentLlm = await retell.llm.retrieve(llmId);
+        console.log(`Current LLM State:`, JSON.stringify(currentLlm, null, 2));
+
+        // 4. Update the LLM with the new prompt
         console.log(`Updating LLM ${llmId} with new prompt...`);
-        // Using 'general_prompt' as the likely field for system prompt in Retell LLM
-        // If Retell API changed, this might need adjustment to 'system_prompt' or 'general_system_prompt'
-        // Checking Retell types usually reveals 'general_prompt' or 'model_config'.
-        // Based on recent docs: 'general_prompt' is the unified system prompt.
+
+        // We try updating 'general_prompt'. 
+        // Note: Check if 'system_prompt' exists in currentLlm and update that too if needed?
+        // Retell V2 usually uses general_prompt.
+
         const llmUpdate = await retell.llm.update(llmId, {
             general_prompt: prompt
         });
+
+        // 5. Verify update
+        const updatedLlm = await retell.llm.retrieve(llmId);
 
         return NextResponse.json({
             success: true,
             message: "Prompt updated",
             llm_id: llmId,
-            agent_id: agent_id
+            agent_id: agent_id,
+            previous_prompt: currentLlm.general_prompt,
+            new_prompt: updatedLlm.general_prompt,
+            llm_type: currentLlm.model // log model type (e.g. gpt-4o)
         });
 
     } catch (error: any) {

@@ -184,7 +184,8 @@ export function CampaignDetail({ campaignId, subworkspaceId, onBack }: CampaignD
                             console.warn("Failed to push to Retell:", errData);
                             // We don't block UI but we warn
                         } else {
-                            console.log("Retell Agent updated successfully");
+                            const successData = await response.json();
+                            console.log("Retell Agent updated successfully:", successData);
                         }
                     } catch (apiErr) {
                         console.error("API Call error:", apiErr);

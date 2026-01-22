@@ -69,7 +69,8 @@ export function TestingEnvironment({ subworkspaceId }: TestingEnvironmentProps) 
                         const errData = await response.json();
                         console.warn("Failed to push to Retell:", errData);
                     } else {
-                        console.log("Retell Agent updated for testing");
+                        const successData = await response.json();
+                        console.log("Retell Agent updated for testing:", successData);
                     }
                 } catch (apiErr) {
                     console.error("API Call error during test save:", apiErr);
