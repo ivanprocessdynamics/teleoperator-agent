@@ -137,7 +137,7 @@ export function CallHistoryTable({ agentId }: CallHistoryTableProps) {
                         </TableHeader>
                         <TableBody>
                             {calls.map((call) => {
-                                const sentiment = getSentimentConfig(call.analysis.user_sentiment);
+                                const sentiment = getSentimentConfig(call.analysis?.user_sentiment);
                                 const SentimentIcon = sentiment.icon;
                                 const isExpanded = expandedSummaries.has(call.id);
 
@@ -177,14 +177,14 @@ export function CallHistoryTable({ agentId }: CallHistoryTableProps) {
                                                     )}
                                                     title={isExpanded ? "Click para reducir" : "Click para expandir"}
                                                 >
-                                                    {call.analysis.call_summary || (
+                                                    {call.analysis?.call_summary || (
                                                         <span className="text-gray-400 italic flex items-center gap-1">
                                                             <Loader2 className="h-3 w-3 animate-spin" /> Procesando resumen...
                                                         </span>
                                                     )}
                                                 </div>
                                                 {/* Custom Data Tags */}
-                                                {call.analysis.custom_analysis_data && call.analysis.custom_analysis_data.length > 0 && (
+                                                {call.analysis?.custom_analysis_data && call.analysis.custom_analysis_data.length > 0 && (
                                                     <div className="flex gap-2 mt-2 flex-wrap">
                                                         {call.analysis.custom_analysis_data.slice(0, 3).map((d, i) => (
                                                             <span key={i} className="inline-flex items-center text-[10px] bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 px-2 py-0.5 rounded border border-indigo-100 dark:border-indigo-800 font-medium">
