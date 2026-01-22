@@ -42,8 +42,9 @@ export async function GET(
         if (snapshot.empty) {
             // If no agent is assigned to this slot, allow a default prompt or 404
             // Returning a default prompt is safer for avoiding errors in Retell
-            return NextResponse.json({
-                prompt: "Waiting for agent assignment..."
+            return new NextResponse("Waiting for agent assignment...", {
+                status: 200,
+                headers: { 'Content-Type': 'text/plain; charset=utf-8' }
             });
         }
 
@@ -59,8 +60,9 @@ export async function GET(
             promptToReturn = `${corePrompt}\n\n${editablePrompt}`;
         }
 
-        return NextResponse.json({
-            prompt: promptToReturn
+        return new NextResponse(promptToReturn, {
+            status: 200,
+            headers: { 'Content-Type': 'text/plain; charset=utf-8' }
         });
 
     } catch (error: any) {
