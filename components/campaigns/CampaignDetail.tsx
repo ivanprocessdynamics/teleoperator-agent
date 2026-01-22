@@ -161,11 +161,42 @@ export function CampaignDetail({ campaignId, subworkspaceId, onBack }: CampaignD
                 status: "running"
             });
 
+            // NEW: Push Prompt to Retell API
+            // Fetch subworkspace to get the retell_agent_id
+            const subSnap = await getDoc(doc(db, "subworkspaces", subworkspaceId));
+            if (subSnap.exists()) {
+                const subData = subSnap.data();
+                const retellAgentId = subData?.retell_agent_id;
+
+                if (retellAgentId) {
+                    try {
+                        const response = await fetch('/api/retell/update-agent', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                agent_id: retellAgentId,
+                                prompt: campaign.prompt_template || ""
+                            })
+                        });
+
+                        if (!response.ok) {
+                            const errData = await response.json();
+                            console.warn("Failed to push to Retell:", errData);
+                            // We don't block UI but we warn
+                        } else {
+                            console.log("Retell Agent updated successfully");
+                        }
+                    } catch (apiErr) {
+                        console.error("API Call error:", apiErr);
+                    }
+                }
+            }
+
             setIsActivated(true);
             setTimeout(() => setIsActivated(false), 3000);
         } catch (error) {
             console.error("Error activating campaign:", error);
-            alert("Error al activar la campaña");
+            alert("Error al activar la campaña. Revisa la consola.");
         } finally {
             setIsActivating(false);
         }

@@ -52,6 +52,30 @@ export function TestingEnvironment({ subworkspaceId }: TestingEnvironmentProps) 
             await updateDoc(doc(db, "subworkspaces", subworkspaceId), {
                 active_prompt: prompt,
             });
+
+            // NEW: Push Prompt to Retell API
+            if (retellAgentId) {
+                try {
+                    const response = await fetch('/api/retell/update-agent', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            agent_id: retellAgentId, // State variable
+                            prompt: prompt
+                        })
+                    });
+
+                    if (!response.ok) {
+                        const errData = await response.json();
+                        console.warn("Failed to push to Retell:", errData);
+                    } else {
+                        console.log("Retell Agent updated for testing");
+                    }
+                } catch (apiErr) {
+                    console.error("API Call error during test save:", apiErr);
+                }
+            }
+
             setSavedPrompt(prompt);
             setSaved(true);
             setTimeout(() => setSaved(false), 2000);
