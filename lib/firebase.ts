@@ -44,12 +44,19 @@ try {
                 callback(null);
                 return () => { }; // unsubscribe function
             },
-            signInWithPopup: () => Promise.reject(new Error("Firebase not configured")),
+            signInWithPopup: () => Promise.reject(new Error("Firebase not configured. Check your environment variables.")),
             signOut: () => Promise.resolve(),
             currentUser: null
         };
-        db = {};
+        db = {
+            // Mock firestore to prevent immediate crash on import, but fail on usage
+            collection: () => { throw new Error("Firestore not initialized. Missing NEXT_PUBLIC_FIREBASE_API_KEY"); },
+            doc: () => { throw new Error("Firestore not initialized. Missing NEXT_PUBLIC_FIREBASE_API_KEY"); }
+        };
         googleProvider = {};
+        if (typeof window !== "undefined") {
+            console.error("🚨 Firebase Config Missing! Make sure .env.local exists and contains NEXT_PUBLIC_FIREBASE_API_KEY");
+        }
     }
 } catch (e) {
     console.warn("Error initializing Firebase services:", e);

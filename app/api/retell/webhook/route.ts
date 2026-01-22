@@ -93,11 +93,23 @@ async function handleCallEnded(callId: string, data: any) {
     // Determine transcript
     let transcriptNodes: any[] = [];
 
-    if (data.transcript_object && Array.isArray(data.transcript_object)) {
+    // 1. Try Structured Transcript
+    if (data.transcript_object && Array.isArray(data.transcript_object) && data.transcript_object.length > 0) {
         transcriptNodes = normalizeTranscript(data.transcript_object);
-    } else if (data.transcript) {
-        // Fallback to text parsing
+    }
+    // 2. Try Tool Calls Transcript (New from Reference)
+    else if (data.transcript_with_tool_calls && Array.isArray(data.transcript_with_tool_calls) && data.transcript_with_tool_calls.length > 0) {
+        transcriptNodes = normalizeTranscript(data.transcript_with_tool_calls);
+    }
+    // 3. Fallback to Text Parsing
+    else if (data.transcript) {
         transcriptNodes = parseTranscript(data.transcript);
+    }
+
+    // 4. Ultimate Fallback: Summary as Chat (New from Reference)
+    if (transcriptNodes.length === 0) {
+        const summary = data.call_analysis?.call_summary || data.summary || "Llamada finalizada (Sin transcripción disponible)";
+        transcriptNodes = [{ role: 'agent', content: summary }];
     }
 
     console.log(`[call_ended] Processing ${transcriptNodes.length} transcript messages for ${callId}`);
