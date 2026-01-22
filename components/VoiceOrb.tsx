@@ -145,12 +145,9 @@ export function VoiceOrb({ agentId, prompt, className = "" }: VoiceOrbProps) {
                     }
                 `}
             >
-                {/* Pulsing rings when listening */}
+                {/* Passive ring when listening (no pulse) */}
                 {state === "listening" && (
-                    <>
-                        <span className="absolute inset-0 rounded-full bg-red-500/30 animate-ping" />
-                        <span className="absolute inset-[-8px] rounded-full border-2 border-red-400/50 animate-pulse" />
-                    </>
+                    <span className="absolute inset-[-4px] rounded-full border-2 border-red-500/30" />
                 )}
 
                 {/* Icon */}
