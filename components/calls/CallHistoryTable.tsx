@@ -6,17 +6,32 @@ import { db } from "@/lib/firebase";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ChatTranscript } from "./ChatTranscript";
-import { Loader2, MessageSquare, PhoneIncoming, PhoneOutgoing } from "lucide-react";
+import {
+    Loader2,
+    MessageSquare,
+    PhoneIncoming,
+    Clock,
+    Calendar,
+    Smile,
+    Meh,
+    Frown,
+    MoreHorizontal,
+    FileText
+} from "lucide-react";
 import { cn } from "@/lib/utils";
+import { formatDistanceToNow } from "date-fns";
+import { es } from "date-fns/locale";
 
 interface CallRecord {
     id: string;
     agent_id: string;
     analysis: {
-        post_call_summary?: string;
-        post_call_sentiment?: string; // 'Positive' | 'Negative' | 'Neutral'
+        call_summary?: string;     // Corrected from post_call_summary
+        user_sentiment?: string;   // Corrected from post_call_sentiment
+        call_successful?: boolean;
         custom_analysis_data?: { name: string; value: any }[];
     };
     transcript_object: { role: 'user' | 'agent', content: string }[];
@@ -26,22 +41,7 @@ interface CallRecord {
 }
 
 interface CallHistoryTableProps {
-    agentId?: string; // If provided, filter by agent
-}
-
-function timeAgo(date: Date) {
-    const seconds = Math.floor((new Date().getTime() - date.getTime()) / 1000);
-    let interval = seconds / 31536000;
-    if (interval > 1) return "hace " + Math.floor(interval) + " años";
-    interval = seconds / 2592000;
-    if (interval > 1) return "hace " + Math.floor(interval) + " meses";
-    interval = seconds / 86400;
-    if (interval > 1) return "hace " + Math.floor(interval) + " días";
-    interval = seconds / 3600;
-    if (interval > 1) return "hace " + Math.floor(interval) + " horas";
-    interval = seconds / 60;
-    if (interval > 1) return "hace " + Math.floor(interval) + " min";
-    return "hace unos segundos";
+    agentId?: string;
 }
 
 export function CallHistoryTable({ agentId }: CallHistoryTableProps) {
@@ -57,10 +57,6 @@ export function CallHistoryTable({ agentId }: CallHistoryTableProps) {
         }
 
         const unsub = onSnapshot(q, (snapshot) => {
-            console.log(`[CallHistory] Querying for agentId: ${agentId || 'ALL'}`);
-            console.log(`[CallHistory] Found ${snapshot.docs.length} documents.`);
-            snapshot.docs.forEach(d => console.log("Doc:", d.id, d.data().agent_id, d.data().timestamp));
-
             const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as CallRecord));
             setCalls(data);
             setLoading(false);
@@ -72,12 +68,12 @@ export function CallHistoryTable({ agentId }: CallHistoryTableProps) {
         return () => unsub();
     }, [agentId]);
 
-    const getSentimentColor = (sentiment?: string) => {
-        if (!sentiment) return "bg-gray-100 text-gray-800";
+    const getSentimentConfig = (sentiment?: string) => {
+        if (!sentiment) return { label: "N/A", icon: MoreHorizontal, color: "bg-gray-100 text-gray-600" };
         const s = sentiment.toLowerCase();
-        if (s.includes("positive") || s.includes("positiva")) return "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400";
-        if (s.includes("negative") || s.includes("negativa")) return "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400";
-        return "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300";
+        if (s.includes("positive") || s.includes("positiva")) return { label: "Positivo", icon: Smile, color: "bg-green-100 text-green-700 border-green-200" };
+        if (s.includes("negative") || s.includes("negativa")) return { label: "Negativo", icon: Frown, color: "bg-red-100 text-red-700 border-red-200" };
+        return { label: "Neutral", icon: Meh, color: "bg-blue-50 text-blue-700 border-blue-200" };
     };
 
     const formatDuration = (seconds?: number) => {
@@ -87,135 +83,134 @@ export function CallHistoryTable({ agentId }: CallHistoryTableProps) {
         return `${mins}:${secs.toString().padStart(2, '0')}`;
     };
 
-    // Debug state
-    const [allCallsCount, setAllCallsCount] = useState<number | null>(null);
-    const [foundAgentIds, setFoundAgentIds] = useState<string[]>([]);
-    const [debugError, setDebugError] = useState<string | null>(null);
-
-    useEffect(() => {
-        // Parallel debug query: Count ALL calls and get unique Agent IDs
-        const debugQ = query(collection(db, "calls"), limit(10)); // check last 10 calls
-        onSnapshot(debugQ, (snap) => {
-            setAllCallsCount(snap.size);
-            const ids = new Set<string>();
-            snap.docs.forEach(d => {
-                const data = d.data();
-                if (data.agent_id) ids.add(data.agent_id);
-            });
-            setFoundAgentIds(Array.from(ids));
-        }, (err) => {
-            console.error("Debug Query Error:", err);
-            setDebugError(err.message);
-        });
-    }, []);
-
-    if (loading) return <div className="flex justify-center p-8"><Loader2 className="h-6 w-6 animate-spin text-gray-400" /></div>;
+    if (loading) return <div className="flex justify-center p-12"><Loader2 className="h-8 w-8 animate-spin text-blue-500" /></div>;
 
     if (calls.length === 0) {
         return (
-            <div className="flex flex-col items-center justify-center p-8 text-gray-500 gap-4">
-                <p>No se encontraron llamadas para este Agente.</p>
-
-                {/* Debug Info Box */}
-                <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 p-4 rounded-md text-sm text-left max-w-lg w-full">
-                    <p className="font-bold text-yellow-800 dark:text-yellow-500 mb-2">🔧 Panel de Diagnóstico:</p>
-                    <ul className="space-y-1 font-mono text-xs">
-                        <li>Filtro Agent ID (Configuración): <span className="font-bold text-red-600">{agentId || "(Vacío)"}</span></li>
-                        <li className="mt-2 text-gray-800 font-semibold border-t border-yellow-200 pt-1">Datos reales en DB (últimas 10):</li>
-
-                        {debugError ? (
-                            <li className="text-red-500 font-bold">Error leyendo DB: {debugError}</li>
-                        ) : (
-                            <>
-                                <li>Llamadas encontradas: {allCallsCount !== null ? allCallsCount : "Cargando..."}</li>
-                                <li>IDs de Agente encontrados:</li>
-                                <ul className="list-disc pl-4 mt-1 text-blue-600">
-                                    {foundAgentIds.length > 0 ? foundAgentIds.map(id => (
-                                        <li key={id}>{id || "(Sin ID)"}</li>
-                                    )) : <li>(Ninguno)</li>}
-                                </ul>
-                            </>
-                        )}
-
-                        <li className="text-gray-500 mt-3 pt-2 border-t border-yellow-200 leading-relaxed">
-                            {foundAgentIds.length > 0 && !foundAgentIds.includes(agentId || "")
-                                ? "🚨 ¡CONFLICTO DETECTADO! Las llamadas se están guardando con un ID distinto al de esta pantalla. Copia el ID de la lista azul y actualízalo en la configuración de la campaña."
-                                : "💡 La base de datos no tiene llamadas para este agente."}
-                        </li>
-                    </ul>
+            <div className="flex flex-col items-center justify-center py-16 px-4 text-center border-2 border-dashed border-gray-200 dark:border-gray-800 rounded-xl bg-gray-50/50 dark:bg-gray-900/50">
+                <div className="bg-white dark:bg-gray-800 p-4 rounded-full shadow-sm mb-4">
+                    <PhoneIncoming className="h-8 w-8 text-gray-400" />
                 </div>
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Sin llamadas registradas</h3>
+                <p className="text-sm text-gray-500 max-w-sm mt-1">
+                    No se han encontrado llamadas para este agente. Realiza una prueba para ver los resultados aquí.
+                </p>
             </div>
         );
     }
 
     return (
         <>
-            <div className="rounded-md border border-gray-200 dark:border-gray-800 overflow-hidden">
-                <Table>
-                    <TableHeader className="bg-gray-50 dark:bg-gray-900">
-                        <TableRow>
-                            <TableHead>Fecha</TableHead>
-                            <TableHead>Duración</TableHead>
-                            <TableHead>Sentimiento</TableHead>
-                            <TableHead>Resumen/Resultado</TableHead>
-                            <TableHead className="text-right">Acciones</TableHead>
-                        </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                        {calls.map((call) => (
-                            <TableRow key={call.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
-                                <TableCell className="font-medium">
-                                    <div className="flex flex-col">
-                                        <span>{call.timestamp?.toDate ? timeAgo(call.timestamp.toDate()) : "Reciente"}</span>
-                                        <span className="text-xs text-gray-400">{call.timestamp?.toDate?.().toLocaleString()}</span>
-                                    </div>
-                                </TableCell>
-                                <TableCell>{formatDuration(call.duration)}</TableCell>
-                                <TableCell>
-                                    <Badge variant="outline" className={cn("border-0", getSentimentColor(call.analysis.post_call_sentiment))}>
-                                        {call.analysis.post_call_sentiment || "N/A"}
-                                    </Badge>
-                                </TableCell>
-                                <TableCell className="max-w-xs truncate" title={call.analysis.post_call_summary}>
-                                    {call.analysis.post_call_summary || (
-                                        <span className="text-gray-400 italic">Sin resumen</span>
-                                    )}
-                                    {/* Display some custom data if available */}
-                                    {call.analysis.custom_analysis_data && call.analysis.custom_analysis_data.length > 0 && (
-                                        <div className="flex gap-1 mt-1 flex-wrap">
-                                            {call.analysis.custom_analysis_data.slice(0, 2).map((d, i) => (
-                                                <span key={i} className="text-[10px] bg-blue-50 dark:bg-blue-900/20 text-blue-600 px-1.5 py-0.5 rounded border border-blue-100 dark:border-blue-800">
-                                                    {d.name}: {String(d.value)}
-                                                </span>
-                                            ))}
-                                        </div>
-                                    )}
-                                </TableCell>
-                                <TableCell className="text-right">
-                                    <Button variant="ghost" size="sm" onClick={() => setSelectedCall(call)}>
-                                        <MessageSquare className="h-4 w-4 mr-2" />
-                                        Ver Chat
-                                    </Button>
-                                </TableCell>
+            <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                    <h2 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                        <Clock className="h-5 w-5 text-gray-500" />
+                        Historial Reciente
+                    </h2>
+                    <Badge variant="outline" className="text-xs font-normal">
+                        Últimas {calls.length} llamadas
+                    </Badge>
+                </div>
+
+                <div className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900/50 shadow-sm overflow-hidden">
+                    <Table>
+                        <TableHeader className="bg-gray-50/50 dark:bg-gray-900">
+                            <TableRow>
+                                <TableHead className="w-[180px]">Fecha y Hora</TableHead>
+                                <TableHead className="w-[100px]">Duración</TableHead>
+                                <TableHead className="w-[140px]">Sentimiento</TableHead>
+                                <TableHead>Resumen de la Conversación</TableHead>
+                                <TableHead className="text-right w-[120px]">Acciones</TableHead>
                             </TableRow>
-                        ))}
-                    </TableBody>
-                </Table>
+                        </TableHeader>
+                        <TableBody>
+                            {calls.map((call) => {
+                                const sentiment = getSentimentConfig(call.analysis.user_sentiment);
+                                const SentimentIcon = sentiment.icon;
+
+                                return (
+                                    <TableRow key={call.id} className="group hover:bg-blue-50/50 dark:hover:bg-blue-900/10 transition-colors">
+                                        <TableCell>
+                                            <div className="flex flex-col">
+                                                <span className="font-medium text-gray-900 dark:text-white">
+                                                    {call.timestamp?.toDate ?
+                                                        formatDistanceToNow(call.timestamp.toDate(), { addSuffix: true, locale: es })
+                                                        : "Reciente"}
+                                                </span>
+                                                <span className="text-xs text-gray-500 flex items-center gap-1 mt-0.5">
+                                                    <Calendar className="h-3 w-3" />
+                                                    {call.timestamp?.toDate?.().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                </span>
+                                            </div>
+                                        </TableCell>
+                                        <TableCell>
+                                            <Badge variant="secondary" className="font-mono font-normal text-xs bg-gray-100 dark:bg-gray-800">
+                                                {formatDuration(call.duration)}
+                                            </Badge>
+                                        </TableCell>
+                                        <TableCell>
+                                            <div className={cn("flex items-center gap-1.5 px-2.5 py-1 rounded-full w-fit text-xs font-medium border", sentiment.color)}>
+                                                <SentimentIcon className="h-3.5 w-3.5" />
+                                                {sentiment.label}
+                                            </div>
+                                        </TableCell>
+                                        <TableCell>
+                                            <div className="max-w-md">
+                                                <p className="text-sm text-gray-600 dark:text-gray-300 line-clamp-2 leading-relaxed group-hover:line-clamp-none transition-all duration-300">
+                                                    {call.analysis.call_summary || (
+                                                        <span className="text-gray-400 italic flex items-center gap-1">
+                                                            <Loader2 className="h-3 w-3 animate-spin" /> Procesando resumen...
+                                                        </span>
+                                                    )}
+                                                </p>
+                                                {/* Custom Data Tags */}
+                                                {call.analysis.custom_analysis_data && call.analysis.custom_analysis_data.length > 0 && (
+                                                    <div className="flex gap-2 mt-2 flex-wrap">
+                                                        {call.analysis.custom_analysis_data.slice(0, 3).map((d, i) => (
+                                                            <span key={i} className="inline-flex items-center text-[10px] bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 px-2 py-0.5 rounded border border-indigo-100 dark:border-indigo-800 font-medium">
+                                                                {d.name}: {String(d.value)}
+                                                            </span>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </TableCell>
+                                        <TableCell className="text-right">
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={() => setSelectedCall(call)}
+                                                className="opacity-0 group-hover:opacity-100 transition-opacity hover:bg-blue-50 text-blue-600 border-blue-200"
+                                            >
+                                                <MessageSquare className="h-4 w-4 mr-2" />
+                                                Chat
+                                            </Button>
+                                        </TableCell>
+                                    </TableRow>
+                                );
+                            })}
+                        </TableBody>
+                    </Table>
+                </div>
             </div>
 
             <Dialog open={!!selectedCall} onOpenChange={(open) => !open && setSelectedCall(null)}>
-                <DialogContent className="max-w-3xl h-[80vh] flex flex-col p-0 gap-0">
-                    <DialogHeader className="p-6 pb-2 border-b border-gray-100 dark:border-gray-800">
-                        <DialogTitle className="flex items-center gap-2">
-                            <PhoneIncoming className="h-5 w-5 text-blue-500" />
-                            Detalles de la Llamada
-                            <span className="text-sm font-normal text-gray-500 ml-auto">
-                                {selectedCall?.timestamp?.toDate?.().toLocaleString()}
-                            </span>
+                <DialogContent className="max-w-2xl h-[85vh] flex flex-col p-0 gap-0 overflow-hidden rounded-2xl">
+                    <DialogHeader className="p-6 border-b border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900">
+                        <DialogTitle className="flex items-center gap-3">
+                            <div className="h-10 w-10 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-600">
+                                <FileText className="h-5 w-5" />
+                            </div>
+                            <div className="flex flex-col">
+                                <span>Transcripción de Llamada</span>
+                                <span className="text-xs font-normal text-gray-500">
+                                    {selectedCall?.timestamp?.toDate?.().toLocaleString()}
+                                </span>
+                            </div>
                         </DialogTitle>
                     </DialogHeader>
                     {selectedCall && (
-                        <div className="flex-1 overflow-hidden bg-gray-50 dark:bg-gray-900/50">
+                        <div className="flex-1 overflow-hidden bg-gray-50 dark:bg-gray-950">
                             <ChatTranscript
                                 messages={selectedCall.transcript_object}
                                 audioUrl={selectedCall.recording_url}
