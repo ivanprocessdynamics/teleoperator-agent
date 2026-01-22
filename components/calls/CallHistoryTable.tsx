@@ -50,14 +50,24 @@ export function CallHistoryTable({ agentId }: CallHistoryTableProps) {
     const [selectedCall, setSelectedCall] = useState<CallRecord | null>(null);
 
     useEffect(() => {
+        console.log("CallHistoryTable mounted. AgentId:", agentId);
         let q = query(collection(db, "calls"), orderBy("timestamp", "desc"), limit(50));
 
         if (agentId) {
+            console.log("Setting up query for agent:", agentId);
             q = query(collection(db, "calls"), where("agent_id", "==", agentId), orderBy("timestamp", "desc"), limit(50));
+        } else {
+            console.log("No agentId provided, querying all calls (limit 50)");
         }
 
         const unsub = onSnapshot(q, (snapshot) => {
-            const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as CallRecord));
+            console.log("Snapshot received. Docs count:", snapshot.docs.length);
+            const data = snapshot.docs.map(doc => {
+                const d = doc.data();
+                // Log specific fields for debugging
+                // console.log(`Doc ${doc.id} Agent: ${d.agent_id} Time: ${d.timestamp}`);
+                return { id: doc.id, ...d } as CallRecord;
+            });
             setCalls(data);
             setLoading(false);
         }, (err) => {
