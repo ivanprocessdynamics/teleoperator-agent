@@ -57,6 +57,10 @@ export function CallHistoryTable({ agentId }: CallHistoryTableProps) {
         }
 
         const unsub = onSnapshot(q, (snapshot) => {
+            console.log(`[CallHistory] Querying for agentId: ${agentId || 'ALL'}`);
+            console.log(`[CallHistory] Found ${snapshot.docs.length} documents.`);
+            snapshot.docs.forEach(d => console.log("Doc:", d.id, d.data().agent_id, d.data().timestamp));
+
             const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as CallRecord));
             setCalls(data);
             setLoading(false);
