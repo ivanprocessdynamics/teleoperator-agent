@@ -89,11 +89,24 @@ export function CallHistoryTable({ agentId }: CallHistoryTableProps) {
 
     // Debug state
     const [allCallsCount, setAllCallsCount] = useState<number | null>(null);
+    const [foundAgentIds, setFoundAgentIds] = useState<string[]>([]);
+    const [debugError, setDebugError] = useState<string | null>(null);
 
     useEffect(() => {
-        // Parallel debug query: Count ALL calls in the system
-        const debugQ = query(collection(db, "calls"));
-        onSnapshot(debugQ, (snap) => setAllCallsCount(snap.size));
+        // Parallel debug query: Count ALL calls and get unique Agent IDs
+        const debugQ = query(collection(db, "calls"), limit(10)); // check last 10 calls
+        onSnapshot(debugQ, (snap) => {
+            setAllCallsCount(snap.size);
+            const ids = new Set<string>();
+            snap.docs.forEach(d => {
+                const data = d.data();
+                if (data.agent_id) ids.add(data.agent_id);
+            });
+            setFoundAgentIds(Array.from(ids));
+        }, (err) => {
+            console.error("Debug Query Error:", err);
+            setDebugError(err.message);
+        });
     }, []);
 
     if (loading) return <div className="flex justify-center p-8"><Loader2 className="h-6 w-6 animate-spin text-gray-400" /></div>;
@@ -104,16 +117,30 @@ export function CallHistoryTable({ agentId }: CallHistoryTableProps) {
                 <p>No se encontraron llamadas para este Agente.</p>
 
                 {/* Debug Info Box */}
-                <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 p-4 rounded-md text-sm text-left max-w-lg">
+                <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 p-4 rounded-md text-sm text-left max-w-lg w-full">
                     <p className="font-bold text-yellow-800 dark:text-yellow-500 mb-2">🔧 Panel de Diagnóstico:</p>
                     <ul className="space-y-1 font-mono text-xs">
-                        <li>Filtro Agent ID: <span className="font-bold">{agentId || "(Vacío)"}</span></li>
-                        <li>Llamadas mostradas: 0</li>
-                        <li>Llamadas TOTALES en DB: {allCallsCount !== null ? allCallsCount : "Cargando..."}</li>
-                        <li className="text-gray-500 mt-2">
-                            {allCallsCount && allCallsCount > 0
-                                ? "💡 Hay llamadas en el sistema, pero no coinciden con este Agent ID."
-                                : "💡 La base de datos está vacía. El webhook no ha guardado nada aún."}
+                        <li>Filtro Agent ID (Configuración): <span className="font-bold text-red-600">{agentId || "(Vacío)"}</span></li>
+                        <li className="mt-2 text-gray-800 font-semibold border-t border-yellow-200 pt-1">Datos reales en DB (últimas 10):</li>
+
+                        {debugError ? (
+                            <li className="text-red-500 font-bold">Error leyendo DB: {debugError}</li>
+                        ) : (
+                            <>
+                                <li>Llamadas encontradas: {allCallsCount !== null ? allCallsCount : "Cargando..."}</li>
+                                <li>IDs de Agente encontrados:</li>
+                                <ul className="list-disc pl-4 mt-1 text-blue-600">
+                                    {foundAgentIds.length > 0 ? foundAgentIds.map(id => (
+                                        <li key={id}>{id || "(Sin ID)"}</li>
+                                    )) : <li>(Ninguno)</li>}
+                                </ul>
+                            </>
+                        )}
+
+                        <li className="text-gray-500 mt-3 pt-2 border-t border-yellow-200 leading-relaxed">
+                            {foundAgentIds.length > 0 && !foundAgentIds.includes(agentId || "")
+                                ? "🚨 ¡CONFLICTO DETECTADO! Las llamadas se están guardando con un ID distinto al de esta pantalla. Copia el ID de la lista azul y actualízalo en la configuración de la campaña."
+                                : "💡 La base de datos no tiene llamadas para este agente."}
                         </li>
                     </ul>
                 </div>
