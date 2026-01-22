@@ -65,7 +65,8 @@ export function CallHistoryTable({ agentId }: CallHistoryTableProps) {
             setLoading(false);
         }, (err) => {
             console.error("Error fetching calls:", err);
-            setError("Error cargando el historial. Revisa la consola por si falta un índice en Firebase.");
+            // Show the actual error message to help identify index issues
+            setError(err.message || "Error cargando el historial.");
             setLoading(false);
         });
 
