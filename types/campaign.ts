@@ -27,9 +27,32 @@ export interface Campaign {
     columns: CampaignColumn[];
 
     // Prompt Configuration
-    prompt_template: string; // "Hola {{nombre}}, tienes una deuda de {{deuda}}"
+    prompt_template: string;
 
     // Visual Customization
     icon?: string;
     color?: string;
+
+    // Analysis Configuration
+    analysis_config?: AnalysisConfig;
+}
+
+export interface AnalysisField {
+    id: string; // unique internal id
+    name: string; // key for Retell
+    description: string; // instruction for AI
+    type: 'string' | 'boolean' | 'number' | 'enum';
+    options?: string[]; // for enum
+}
+
+export interface AnalysisConfig {
+    enable_transcription: boolean;
+    standard_fields: {
+        satisfaction_score: boolean; // 0-10
+        sentiment: boolean; // Positive/Neutral/Negative
+        summary: boolean;
+        user_sentiment: boolean;
+        call_successful: boolean; // Did it achieve the goal?
+    };
+    custom_fields: AnalysisField[];
 }

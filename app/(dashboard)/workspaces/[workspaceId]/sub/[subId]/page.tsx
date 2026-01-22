@@ -8,15 +8,17 @@ import Link from "next/link";
 import { CampaignList } from "@/components/campaigns/CampaignList";
 import { CampaignDetail } from "@/components/campaigns/CampaignDetail";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Users, Settings, FlaskConical, Pencil, Check, X } from "lucide-react";
+import { Users, Settings, FlaskConical, Pencil, Check, X, History } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { TestingEnvironment } from "@/components/TestingEnvironment";
+import { CallHistoryTable } from "@/components/calls/CallHistoryTable";
 
 export default function SubworkspacePage() {
     const params = useParams();
     const subId = params.subId as string;
     const [subName, setSubName] = useState("");
+    const [agentId, setAgentId] = useState<string | null>(null);
     const [isEditing, setIsEditing] = useState(false);
     const [activeTab, setActiveTab] = useState("contacts");
     const [selectedCampaignId, setSelectedCampaignId] = useState<string | null>(null);
@@ -34,14 +36,16 @@ export default function SubworkspacePage() {
     };
 
     useEffect(() => {
-        async function fetchName() {
+        async function fetchSub() {
             if (!subId) return;
             const snap = await getDoc(doc(db, "subworkspaces", subId));
             if (snap.exists()) {
-                setSubName(snap.data().name);
+                const data = snap.data();
+                setSubName(data.name);
+                setAgentId(data.retell_agent_id);
             }
         }
-        fetchName();
+        fetchSub();
     }, [subId]);
 
     return (
@@ -91,7 +95,7 @@ export default function SubworkspacePage() {
             ) : (
                 // Tabs containing Campaign List
                 <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-                    <TabsList className="grid w-full max-w-[400px] grid-cols-2 bg-gray-100 dark:bg-gray-800 p-1 rounded-lg">
+                    <TabsList className="grid w-full max-w-[600px] grid-cols-3 bg-gray-100 dark:bg-gray-800 p-1 rounded-lg">
                         <TabsTrigger
                             value="contacts"
                             className="gap-2 text-gray-900 dark:text-gray-300 data-[state=active]:bg-white dark:data-[state=active]:bg-gray-700 data-[state=active]:text-gray-900 dark:data-[state=active]:text-white data-[state=active]:shadow-sm transition-all"
@@ -104,6 +108,12 @@ export default function SubworkspacePage() {
                         >
                             <FlaskConical className="h-4 w-4" /> Entorno de Pruebas
                         </TabsTrigger>
+                        <TabsTrigger
+                            value="history"
+                            className="gap-2 text-gray-900 dark:text-gray-300 data-[state=active]:bg-white dark:data-[state=active]:bg-gray-700 data-[state=active]:text-gray-900 dark:data-[state=active]:text-white data-[state=active]:shadow-sm transition-all"
+                        >
+                            <History className="h-4 w-4" /> Historial
+                        </TabsTrigger>
                     </TabsList>
 
                     <TabsContent value="contacts" className="mt-6">
@@ -115,6 +125,17 @@ export default function SubworkspacePage() {
 
                     <TabsContent value="test" className="mt-6">
                         <TestingEnvironment subworkspaceId={subId} />
+                    </TabsContent>
+
+                    <TabsContent value="history" className="mt-6">
+                        <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-800 p-6">
+                            <h2 className="text-xl font-semibold mb-4 text-gray-900 dark:text-white">Historial de Llamadas</h2>
+                            {agentId ? (
+                                <CallHistoryTable agentId={agentId} />
+                            ) : (
+                                <div className="text-center py-10 text-gray-500">Cargando agente...</div>
+                            )}
+                        </div>
                     </TabsContent>
                 </Tabs>
             )}

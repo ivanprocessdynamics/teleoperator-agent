@@ -12,60 +12,84 @@ export async function POST(req: Request) {
         }
 
         const body = await req.json();
-        const { agent_id, prompt } = body;
+        const { agent_id, prompt, analysis_config } = body;
 
-        if (!agent_id || !prompt) {
-            return NextResponse.json({ error: "Missing agent_id or prompt" }, { status: 400 });
+        if (!agent_id) {
+            return NextResponse.json({ error: "Missing agent_id" }, { status: 400 });
         }
 
-        // 1. Fetch Agent to find its LLM
-        console.log(`Fetching agent ${agent_id}...`);
-        const agent = await retell.agent.retrieve(agent_id);
+        const updates: any = {};
 
-        if (!agent.response_engine) {
-            return NextResponse.json({ error: "Agent has no response_engine configured" }, { status: 400 });
+        // 1. Handle Prompt Update (Push)
+        // Note: We are moving to Dynamic Variables, but we keep this for backward compat 
+        // or if the user explicitly wants to "Reset" the hardcoded prompt.
+        if (prompt) {
+            // Find LLM and update
+            const agent = await retell.agent.retrieve(agent_id);
+            if (agent.response_engine?.type === 'retell-llm' && agent.response_engine.llm_id) {
+                const llmId = agent.response_engine.llm_id;
+                await retell.llm.update(llmId, { general_prompt: prompt });
+                updates.prompt_updated = true;
+            }
         }
 
-        // 2. Identify LLM ID
-        // Note: Retell agents usually have response_engine: { type: 'retell-llm', llm_id: '...' }
-        // If it's a 'custom-llm', we can't update the prompt here (it's managed by your server).
-        if (agent.response_engine.type !== "retell-llm") {
-            return NextResponse.json({
-                error: `Cannot update prompt for agent type '${agent.response_engine.type}'. Only 'retell-llm' is supported.`
-            }, { status: 400 });
+        // 2. Handle Analysis Config Update
+        if (analysis_config) {
+            const customData = [];
+
+            // Map Standard Fields to Custom Data (unless native)
+            // 'summary' and 'sentiment' are native fields in post_call_analysis_data
+
+            if (analysis_config.standard_fields.satisfaction_score) {
+                customData.push({
+                    name: "satisfaction_score",
+                    description: "Rate the customer's satisfaction on a scale from 0 to 10 based on their tone and responses.",
+                    type: "number" as const
+                });
+            }
+
+            if (analysis_config.standard_fields.call_successful) {
+                customData.push({
+                    name: "call_successful",
+                    description: "Did the AI agent successfully achieve the primary goal of the call?",
+                    type: "boolean" as const
+                });
+            }
+
+            if (analysis_config.standard_fields.user_sentiment) {
+                customData.push({
+                    name: "user_sentiment_label",
+                    description: "Determine the user's overall sentiment: Positive, Negative, Neutral, or Angry.",
+                    type: "string" as const
+                });
+            }
+
+            // Map User's Custom Fields
+            if (analysis_config.custom_fields) {
+                for (const field of analysis_config.custom_fields) {
+                    customData.push({
+                        name: field.name,
+                        description: field.description,
+                        type: field.type // Retell uses 'string' | 'boolean' | 'number' | 'enum'
+                    });
+                }
+            }
+
+            // Update Agent
+            await retell.agent.update(agent_id, {
+                post_call_analysis_data: {
+                    post_call_summary: analysis_config.standard_fields.summary || false,
+                    post_call_sentiment: analysis_config.standard_fields.sentiment || false,
+                    custom_analysis_data: customData
+                } as any
+            });
+            updates.analysis_updated = true;
         }
-
-        const llmId = agent.response_engine.llm_id;
-        if (!llmId) {
-            return NextResponse.json({ error: "Agent has no LLM ID assigned" }, { status: 400 });
-        }
-
-        // 3. Retrieve LLM to check structure
-        const currentLlm = await retell.llm.retrieve(llmId);
-        console.log(`Current LLM State:`, JSON.stringify(currentLlm, null, 2));
-
-        // 4. Update the LLM with the new prompt
-        console.log(`Updating LLM ${llmId} with new prompt...`);
-
-        // We try updating 'general_prompt'. 
-        // Note: Check if 'system_prompt' exists in currentLlm and update that too if needed?
-        // Retell V2 usually uses general_prompt.
-
-        const llmUpdate = await retell.llm.update(llmId, {
-            general_prompt: prompt
-        });
-
-        // 5. Verify update
-        const updatedLlm = await retell.llm.retrieve(llmId);
 
         return NextResponse.json({
             success: true,
-            message: "Prompt updated",
-            llm_id: llmId,
-            agent_id: agent_id,
-            previous_prompt: currentLlm.general_prompt,
-            new_prompt: updatedLlm.general_prompt,
-            llm_type: currentLlm.model // log model type (e.g. gpt-4o)
+            message: "Agent updated successfully",
+            updates: updates
         });
 
     } catch (error: any) {

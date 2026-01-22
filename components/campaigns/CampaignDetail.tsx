@@ -3,11 +3,12 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import { doc, onSnapshot, updateDoc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { Campaign, CampaignColumn } from "@/types/campaign";
+import { Campaign, CampaignColumn, AnalysisConfig } from "@/types/campaign";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Play, Save, Check, Loader2, FileText, Phone, Users, Target, Zap, Star, MessageCircle, Mail } from "lucide-react";
 import { CampaignTable } from "./CampaignTable";
 import { CampaignPrompt } from "./CampaignPrompt";
+import { CampaignAnalysis } from "./CampaignAnalysis";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import {
@@ -15,6 +16,7 @@ import {
     DropdownMenuContent,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface CampaignDetailProps {
     campaignId: string;
@@ -75,16 +77,8 @@ export function CampaignDetail({ campaignId, subworkspaceId, onBack }: CampaignD
         const unsub = onSnapshot(doc(db, "campaigns", campaignId), (doc) => {
             if (doc.exists()) {
                 const data = { id: doc.id, ...doc.data() } as Campaign;
-                // Only update full object if not saving to prevent overwriting local edits
-                // We trust local strict equality if we are the editor
                 setCampaign(prev => {
                     if (prev?.id === data.id) {
-                        // Merge carefully? 
-                        // For now, we take remote updates but we might want to ignore 
-                        // specific fields if we are typing. 
-                        // But since we use local state inside Table/Prompt components typically, 
-                        // top level merge is usually okay unless we hold state here.
-                        // We DO hold 'name' and 'prompt' here.
                         return data;
                     }
                     return data;
@@ -111,7 +105,6 @@ export function CampaignDetail({ campaignId, subworkspaceId, onBack }: CampaignD
 
     // Handlers
     const handleUpdateColumns = async (newCols: CampaignColumn[]) => {
-        // Columns usually don't need debounce as they are discrete actions
         if (!campaign) return;
         setIsSaving(true);
         await updateDoc(doc(db, "campaigns", campaign.id), { columns: newCols });
@@ -121,25 +114,25 @@ export function CampaignDetail({ campaignId, subworkspaceId, onBack }: CampaignD
 
     const handleUpdatePrompt = (newPrompt: string) => {
         if (!campaign) return;
-        // 1. Optimistic Update
         setCampaign(prev => prev ? ({ ...prev, prompt_template: newPrompt }) : null);
-        // 2. Debounced Save
         debouncedSave({ prompt_template: newPrompt });
+    };
+
+    const handleUpdateAnalysis = (newConfig: AnalysisConfig) => {
+        if (!campaign) return;
+        setCampaign(prev => prev ? ({ ...prev, analysis_config: newConfig }) : null);
+        debouncedSave({ analysis_config: newConfig });
     };
 
     const handleNameChange = (newName: string) => {
         if (!campaign) return;
-        // 1. Optimistic Update
         setCampaign(prev => prev ? ({ ...prev, name: newName }) : null);
-        // 2. Debounced Save
         debouncedSave({ name: newName });
     };
 
     const handleUpdateVisuals = async (newIcon: string, newColor: string) => {
         if (!campaign) return;
-        // 1. Optimistic Update
         setCampaign(prev => prev ? ({ ...prev, icon: newIcon, color: newColor }) : null);
-        // 2. Immediate Save (discrete action)
         setIsSaving(true);
         await updateDoc(doc(db, "campaigns", campaign.id), { icon: newIcon, color: newColor });
         setIsSaving(false);
@@ -151,18 +144,36 @@ export function CampaignDetail({ campaignId, subworkspaceId, onBack }: CampaignD
 
         setIsActivating(true);
         try {
-            // Write the campaign's prompt to the agent's active_prompt
-            await updateDoc(doc(db, "subworkspaces", subworkspaceId), {
+            const subRef = doc(db, "subworkspaces", subworkspaceId);
+
+            // 1. Update active prompt
+            await updateDoc(subRef, {
                 active_prompt: campaign.prompt_template || ""
             });
 
-            // Update campaign status to running
+            // 2. Update campaign status
             await updateDoc(doc(db, "campaigns", campaign.id), {
                 status: "running"
             });
 
-            // Note: We use Dynamic Variables now. The Dialer script should read 'active_prompt' 
-            // from the subworkspace and pass it as 'campaign_prompt' variable.
+            // 3. Update Analysis Config (Push to Retell)
+            if (campaign.analysis_config) {
+                const subSnap = await getDoc(subRef);
+                const subData = subSnap.data();
+                const retellAgentId = subData?.retell_agent_id;
+
+                if (retellAgentId) {
+                    await fetch('/api/retell/update-agent', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            agent_id: retellAgentId,
+                            analysis_config: campaign.analysis_config
+                            // We do NOT send prompt here anymore
+                        })
+                    });
+                }
+            }
 
             setIsActivated(true);
             setTimeout(() => setIsActivated(false), 3000);
@@ -307,16 +318,30 @@ export function CampaignDetail({ campaignId, subworkspaceId, onBack }: CampaignD
                     />
                 </div>
 
-                {/* Right: Prompt Editor (5 cols) - Sticky */}
-                <div className="col-span-12 lg:col-span-5 h-full overflow-y-auto">
-                    <div className="sticky top-0">
-                        <CampaignPrompt
-                            prompt={campaign.prompt_template || ""}
-                            columns={campaign.columns || []}
-                            onChange={handleUpdatePrompt}
-                            variableClass={styles.variable}
-                        />
-                    </div>
+                {/* Right: Prompt Editor & Analysis (5 cols) - Sticky */}
+                <div className="col-span-12 lg:col-span-5 h-full overflow-y-auto pr-2">
+                    <Tabs defaultValue="prompt" className="w-full">
+                        <TabsList className="grid w-full grid-cols-2 mb-4 bg-gray-100 dark:bg-gray-800">
+                            <TabsTrigger value="prompt">Prompt (Guion)</TabsTrigger>
+                            <TabsTrigger value="analysis">Análisis & IA</TabsTrigger>
+                        </TabsList>
+
+                        <TabsContent value="prompt">
+                            <CampaignPrompt
+                                prompt={campaign?.prompt_template || ""}
+                                columns={campaign?.columns || []}
+                                onChange={handleUpdatePrompt}
+                                variableClass={styles.variable}
+                            />
+                        </TabsContent>
+
+                        <TabsContent value="analysis">
+                            <CampaignAnalysis
+                                config={campaign?.analysis_config}
+                                onChange={handleUpdateAnalysis}
+                            />
+                        </TabsContent>
+                    </Tabs>
                 </div>
             </div>
         </div>
