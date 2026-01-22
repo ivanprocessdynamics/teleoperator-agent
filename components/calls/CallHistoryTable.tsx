@@ -68,6 +68,18 @@ export function CallHistoryTable({ agentId }: CallHistoryTableProps) {
         return () => unsub();
     }, [agentId]);
 
+    const [expandedSummaries, setExpandedSummaries] = useState<Set<string>>(new Set());
+
+    const toggleSummary = (id: string) => {
+        const newSet = new Set(expandedSummaries);
+        if (newSet.has(id)) {
+            newSet.delete(id);
+        } else {
+            newSet.add(id);
+        }
+        setExpandedSummaries(newSet);
+    };
+
     const getSentimentConfig = (sentiment?: string) => {
         if (!sentiment) return { label: "N/A", icon: MoreHorizontal, color: "bg-gray-100 text-gray-600" };
         const s = sentiment.toLowerCase();
@@ -127,6 +139,7 @@ export function CallHistoryTable({ agentId }: CallHistoryTableProps) {
                             {calls.map((call) => {
                                 const sentiment = getSentimentConfig(call.analysis.user_sentiment);
                                 const SentimentIcon = sentiment.icon;
+                                const isExpanded = expandedSummaries.has(call.id);
 
                                 return (
                                     <TableRow key={call.id} className="group hover:bg-blue-50/50 dark:hover:bg-blue-900/10 transition-colors">
@@ -156,13 +169,20 @@ export function CallHistoryTable({ agentId }: CallHistoryTableProps) {
                                         </TableCell>
                                         <TableCell>
                                             <div className="max-w-md">
-                                                <p className="text-sm text-gray-600 dark:text-gray-300 line-clamp-2 leading-relaxed group-hover:line-clamp-none transition-all duration-300">
+                                                <div
+                                                    onClick={() => toggleSummary(call.id)}
+                                                    className={cn(
+                                                        "text-sm text-gray-600 dark:text-gray-300 cursor-pointer transition-all duration-300",
+                                                        isExpanded ? "" : "line-clamp-2"
+                                                    )}
+                                                    title={isExpanded ? "Click para reducir" : "Click para expandir"}
+                                                >
                                                     {call.analysis.call_summary || (
                                                         <span className="text-gray-400 italic flex items-center gap-1">
                                                             <Loader2 className="h-3 w-3 animate-spin" /> Procesando resumen...
                                                         </span>
                                                     )}
-                                                </p>
+                                                </div>
                                                 {/* Custom Data Tags */}
                                                 {call.analysis.custom_analysis_data && call.analysis.custom_analysis_data.length > 0 && (
                                                     <div className="flex gap-2 mt-2 flex-wrap">
