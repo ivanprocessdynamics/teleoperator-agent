@@ -87,10 +87,38 @@ export function CallHistoryTable({ agentId }: CallHistoryTableProps) {
         return `${mins}:${secs.toString().padStart(2, '0')}`;
     };
 
+    // Debug state
+    const [allCallsCount, setAllCallsCount] = useState<number | null>(null);
+
+    useEffect(() => {
+        // Parallel debug query: Count ALL calls in the system
+        const debugQ = query(collection(db, "calls"));
+        onSnapshot(debugQ, (snap) => setAllCallsCount(snap.size));
+    }, []);
+
     if (loading) return <div className="flex justify-center p-8"><Loader2 className="h-6 w-6 animate-spin text-gray-400" /></div>;
 
     if (calls.length === 0) {
-        return <div className="text-center p-8 text-gray-500">No hay llamadas registradas aún.</div>;
+        return (
+            <div className="flex flex-col items-center justify-center p-8 text-gray-500 gap-4">
+                <p>No se encontraron llamadas para este Agente.</p>
+
+                {/* Debug Info Box */}
+                <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 p-4 rounded-md text-sm text-left max-w-lg">
+                    <p className="font-bold text-yellow-800 dark:text-yellow-500 mb-2">🔧 Panel de Diagnóstico:</p>
+                    <ul className="space-y-1 font-mono text-xs">
+                        <li>Filtro Agent ID: <span className="font-bold">{agentId || "(Vacío)"}</span></li>
+                        <li>Llamadas mostradas: 0</li>
+                        <li>Llamadas TOTALES en DB: {allCallsCount !== null ? allCallsCount : "Cargando..."}</li>
+                        <li className="text-gray-500 mt-2">
+                            {allCallsCount && allCallsCount > 0
+                                ? "💡 Hay llamadas en el sistema, pero no coinciden con este Agent ID."
+                                : "💡 La base de datos está vacía. El webhook no ha guardado nada aún."}
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        );
     }
 
     return (
