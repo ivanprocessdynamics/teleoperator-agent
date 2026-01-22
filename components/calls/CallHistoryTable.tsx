@@ -47,35 +47,25 @@ interface CallHistoryTableProps {
 export function CallHistoryTable({ agentId }: CallHistoryTableProps) {
     const [calls, setCalls] = useState<CallRecord[]>([]);
     const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
     const [selectedCall, setSelectedCall] = useState<CallRecord | null>(null);
 
     useEffect(() => {
-        console.log("CallHistoryTable mounted. AgentId:", agentId);
+        setError(null);
         let q = query(collection(db, "calls"), orderBy("timestamp", "desc"), limit(50));
 
         if (agentId) {
-            console.log("Setting up query for agent:", agentId);
-            // TEMPORARILY REMOVED FILTER FOR DEBUGGING
-            // q = query(collection(db, "calls"), where("agent_id", "==", agentId), orderBy("timestamp", "desc"), limit(50));
-            // Fetch ALL calls to verify data exists
-            q = query(collection(db, "calls"), orderBy("timestamp", "desc"), limit(50));
-        } else {
-            console.log("No agentId provided, querying all calls (limit 50)");
+            // Filter by agentId
+            q = query(collection(db, "calls"), where("agent_id", "==", agentId), orderBy("timestamp", "desc"), limit(50));
         }
 
-
         const unsub = onSnapshot(q, (snapshot) => {
-            console.log("Snapshot received. Docs count:", snapshot.docs.length);
-            const data = snapshot.docs.map(doc => {
-                const d = doc.data();
-                // Log specific fields for debugging
-                // console.log(`Doc ${doc.id} Agent: ${d.agent_id} Time: ${d.timestamp}`);
-                return { id: doc.id, ...d } as CallRecord;
-            });
+            const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as CallRecord));
             setCalls(data);
             setLoading(false);
         }, (err) => {
             console.error("Error fetching calls:", err);
+            setError("Error cargando el historial. Revisa la consola por si falta un índice en Firebase.");
             setLoading(false);
         });
 
@@ -110,6 +100,14 @@ export function CallHistoryTable({ agentId }: CallHistoryTableProps) {
     };
 
     if (loading) return <div className="flex justify-center p-12"><Loader2 className="h-8 w-8 animate-spin text-blue-500" /></div>;
+
+    if (error) {
+        return (
+            <div className="flex flex-col items-center justify-center py-16 px-4 text-center border-2 border-dashed border-red-200 bg-red-50 rounded-xl text-red-600">
+                <p>{error}</p>
+            </div>
+        );
+    }
 
     if (calls.length === 0) {
         return (
@@ -163,9 +161,6 @@ export function CallHistoryTable({ agentId }: CallHistoryTableProps) {
                                                     {call.timestamp?.toDate ?
                                                         formatDistanceToNow(call.timestamp.toDate(), { addSuffix: true, locale: es })
                                                         : "Reciente"}
-                                                </span>
-                                                <span className="text-xs text-gray-400 font-mono mt-0.5">
-                                                    ID: {call.agent_id?.substring(0, 8)}...
                                                 </span>
                                                 <span className="text-xs text-gray-500 flex items-center gap-1 mt-0.5">
                                                     <Calendar className="h-3 w-3" />
