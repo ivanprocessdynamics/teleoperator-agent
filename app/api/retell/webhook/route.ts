@@ -1,41 +1,60 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/firebase";
 import { doc, setDoc, serverTimestamp } from "firebase/firestore";
-import crypto from 'crypto';
 
 export async function POST(req: Request) {
     try {
-        // 1. Signature Verification (Optional but recommended)
-        // const signature = req.headers.get("x-retell-signature");
-        // if (!signature) ... verify with process.env.RETELL_WEBHOOK_SECRET
-
         const body = await req.json();
-        const { event, call_id, agent_id, call_analysis, transcript_object, recording_url, end_timestamp } = body;
+        const { event, call_id, call } = body;
 
-        console.log(`Webhook received: ${event} for call ${call_id}`);
+        console.log(`Webhook received: ${event} for call ${call_id || call?.call_id}`);
 
-        if (event === "call.analyzed") {
-            // 2. Save to Firestore
-            // We use 'calls' collection.
-            // ID = call_id
+        // Handle both call_ended and call_analyzed events
+        // call_ended: contains transcript immediately after call ends
+        // call_analyzed: contains transcript + analysis results (processed after)
 
-            const callData = {
-                id: call_id,
-                agent_id: agent_id,
-                // We don't have campaign_id in the webhook body unless passed as metadata.
-                // If we passed it in create-web-call > metadata, we could retrieve it.
-                // For now, we store what we have.
-                analysis: call_analysis || {}, // { custom_analysis_data: [ ... ], call_summary: "...", user_sentiment: "..." }
-                transcript_object: transcript_object || [],
-                recording_url: recording_url || null,
-                duration: (end_timestamp - body.start_timestamp) / 1000,
-                timestamp: serverTimestamp(), // Use server timestamp for sorting
-                created_at_iso: new Date().toISOString()
+        if (event === "call_ended" || event === "call.analyzed" || event === "call_analyzed") {
+            const callId = call_id || call?.call_id;
+            if (!callId) {
+                console.error("No call_id found in webhook payload");
+                return NextResponse.json({ error: "No call_id" }, { status: 400 });
+            }
+
+            // Retell sends data in different structures depending on the event
+            // For call_ended: data is in 'call' object
+            // For call_analyzed/call.analyzed: data might be at root or in 'call'
+            const callData = call || body;
+
+            const transcript = callData.transcript_object || callData.transcript || [];
+            const analysis = callData.call_analysis || {};
+            const recordingUrl = callData.recording_url || null;
+            const agentId = callData.agent_id || null;
+
+            // Calculate duration
+            let duration = 0;
+            if (callData.end_timestamp && callData.start_timestamp) {
+                duration = (callData.end_timestamp - callData.start_timestamp) / 1000;
+            }
+
+            const docData: any = {
+                id: callId,
+                agent_id: agentId,
+                transcript_object: transcript,
+                recording_url: recordingUrl,
+                duration: duration,
+                event_type: event, // Track which event saved this
+                updated_at: serverTimestamp(),
             };
 
-            await setDoc(doc(db, "calls", call_id), callData);
+            // Only add analysis if it exists (from call_analyzed event)
+            if (Object.keys(analysis).length > 0) {
+                docData.analysis = analysis;
+            }
 
-            console.log(`Call ${call_id} saved to Firestore.`);
+            // Use merge to not overwrite existing data if call_ended already saved
+            await setDoc(doc(db, "calls", callId), docData, { merge: true });
+
+            console.log(`Call ${callId} saved/updated in Firestore from ${event} event.`);
         }
 
         return NextResponse.json({ received: true }, { status: 200 });

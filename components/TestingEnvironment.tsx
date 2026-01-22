@@ -4,9 +4,11 @@ import { useState, useEffect } from "react";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { VoiceOrb } from "@/components/VoiceOrb";
+import { CampaignAnalysis } from "@/components/campaigns/CampaignAnalysis";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import { Save, Check, Loader2, FileText, Mic } from "lucide-react";
+import { Save, Check, Loader2, FileText, Mic, Brain, ChevronDown, ChevronUp } from "lucide-react";
+import { AnalysisConfig } from "@/types/campaign";
 
 interface TestingEnvironmentProps {
     subworkspaceId: string;
@@ -23,6 +25,10 @@ export function TestingEnvironment({ subworkspaceId }: TestingEnvironmentProps) 
     // Variable State
     const [variables, setVariables] = useState<Record<string, string>>({});
 
+    // Analysis Config State
+    const [analysisConfig, setAnalysisConfig] = useState<AnalysisConfig | undefined>(undefined);
+    const [showAnalysis, setShowAnalysis] = useState(false);
+
     // Load subworkspace data
     useEffect(() => {
         async function loadData() {
@@ -36,6 +42,7 @@ export function TestingEnvironment({ subworkspaceId }: TestingEnvironmentProps) 
                     setPrompt(existingPrompt);
                     setSavedPrompt(existingPrompt);
                     setRetellAgentId(data.retell_agent_id || "");
+                    setAnalysisConfig(data.analysis_config);
                 }
             } catch (error) {
                 console.error("Error loading subworkspace:", error);
@@ -52,27 +59,23 @@ export function TestingEnvironment({ subworkspaceId }: TestingEnvironmentProps) 
         const regex = /\{\{([^}]+)\}\}/g;
         const matches = text.match(regex);
         const uniqueVars = matches ? Array.from(new Set(matches.map(m => m.replace(/\{\{|\}\}/g, '').trim()))) : [];
-        return uniqueVars.filter(v => v !== 'campaign_prompt'); // Exclude system variable if present
+        return uniqueVars.filter(v => v !== 'campaign_prompt');
     };
 
     const foundVariables = extractVariables(prompt);
 
-    // Update variable values
     const handleVariableChange = (name: string, value: string) => {
         setVariables(prev => ({ ...prev, [name]: value }));
     };
 
-    // Inject variables into prompt for testing
     const getPromptWithVariables = () => {
         let finalPrompt = prompt;
         foundVariables.forEach(v => {
-            const value = variables[v] || `[${v}]`; // Fallback to placeholder if empty
-            // Replace globally
+            const value = variables[v] || `[${v}]`;
             finalPrompt = finalPrompt.replace(new RegExp(`\\{\\{${v}\\}\\}`, 'g'), value);
         });
         return finalPrompt;
     };
-
 
     const handleSavePrompt = async () => {
         if (!subworkspaceId) return;
@@ -94,6 +97,33 @@ export function TestingEnvironment({ subworkspaceId }: TestingEnvironmentProps) 
         }
     };
 
+    const handleUpdateAnalysis = async (newConfig: AnalysisConfig) => {
+        setAnalysisConfig(newConfig);
+
+        // Save to subworkspace
+        if (subworkspaceId) {
+            try {
+                await updateDoc(doc(db, "subworkspaces", subworkspaceId), {
+                    analysis_config: newConfig,
+                });
+
+                // Also push to Retell Agent if configured
+                if (retellAgentId) {
+                    await fetch('/api/retell/update-agent', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            agent_id: retellAgentId,
+                            analysis_config: newConfig
+                        })
+                    });
+                }
+            } catch (error) {
+                console.error("Error saving analysis config:", error);
+            }
+        }
+    };
+
     const hasChanges = prompt !== savedPrompt;
 
     if (loading) {
@@ -106,7 +136,7 @@ export function TestingEnvironment({ subworkspaceId }: TestingEnvironmentProps) 
 
     return (
         <div className="max-w-[1600px] mx-auto grid grid-cols-1 lg:grid-cols-2 gap-6 h-[calc(100vh-200px)]">
-            {/* Left Column: Prompt Editor & Variables */}
+            {/* Left Column: Prompt Editor & Variables & Analysis */}
             <div className="flex flex-col gap-6 h-full overflow-y-auto pr-2">
                 {/* Prompt Editor */}
                 <div className="rounded-xl border border-gray-200 dark:border-blue-500/30 bg-white dark:bg-blue-500/10 overflow-hidden shrink-0">
@@ -127,7 +157,7 @@ export function TestingEnvironment({ subworkspaceId }: TestingEnvironmentProps) 
                             value={prompt}
                             onChange={(e) => setPrompt(e.target.value)}
                             placeholder="Escribe aquí el prompt para tu agente de voz..."
-                            className="min-h-[300px] resize-none border-gray-200 dark:border-gray-600 dark:bg-gray-900 dark:text-white dark:placeholder:text-gray-500 focus:border-blue-500 dark:focus:border-blue-400 font-mono text-sm leading-relaxed"
+                            className="min-h-[250px] resize-none border-gray-200 dark:border-gray-600 dark:bg-gray-900 dark:text-white dark:placeholder:text-gray-500 focus:border-blue-500 dark:focus:border-blue-400 font-sans text-base leading-relaxed"
                         />
 
                         <div className="flex items-center justify-between">
@@ -199,6 +229,40 @@ export function TestingEnvironment({ subworkspaceId }: TestingEnvironmentProps) 
                         </div>
                     </div>
                 )}
+
+                {/* Analysis Config Section (Collapsible) */}
+                <div className="rounded-xl border border-gray-200 dark:border-blue-500/30 bg-white dark:bg-blue-500/10 overflow-hidden shrink-0">
+                    <button
+                        onClick={() => setShowAnalysis(!showAnalysis)}
+                        className="w-full flex items-center justify-between gap-3 px-5 py-4 bg-gray-50 dark:bg-gray-800/50 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                    >
+                        <div className="flex items-center gap-3">
+                            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-green-100 dark:bg-green-500/20 text-green-600 dark:text-green-400">
+                                <Brain className="h-4 w-4" />
+                            </div>
+                            <div className="text-left">
+                                <h3 className="font-semibold text-gray-900 dark:text-white">Análisis e IA</h3>
+                                <p className="text-xs text-gray-500 dark:text-gray-400">
+                                    Configura qué datos recoger de las llamadas
+                                </p>
+                            </div>
+                        </div>
+                        {showAnalysis ? (
+                            <ChevronUp className="h-5 w-5 text-gray-400" />
+                        ) : (
+                            <ChevronDown className="h-5 w-5 text-gray-400" />
+                        )}
+                    </button>
+
+                    {showAnalysis && (
+                        <div className="p-5 border-t border-gray-100 dark:border-gray-700">
+                            <CampaignAnalysis
+                                config={analysisConfig}
+                                onChange={handleUpdateAnalysis}
+                            />
+                        </div>
+                    )}
+                </div>
             </div>
 
             {/* Right Column: Voice Orb */}
