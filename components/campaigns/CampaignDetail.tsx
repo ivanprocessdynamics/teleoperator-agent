@@ -161,37 +161,8 @@ export function CampaignDetail({ campaignId, subworkspaceId, onBack }: CampaignD
                 status: "running"
             });
 
-            // NEW: Push Prompt to Retell API
-            // Fetch subworkspace to get the retell_agent_id
-            const subSnap = await getDoc(doc(db, "subworkspaces", subworkspaceId));
-            if (subSnap.exists()) {
-                const subData = subSnap.data();
-                const retellAgentId = subData?.retell_agent_id;
-
-                if (retellAgentId) {
-                    try {
-                        const response = await fetch('/api/retell/update-agent', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                agent_id: retellAgentId,
-                                prompt: campaign.prompt_template || ""
-                            })
-                        });
-
-                        if (!response.ok) {
-                            const errData = await response.json();
-                            console.warn("Failed to push to Retell:", errData);
-                            // We don't block UI but we warn
-                        } else {
-                            const successData = await response.json();
-                            console.log("Retell Agent updated successfully:", successData);
-                        }
-                    } catch (apiErr) {
-                        console.error("API Call error:", apiErr);
-                    }
-                }
-            }
+            // Note: We use Dynamic Variables now. The Dialer script should read 'active_prompt' 
+            // from the subworkspace and pass it as 'campaign_prompt' variable.
 
             setIsActivated(true);
             setTimeout(() => setIsActivated(false), 3000);

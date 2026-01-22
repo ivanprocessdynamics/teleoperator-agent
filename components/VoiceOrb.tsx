@@ -8,10 +8,11 @@ type OrbState = "idle" | "connecting" | "listening";
 
 interface VoiceOrbProps {
     agentId: string;
+    prompt?: string;
     className?: string;
 }
 
-export function VoiceOrb({ agentId, className = "" }: VoiceOrbProps) {
+export function VoiceOrb({ agentId, prompt, className = "" }: VoiceOrbProps) {
     const [state, setState] = useState<OrbState>("idle");
     const [timer, setTimer] = useState(0);
     const webClientRef = useRef<RetellWebClient | null>(null);
@@ -79,7 +80,10 @@ export function VoiceOrb({ agentId, className = "" }: VoiceOrbProps) {
             const res = await fetch("/api/retell/create-web-call", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ agent_id: agentId }),
+                body: JSON.stringify({
+                    agent_id: agentId,
+                    prompt: prompt
+                }),
             });
 
             if (!res.ok) {
@@ -102,7 +106,7 @@ export function VoiceOrb({ agentId, className = "" }: VoiceOrbProps) {
             setState("idle");
             isCallingRef.current = false;
         }
-    }, [agentId]);
+    }, [agentId, prompt]);
 
     const handleClick = () => {
         if (webClientRef.current && state === "listening") {

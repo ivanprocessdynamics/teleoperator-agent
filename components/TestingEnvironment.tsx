@@ -53,29 +53,7 @@ export function TestingEnvironment({ subworkspaceId }: TestingEnvironmentProps) 
                 active_prompt: prompt,
             });
 
-            // NEW: Push Prompt to Retell API
-            if (retellAgentId) {
-                try {
-                    const response = await fetch('/api/retell/update-agent', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            agent_id: retellAgentId, // State variable
-                            prompt: prompt
-                        })
-                    });
-
-                    if (!response.ok) {
-                        const errData = await response.json();
-                        console.warn("Failed to push to Retell:", errData);
-                    } else {
-                        const successData = await response.json();
-                        console.log("Retell Agent updated for testing:", successData);
-                    }
-                } catch (apiErr) {
-                    console.error("API Call error during test save:", apiErr);
-                }
-            }
+            // Note: We removed the Push Logic because we now use Dynamic Variables in VoiceOrb
 
             setSavedPrompt(prompt);
             setSaved(true);
@@ -171,7 +149,7 @@ export function TestingEnvironment({ subworkspaceId }: TestingEnvironmentProps) 
                     </p>
 
                     {retellAgentId ? (
-                        <VoiceOrb agentId={retellAgentId} />
+                        <VoiceOrb agentId={retellAgentId} prompt={prompt} />
                     ) : (
                         <div className="py-8 text-center">
                             <div className="w-32 h-32 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center mx-auto mb-4">

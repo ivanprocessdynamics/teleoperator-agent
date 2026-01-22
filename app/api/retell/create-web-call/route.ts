@@ -7,7 +7,7 @@ const retell = new Retell({
 
 export async function POST(req: Request) {
     try {
-        const { agent_id } = await req.json();
+        const { agent_id, prompt } = await req.json();
 
         if (!process.env.RETELL_API_KEY) {
             return NextResponse.json(
@@ -19,6 +19,9 @@ export async function POST(req: Request) {
         // Create a Web Call to get the access token
         const webCallResponse = await retell.call.createWebCall({
             agent_id: agent_id,
+            retell_llm_dynamic_variables: {
+                campaign_prompt: prompt || "Prompt no configurado",
+            },
         });
 
         return NextResponse.json(webCallResponse, { status: 200 });
