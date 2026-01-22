@@ -3,6 +3,13 @@ import { db } from "@/lib/firebase";
 import { doc, setDoc, serverTimestamp, getDoc } from "firebase/firestore";
 import crypto from 'crypto';
 
+// Helper to normalize roles to 'user' | 'agent'
+function normalizeRole(role: string): "user" | "agent" {
+    if (role === "user" || role === "human") return "user";
+    // Default to agent for 'assistant', 'agent', 'model', etc.
+    return "agent";
+}
+
 // Helper to parse plain text transcript if object is missing
 function parseTranscript(transcriptText: string) {
     if (!transcriptText) return [];
@@ -21,12 +28,21 @@ function parseTranscript(transcriptText: string) {
     return messages;
 }
 
+// Helper to normalize transcript object from Retell
+function normalizeTranscript(transcript: any[]) {
+    if (!Array.isArray(transcript)) return [];
+    return transcript.map(t => ({
+        role: normalizeRole(t.role),
+        content: t.content || t.message || ""
+    }));
+}
+
 export async function POST(req: Request) {
     try {
+        const bodyText = await req.text();
         // 1. Validate Signature (Optional but recommended)
         const signature = req.headers.get("x-retell-signature");
         if (process.env.RETELL_WEBHOOK_SECRET && signature) {
-            const bodyText = await req.text();
             const expectedSignature = crypto
                 .createHmac('sha256', process.env.RETELL_WEBHOOK_SECRET)
                 .update(bodyText)
@@ -36,12 +52,9 @@ export async function POST(req: Request) {
                 console.error("Invalid Retell signature");
                 return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
             }
-            // Parse body after reading text
-            var body = JSON.parse(bodyText);
-        } else {
-            var body = await req.json();
         }
 
+        const body = JSON.parse(bodyText);
         const { event, call_id, call } = body;
         const callId = call_id || call?.call_id;
 
@@ -49,7 +62,7 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: "No call_id provided" }, { status: 400 });
         }
 
-        console.log(`Webhook Event: ${event} | Call ID: ${callId}`);
+        console.log(`Webhook Event: ${event} | Call ID: ${callId} | Body Size: ${bodyText.length}`);
 
         // Extract Call Data (normalized)
         const callData = call || body; // 'call_ended' puts data in 'call', 'call.analyzed' might be at root or 'call'
@@ -78,14 +91,16 @@ export async function POST(req: Request) {
 
 async function handleCallEnded(callId: string, data: any) {
     // Determine transcript
-    let transcriptNodes = [];
+    let transcriptNodes: any[] = [];
 
     if (data.transcript_object && Array.isArray(data.transcript_object)) {
-        transcriptNodes = data.transcript_object;
+        transcriptNodes = normalizeTranscript(data.transcript_object);
     } else if (data.transcript) {
         // Fallback to text parsing
         transcriptNodes = parseTranscript(data.transcript);
     }
+
+    console.log(`[call_ended] Processing ${transcriptNodes.length} transcript messages for ${callId}`);
 
     // Prepare basic call record
     const docData: any = {
@@ -113,7 +128,7 @@ async function handleCallEnded(callId: string, data: any) {
     */
 
     await setDoc(docRef, docData, { merge: true });
-    console.log(`[call_ended] Transcript saved for ${callId}`);
+    console.log(`[call_ended] Saved for ${callId}`);
 }
 
 async function handleCallAnalyzed(callId: string, data: any) {
@@ -124,7 +139,7 @@ async function handleCallAnalyzed(callId: string, data: any) {
 
     let transcriptNodes = null;
     if (data.transcript_object && Array.isArray(data.transcript_object)) {
-        transcriptNodes = data.transcript_object;
+        transcriptNodes = normalizeTranscript(data.transcript_object);
     }
 
     const updates: any = {
