@@ -55,10 +55,14 @@ export function CallHistoryTable({ agentId }: CallHistoryTableProps) {
 
         if (agentId) {
             console.log("Setting up query for agent:", agentId);
-            q = query(collection(db, "calls"), where("agent_id", "==", agentId), orderBy("timestamp", "desc"), limit(50));
+            // TEMPORARILY REMOVED FILTER FOR DEBUGGING
+            // q = query(collection(db, "calls"), where("agent_id", "==", agentId), orderBy("timestamp", "desc"), limit(50));
+            // Fetch ALL calls to verify data exists
+            q = query(collection(db, "calls"), orderBy("timestamp", "desc"), limit(50));
         } else {
             console.log("No agentId provided, querying all calls (limit 50)");
         }
+
 
         const unsub = onSnapshot(q, (snapshot) => {
             console.log("Snapshot received. Docs count:", snapshot.docs.length);
@@ -159,6 +163,9 @@ export function CallHistoryTable({ agentId }: CallHistoryTableProps) {
                                                     {call.timestamp?.toDate ?
                                                         formatDistanceToNow(call.timestamp.toDate(), { addSuffix: true, locale: es })
                                                         : "Reciente"}
+                                                </span>
+                                                <span className="text-xs text-gray-400 font-mono mt-0.5">
+                                                    ID: {call.agent_id?.substring(0, 8)}...
                                                 </span>
                                                 <span className="text-xs text-gray-500 flex items-center gap-1 mt-0.5">
                                                     <Calendar className="h-3 w-3" />
