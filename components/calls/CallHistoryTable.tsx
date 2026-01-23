@@ -1,29 +1,52 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { collection, query, where, orderBy, onSnapshot, limit, Timestamp } from "firebase/firestore";
-import { db } from "@/lib/firebase";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { ChatTranscript } from "./ChatTranscript";
-import {
-    Loader2,
-    MessageSquare,
-    PhoneIncoming,
-    Clock,
-    Calendar,
-    Smile,
-    Meh,
-    Frown,
-    MoreHorizontal,
-    FileText
-} from "lucide-react";
-import { cn } from "@/lib/utils";
-import { formatDistanceToNow } from "date-fns";
-import { es } from "date-fns/locale";
+import { DateRangePicker } from "@/components/ui/date-range-picker";
+
+// ... existing imports ...
+
+// Inside function component:
+// Sync state for picker
+const [pickerStart, setPickerStart] = useState<Date | null>(null);
+const [pickerEnd, setPickerEnd] = useState<Date | null>(null);
+
+// Update effect to use picker dates when interval is custom
+useEffect(() => {
+    // ... (existing logic) ...
+} else if (interval === "custom" && pickerStart && pickerEnd) {
+    start = pickerStart;
+    end = pickerEnd;
+}
+        // ...
+    }, [agentId, interval, pickerStart, pickerEnd]);
+
+// ...
+
+<div className="flex flex-wrap items-center gap-3">
+    <select
+        value={interval}
+        onChange={(e) => setInterval(e.target.value)}
+        className="h-9 rounded-md border border-gray-200 bg-white px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-gray-950 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-50 focus:border-blue-500"
+    >
+        <option value="1h">Última hora</option>
+        <option value="24h">Últimas 24 horas</option>
+        <option value="7d">Última semana</option>
+        <option value="30d">Último mes</option>
+        <option value="custom">Personalizado</option>
+    </select>
+
+    {interval === "custom" && (
+        <div className="animate-in fade-in slide-in-from-right-4 duration-300">
+            <DateRangePicker
+                startDate={pickerStart}
+                endDate={pickerEnd}
+                onChange={(s, e) => {
+                    setPickerStart(s);
+                    setPickerEnd(e);
+                }}
+            />
+        </div>
+    )}
+</div>
 
 interface CallRecord {
     id: string;
