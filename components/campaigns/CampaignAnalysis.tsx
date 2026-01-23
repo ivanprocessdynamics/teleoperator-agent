@@ -147,44 +147,48 @@ export function CampaignAnalysis({ config = DEFAULT_CONFIG, onChange }: Campaign
                 </CardHeader>
                 <CardContent className="space-y-6">
                     {/* Add New Field Form */}
-                    <div className="bg-gray-50 dark:bg-gray-900/50 p-4 rounded-lg border border-gray-100 dark:border-gray-700 flex flex-col md:flex-row gap-4 items-end">
-                        <div className="flex-1 space-y-2 w-full">
-                            <Label className="text-xs uppercase text-gray-500">Nombre del Campo</Label>
-                            <Input
-                                placeholder="ej: motivo_rechazo"
-                                value={newField.name}
-                                onChange={(e) => setNewField({ ...newField, name: e.target.value })}
-                                className="bg-white dark:bg-gray-800"
-                            />
+                    <div className="bg-gray-50 dark:bg-gray-900/50 p-5 rounded-xl border border-gray-100 dark:border-gray-700 space-y-4">
+                        <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
+                            <div className="md:col-span-3 space-y-1.5">
+                                <Label className="text-xs font-semibold uppercase text-gray-500 tracking-wider">Nombre del Campo</Label>
+                                <Input
+                                    placeholder="ej: motivo_rechazo"
+                                    value={newField.name}
+                                    onChange={(e) => setNewField({ ...newField, name: e.target.value })}
+                                    className="bg-white dark:bg-gray-800"
+                                />
+                            </div>
+                            <div className="md:col-span-3 space-y-1.5">
+                                <Label className="text-xs font-semibold uppercase text-gray-500 tracking-wider">Tipo</Label>
+                                <Select
+                                    value={newField.type}
+                                    onValueChange={(v) => setNewField({ ...newField, type: v as any })}
+                                >
+                                    <SelectTrigger className="bg-white dark:bg-gray-800">
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="string">Texto</SelectItem>
+                                        <SelectItem value="boolean">Sí/No</SelectItem>
+                                        <SelectItem value="number">Número</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <div className="md:col-span-6 space-y-1.5">
+                                <Label className="text-xs font-semibold uppercase text-gray-500 tracking-wider">¿Qué debe buscar la IA?</Label>
+                                <div className="flex gap-2">
+                                    <Input
+                                        placeholder="ej: La razón exacta por la que el cliente dijo que no"
+                                        value={newField.description}
+                                        onChange={(e) => setNewField({ ...newField, description: e.target.value })}
+                                        className="bg-white dark:bg-gray-800"
+                                    />
+                                    <Button onClick={addCustomField} disabled={!newField.name || !newField.description} className="shrink-0 bg-gray-900 dark:bg-white text-white dark:text-gray-900">
+                                        <Plus className="h-4 w-4 mr-2" /> Añadir
+                                    </Button>
+                                </div>
+                            </div>
                         </div>
-                        <div className="flex-[2] space-y-2 w-full">
-                            <Label className="text-xs uppercase text-gray-500">¿Qué debe buscar la IA?</Label>
-                            <Input
-                                placeholder="ej: La razón exacta por la que el cliente dijo que no le interesaba"
-                                value={newField.description}
-                                onChange={(e) => setNewField({ ...newField, description: e.target.value })}
-                                className="bg-white dark:bg-gray-800"
-                            />
-                        </div>
-                        <div className="w-full md:w-32 space-y-2">
-                            <Label className="text-xs uppercase text-gray-500">Tipo</Label>
-                            <Select
-                                value={newField.type}
-                                onValueChange={(v) => setNewField({ ...newField, type: v as any })}
-                            >
-                                <SelectTrigger className="bg-white dark:bg-gray-800">
-                                    <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="string">Texto</SelectItem>
-                                    <SelectItem value="boolean">Sí/No</SelectItem>
-                                    <SelectItem value="number">Número</SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
-                        <Button onClick={addCustomField} disabled={!newField.name || !newField.description} className="shrink-0 bg-gray-900 dark:bg-white text-white dark:text-gray-900">
-                            <Plus className="h-4 w-4 mr-2" /> Añadir
-                        </Button>
                     </div>
 
                     {/* List of Fields */}

@@ -290,9 +290,10 @@ export function CallHistoryTable({ agentId }: CallHistoryTableProps) {
                                                                 <div className="flex gap-2 mt-2 flex-wrap">
                                                                     {customData
                                                                         .filter(d => d.name !== "resumen_espanol")
-                                                                        .slice(0, 3).map((d, i) => (
-                                                                            <span key={i} className="inline-flex items-center text-[10px] bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 px-2 py-0.5 rounded border border-indigo-100 dark:border-indigo-800 font-medium">
-                                                                                {d.name}: {String(d.value)}
+                                                                        .map((d, i) => (
+                                                                            <span key={i} className="inline-flex items-center text-[11px] bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300 px-2 py-1 rounded-md border border-purple-100 dark:border-purple-800/50 font-medium shadow-sm">
+                                                                                <span className="opacity-70 mr-1 uppercase text-[9px] tracking-wider">{d.name}:</span>
+                                                                                <span>{String(d.value)}</span>
                                                                             </span>
                                                                         ))}
                                                                 </div>

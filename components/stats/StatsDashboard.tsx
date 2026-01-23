@@ -78,6 +78,35 @@ export function StatsDashboard({ agentId }: StatsDashboardProps) {
                     sentimentBreakdown: sentimentCounts
                 });
 
+                // Aggregate Custom Fields
+                const customAgg: Record<string, { type: string, yes: number, no: number, count: number, totalSum: number }> = {};
+
+                snapshot.docs.forEach(doc => {
+                    const data = doc.data();
+                    const customs = data.analysis?.custom_analysis_data;
+                    if (Array.isArray(customs)) {
+                        customs.forEach((c: any) => {
+                            if (!customAgg[c.name]) {
+                                customAgg[c.name] = { type: typeof c.value, yes: 0, no: 0, count: 0, totalSum: 0 };
+                            }
+                            const entry = customAgg[c.name];
+                            entry.count++;
+
+                            if (typeof c.value === 'boolean') {
+                                entry.type = 'boolean';
+                                if (c.value) entry.yes++; else entry.no++;
+                            } else if (typeof c.value === 'number') {
+                                entry.type = 'number';
+                                entry.totalSum += c.value;
+                            } else {
+                                entry.type = 'string';
+                            }
+                        });
+                    }
+                });
+
+                setCustomStats(customAgg);
+
             } catch (error) {
                 console.error("Error fetching stats:", error);
             } finally {
@@ -93,6 +122,9 @@ export function StatsDashboard({ agentId }: StatsDashboardProps) {
         const secs = Math.floor(seconds % 60);
         return `${mins}m ${secs}s`;
     };
+
+    // State for custom stats
+    const [customStats, setCustomStats] = useState<Record<string, any>>({});
 
     if (loading) {
         return <div className="flex justify-center p-12"><Loader2 className="h-8 w-8 animate-spin text-blue-500" /></div>;
@@ -205,6 +237,47 @@ export function StatsDashboard({ agentId }: StatsDashboardProps) {
                     </div>
                 </div>
             </div>
+
+            {/* Custom Metrics */}
+            {Object.keys(customStats).length > 0 && (
+                <div className="mt-4 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-6">
+                    <h4 className="text-sm font-medium mb-4 text-gray-700 dark:text-gray-300">Métricas Personalizadas</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {Object.entries(customStats).map(([name, data]) => {
+                            if (name === 'resumen_espanol') return null; // Skip summary
+                            return (
+                                <Card key={name} className="border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50">
+                                    <CardHeader className="pb-2">
+                                        <CardTitle className="text-xs font-semibold uppercase text-gray-500">{name}</CardTitle>
+                                    </CardHeader>
+                                    <CardContent>
+                                        {data.type === 'boolean' ? (
+                                            <div className="flex flex-col gap-2">
+                                                <div className="flex items-center justify-between text-sm">
+                                                    <span className="text-green-600">Sí: {data.yes}</span>
+                                                    <span className="text-red-500">No: {data.no}</span>
+                                                </div>
+                                                <div className="h-2 w-full bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden flex">
+                                                    <div style={{ width: `${(data.yes / data.count) * 100}%` }} className="bg-green-500 h-full" />
+                                                </div>
+                                            </div>
+                                        ) : data.type === 'number' ? (
+                                            <div>
+                                                <div className="text-2xl font-bold text-gray-900 dark:text-white">{(data.totalSum / data.count).toFixed(1)}</div>
+                                                <p className="text-xs text-gray-500">Promedio</p>
+                                            </div>
+                                        ) : (
+                                            <div className="text-sm text-gray-600">
+                                                {data.count} respuestas recogidas
+                                            </div>
+                                        )}
+                                    </CardContent>
+                                </Card>
+                            )
+                        })}
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
