@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/firebase";
-import { doc, setDoc, serverTimestamp, getDoc } from "firebase/firestore";
+import { doc, setDoc, serverTimestamp, getDoc, query, collection, where, getDocs } from "firebase/firestore";
 import crypto from 'crypto';
 
 // Helper to normalize roles to 'user' | 'agent'
@@ -144,14 +144,70 @@ async function handleCallEnded(callId: string, data: any) {
 }
 
 async function handleCallAnalyzed(callId: string, data: any) {
-    const analysis = data.call_analysis || {};
+    let analysis = data.call_analysis || {};
 
     // We update ONLY the analysis fields + transcript (if improved)
     // Sometimes call.analyzed has a better/final transcript
 
     let transcriptNodes = null;
+    let transcriptText = "";
+
     if (data.transcript_object && Array.isArray(data.transcript_object)) {
         transcriptNodes = normalizeTranscript(data.transcript_object);
+        transcriptText = transcriptNodes.map(t => `${t.role.toUpperCase()}: ${t.content}`).join('\n');
+    } else if (data.transcript) {
+        transcriptText = data.transcript;
+    }
+
+    // AI Fallback for Custom Extraction
+    // If we have an agent_id but NO custom_analysis_data, try to generate it
+    if (data.agent_id && (!analysis.custom_analysis_data || analysis.custom_analysis_data.length === 0)) {
+        try {
+            console.log(`[AI Fallback] Checking if custom extraction is needed for agent ${data.agent_id}`);
+
+            // 1. Find Subworkspace config for this agent
+            const q = query(collection(db, "subworkspaces"), where("retell_agent_id", "==", data.agent_id));
+            const snapshot = await getDocs(q);
+
+            if (!snapshot.empty) {
+                const subSettings = snapshot.docs[0].data();
+                const customFields = subSettings.analysis_config?.custom_fields || [];
+
+                if (customFields.length > 0 && transcriptText) {
+                    console.log(`[AI Fallback] Generating analysis for ${customFields.length} fields using OpenAI...`);
+
+                    const OpenAI = require("openai");
+                    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+                    const prompt = `
+                        Analyze the following call transcript and extract the requested variables. 
+                        Return ONLY a valid JSON object with a key "custom_analysis_data" containing an array of objects.
+                        Each object must have: "name" (string), "value" (string, number, or boolean), and "rationale" (string).
+                        
+                        Variables to extract:
+                        ${customFields.map((f: any) => `- Name: ${f.name}, Type: ${f.type}, Description: ${f.description}`).join('\n')}
+                        
+                        Transcript:
+                        ${transcriptText}
+                    `;
+
+                    const completion = await openai.chat.completions.create({
+                        messages: [{ role: "system", content: "You are a precise data extraction assistant." }, { role: "user", content: prompt }],
+                        model: "gpt-4o-mini",
+                        response_format: { type: "json_object" }
+                    });
+
+                    const result = JSON.parse(completion.choices[0].message.content || "{}");
+
+                    if (result.custom_analysis_data) {
+                        analysis.custom_analysis_data = result.custom_analysis_data;
+                        console.log(`[AI Fallback] Successfully generated ${result.custom_analysis_data.length} data points.`);
+                    }
+                }
+            }
+        } catch (err) {
+            console.error("[AI Fallback] Error generating analysis:", err);
+        }
     }
 
     const updates: any = {

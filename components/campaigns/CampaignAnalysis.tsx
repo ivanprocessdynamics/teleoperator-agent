@@ -133,8 +133,8 @@ export function CampaignAnalysis({ config = DEFAULT_CONFIG, onChange }: Campaign
             </Card>
 
             {/* Custom Extraction */}
-            <Card className="bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 shadow-sm">
-                <CardHeader>
+            <Card className="bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden">
+                <CardHeader className="bg-gray-50/50 dark:bg-gray-900/50 border-b border-gray-100 dark:border-gray-800 pb-4">
                     <div className="flex items-center gap-2">
                         <div className="p-2 bg-purple-100 dark:bg-purple-900/30 rounded-lg text-purple-600 dark:text-purple-400">
                             <Brain className="h-5 w-5" />
@@ -145,9 +145,13 @@ export function CampaignAnalysis({ config = DEFAULT_CONFIG, onChange }: Campaign
                         </div>
                     </div>
                 </CardHeader>
-                <CardContent className="space-y-6">
+                <CardContent className="space-y-6 p-6">
                     {/* Add New Field Form */}
                     <div className="bg-gray-50 dark:bg-gray-900/50 p-5 rounded-xl border border-gray-100 dark:border-gray-700 space-y-4">
+                        <div className="flex items-center gap-2 mb-2">
+                            <div className="h-6 w-1 bg-blue-500 rounded-full" />
+                            <h4 className="text-sm font-medium text-gray-900 dark:text-white">Añadir Nuevo Campo</h4>
+                        </div>
                         <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
                             <div className="md:col-span-3 space-y-1.5">
                                 <Label className="text-xs font-semibold uppercase text-gray-500 tracking-wider">Nombre del Campo</Label>
