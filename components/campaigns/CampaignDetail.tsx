@@ -337,7 +337,17 @@ export function CampaignDetail({ campaignId, subworkspaceId, onBack }: CampaignD
 
                         <TabsContent value="analysis">
                             <CampaignAnalysis
-                                config={campaign?.analysis_config}
+                                config={campaign?.analysis_config || {
+                                    enable_transcription: true,
+                                    standard_fields: {
+                                        satisfaction_score: true,
+                                        sentiment: true,
+                                        summary: true,
+                                        user_sentiment: true,
+                                        call_successful: true
+                                    },
+                                    custom_fields: []
+                                }}
                                 onChange={handleUpdateAnalysis}
                             />
                         </TabsContent>
