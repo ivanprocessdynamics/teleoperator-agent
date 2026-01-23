@@ -192,13 +192,14 @@ export function CampaignDetail({ campaignId, subworkspaceId, onBack }: CampaignD
                 status: "running"
             });
 
-            // 3. Update Analysis Config (Push to Retell)
-            if (campaign.analysis_config && retellAgentId) {
+            // 3. Update Agent Prompt AND Analysis Config (Push to Retell)
+            if (retellAgentId) {
                 await fetch('/api/retell/update-agent', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         agent_id: retellAgentId,
+                        prompt: campaign.prompt_template || "",  // Push the campaign prompt to the agent!
                         analysis_config: campaign.analysis_config
                     })
                 });

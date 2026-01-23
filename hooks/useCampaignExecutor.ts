@@ -59,15 +59,20 @@ export function useCampaignExecutor({
             const data = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as CampaignRow));
             setRows(data);
 
-            // Update counts
-            const completed = data.filter(r => r.status === 'completed').length;
-            const failed = data.filter(r => ['failed', 'no_answer'].includes(r.status)).length;
-            const pending = data.filter(r => r.status === 'pending').length;
-            const calling = data.filter(r => r.status === 'calling').length;
+            // Update counts - only count rows with valid phone numbers
+            const rowsWithPhones = data.filter(r => {
+                const phone = r.data[phoneColumnId]?.trim();
+                return phone && phone.length >= 7;
+            });
+
+            const completed = rowsWithPhones.filter(r => r.status === 'completed').length;
+            const failed = rowsWithPhones.filter(r => ['failed', 'no_answer'].includes(r.status)).length;
+            const pending = rowsWithPhones.filter(r => r.status === 'pending').length;
+            const calling = rowsWithPhones.filter(r => r.status === 'calling').length;
 
             setState(prev => ({
                 ...prev,
-                totalRows: data.length,
+                totalRows: rowsWithPhones.length,  // Only count rows with phones
                 completedCount: completed,
                 failedCount: failed,
                 pendingCount: pending,
@@ -76,7 +81,14 @@ export function useCampaignExecutor({
 
             // If a call just finished and we're running, process next
             if (isRunningRef.current && !isPausedRef.current) {
-                processNextCalls(data);
+                // Check if campaign is complete (no pending, no calling)
+                if (pending === 0 && calling === 0 && rowsWithPhones.length > 0) {
+                    console.log("Campaign complete - all calls finished");
+                    isRunningRef.current = false;
+                    setState(prev => ({ ...prev, isRunning: false }));
+                } else {
+                    processNextCalls(data);
+                }
             }
         });
 
