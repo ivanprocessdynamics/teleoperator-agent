@@ -41,18 +41,7 @@ export function VoiceOrb({ agentId, prompt, className = "", analysisConfig }: Vo
         isCallingRef.current = true;
         setState("connecting");
 
-        // Request microphone permissions
-        try {
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            console.log("🎤 Microphone permission granted");
-            stream.getTracks().forEach((track) => track.stop());
-        } catch (err) {
-            console.error("🚫 Microphone permission denied:", err);
-            alert("Necesitas permitir el acceso al micrófono para usar el asistente de voz.");
-            setState("idle");
-            isCallingRef.current = false;
-            return;
-        }
+
 
         // Initialize Retell client
         const client = new RetellWebClient();
