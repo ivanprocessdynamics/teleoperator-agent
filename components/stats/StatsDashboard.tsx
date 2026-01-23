@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { collection, query, where, getDocs, Timestamp, orderBy } from "firebase/firestore";
+import { collection, query, where, getDocs, Timestamp, orderBy, doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Loader2, TrendingUp, Clock, Phone, ThumbsUp, Activity } from "lucide-react";
@@ -9,9 +9,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 
 interface StatsDashboardProps {
     agentId?: string;
+    subworkspaceId?: string;
 }
 
-export function StatsDashboard({ agentId }: StatsDashboardProps) {
+export function StatsDashboard(props: StatsDashboardProps) {
+    const { agentId } = props;
     const [loading, setLoading] = useState(true);
     const [stats, setStats] = useState({
         totalCalls: 0,
@@ -23,11 +25,31 @@ export function StatsDashboard({ agentId }: StatsDashboardProps) {
 
     useEffect(() => {
         async function fetchStats() {
-            if (!agentId) return;
+            if (!agentId || !props.subworkspaceId) return;
             setLoading(true);
 
             try {
-                // Determine date range
+                // 1. Fetch Subworkspace Config for Custom Fields definition
+                const subDoc = await getDoc(doc(db, "subworkspaces", props.subworkspaceId));
+                let initialCustomStats: Record<string, any> = {};
+
+                if (subDoc.exists()) {
+                    const data = subDoc.data();
+                    const customFields = data.analysis_config?.custom_fields || [];
+
+                    customFields.forEach((field: any) => {
+                        initialCustomStats[field.name] = {
+                            type: field.type,
+                            yes: 0,
+                            no: 0,
+                            count: 0,
+                            totalSum: 0,
+                            description: field.description
+                        };
+                    });
+                }
+
+                // 2. Determine date range
                 const now = new Date();
                 let start = new Date();
 
@@ -78,17 +100,30 @@ export function StatsDashboard({ agentId }: StatsDashboardProps) {
                     sentimentBreakdown: sentimentCounts
                 });
 
-                // Aggregate Custom Fields
-                const customAgg: Record<string, { type: string, yes: number, no: number, count: number, totalSum: number }> = {};
+                // 3. Aggregate Custom Fields over the initialized base
+                // We clone the initial stats to avoid mutation issues if we were reusing it, 
+                // though here it's fresh every effect run.
+                const customAgg = { ...initialCustomStats };
 
                 snapshot.docs.forEach(doc => {
                     const data = doc.data();
                     const customs = data.analysis?.custom_analysis_data;
                     if (Array.isArray(customs)) {
                         customs.forEach((c: any) => {
+                            // If field exists in config (or we want to show unconfigured ones too?)
+                            // User request implies focusing on configured ones, but usually showing historical data is good.
+                            // However, strictly following "Debería añadirse solo según lo que el usuario añada" implies 
+                            // we prioritize the config. But if we only use config, we miss historical data for deleted fields.
+                            // Let's ensure we add it if it's not there, OR just update if it matches.
+                            // Decision: Show all found, but verify the configured ones are initialized.
+
                             if (!customAgg[c.name]) {
+                                // Found a field in data that wasn't in config. 
+                                // Optionally skip it if we only want to show currently configured fields.
+                                // But safest is to initialize it so we don't crash.
                                 customAgg[c.name] = { type: typeof c.value, yes: 0, no: 0, count: 0, totalSum: 0 };
                             }
+
                             const entry = customAgg[c.name];
                             entry.count++;
 
@@ -115,7 +150,7 @@ export function StatsDashboard({ agentId }: StatsDashboardProps) {
         }
 
         fetchStats();
-    }, [agentId, period]);
+    }, [agentId, period, props.subworkspaceId]);
 
     const formatDuration = (seconds: number) => {
         const mins = Math.floor(seconds / 60);

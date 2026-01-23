@@ -194,7 +194,7 @@ export default function SubworkspacePage() {
                     <TabsContent value="stats" forceMount className="mt-6 data-[state=inactive]:hidden">
                         <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-800 p-6">
                             {agentId ? (
-                                <StatsDashboard agentId={agentId} />
+                                <StatsDashboard agentId={agentId} subworkspaceId={subId} />
                             ) : (
                                 <div className="text-center py-10 text-gray-500">Cargando agente...</div>
                             )}
