@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/firebase";
-import { doc, setDoc, serverTimestamp, getDoc, query, collection, where, getDocs } from "firebase/firestore";
+import { doc, setDoc, serverTimestamp, getDoc, query, collection, where, getDocs, updateDoc, Timestamp } from "firebase/firestore";
 import crypto from 'crypto';
 
 // Helper to normalize roles to 'user' | 'agent'
@@ -30,11 +30,56 @@ function parseTranscript(transcriptText: string) {
 
 // Helper to normalize transcript object from Retell
 function normalizeTranscript(transcript: any[]) {
-    if (!Array.isArray(transcript)) return [];
+    if (!Array.isArray(transcript)) return []
     return transcript.map(t => ({
         role: normalizeRole(t.role),
         content: t.content || t.message || ""
     }));
+}
+
+// Helper to update campaign row status
+async function updateCampaignRowStatus(callId: string, data: any, eventType: 'started' | 'ended') {
+    try {
+        // Try to find the campaign row by call_id
+        const q = query(collection(db, "campaign_rows"), where("call_id", "==", callId));
+        const snapshot = await getDocs(q);
+
+        if (!snapshot.empty) {
+            const rowDoc = snapshot.docs[0];
+            console.log(`[Campaign Row] Found row ${rowDoc.id} for call ${callId}`);
+
+            if (eventType === 'started') {
+                await updateDoc(doc(db, "campaign_rows", rowDoc.id), {
+                    status: 'calling',
+                    called_at: Timestamp.now(),
+                });
+                console.log(`[Campaign Row] Updated ${rowDoc.id} to 'calling'`);
+            } else if (eventType === 'ended') {
+                // Determine final status based on disconnection_reason
+                let finalStatus: 'completed' | 'failed' | 'no_answer' = 'completed';
+                const disconnectionReason = data.disconnection_reason;
+
+                const failedReasons = ['dial_failed', 'dial_busy', 'error_unknown', 'error_retell', 'scam_detected', 'error_llm_websocket_open', 'error_llm_websocket_lost_connection'];
+                const noAnswerReasons = ['dial_no_answer', 'voicemail_reached', 'user_not_joined', 'registered_call_timeout'];
+
+                if (disconnectionReason && failedReasons.includes(disconnectionReason)) {
+                    finalStatus = 'failed';
+                } else if (disconnectionReason && noAnswerReasons.includes(disconnectionReason)) {
+                    finalStatus = 'no_answer';
+                }
+
+                await updateDoc(doc(db, "campaign_rows", rowDoc.id), {
+                    status: finalStatus,
+                    last_error: finalStatus !== 'completed' ? disconnectionReason : null,
+                });
+                console.log(`[Campaign Row] Updated ${rowDoc.id} to '${finalStatus}'`);
+            }
+        } else {
+            console.log(`[Campaign Row] No row found for call_id ${callId}`);
+        }
+    } catch (error) {
+        console.error(`[Campaign Row] Error updating row for call ${callId}:`, error);
+    }
 }
 
 export async function POST(req: Request) {
@@ -71,6 +116,9 @@ export async function POST(req: Request) {
         if (event === "call_ended") {
             // Priority: Save Transcript IMMEDIATELY
             await handleCallEnded(callId, callData);
+
+            // Update Campaign Row Status (if this call was part of a campaign)
+            await updateCampaignRowStatus(callId, callData, 'ended');
         }
         else if (event === "call.analyzed" || event === "call_analyzed") {
             // Secondary: enrich with Analysis later
@@ -78,7 +126,8 @@ export async function POST(req: Request) {
         }
         else if (event === "call_started") {
             console.log("Call started event received");
-            // Optional: Log start time or active status
+            // Update Campaign Row Status to 'calling'
+            await updateCampaignRowStatus(callId, callData, 'started');
         }
 
         return NextResponse.json({ received: true }, { status: 200 });
