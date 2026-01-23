@@ -1,59 +1,36 @@
 "use client";
 
+import { useEffect, useState } from "react";
+import { collection, query, where, orderBy, onSnapshot, limit, Timestamp } from "firebase/firestore";
+import { db } from "@/lib/firebase";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ChatTranscript } from "./ChatTranscript";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
-
-// ... existing imports ...
-
-// Inside function component:
-// Sync state for picker
-const [pickerStart, setPickerStart] = useState<Date | null>(null);
-const [pickerEnd, setPickerEnd] = useState<Date | null>(null);
-
-// Update effect to use picker dates when interval is custom
-useEffect(() => {
-    // ... (existing logic) ...
-} else if (interval === "custom" && pickerStart && pickerEnd) {
-    start = pickerStart;
-    end = pickerEnd;
-}
-        // ...
-    }, [agentId, interval, pickerStart, pickerEnd]);
-
-// ...
-
-<div className="flex flex-wrap items-center gap-3">
-    <select
-        value={interval}
-        onChange={(e) => setInterval(e.target.value)}
-        className="h-9 rounded-md border border-gray-200 bg-white px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-gray-950 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-50 focus:border-blue-500"
-    >
-        <option value="1h">Última hora</option>
-        <option value="24h">Últimas 24 horas</option>
-        <option value="7d">Última semana</option>
-        <option value="30d">Último mes</option>
-        <option value="custom">Personalizado</option>
-    </select>
-
-    {interval === "custom" && (
-        <div className="animate-in fade-in slide-in-from-right-4 duration-300">
-            <DateRangePicker
-                startDate={pickerStart}
-                endDate={pickerEnd}
-                onChange={(s, e) => {
-                    setPickerStart(s);
-                    setPickerEnd(e);
-                }}
-            />
-        </div>
-    )}
-</div>
+import {
+    Loader2,
+    MessageSquare,
+    PhoneIncoming,
+    Clock,
+    Calendar,
+    Smile,
+    Meh,
+    Frown,
+    MoreHorizontal,
+    FileText
+} from "lucide-react";
+import { cn } from "@/lib/utils";
+import { formatDistanceToNow } from "date-fns";
+import { es } from "date-fns/locale";
 
 interface CallRecord {
     id: string;
     agent_id: string;
     analysis: {
-        call_summary?: string;     // Corrected from post_call_summary
-        user_sentiment?: string;   // Corrected from post_call_sentiment
+        call_summary?: string;
+        user_sentiment?: string;
         call_successful?: boolean;
         custom_analysis_data?: { name: string; value: any }[];
     };
@@ -74,8 +51,8 @@ export function CallHistoryTable({ agentId }: CallHistoryTableProps) {
     const [selectedCall, setSelectedCall] = useState<CallRecord | null>(null);
 
     const [interval, setInterval] = useState<string>("7d"); // Default to last 7 days
-    const [customStart, setCustomStart] = useState<string>("");
-    const [customEnd, setCustomEnd] = useState<string>("");
+    const [pickerStart, setPickerStart] = useState<Date | null>(null);
+    const [pickerEnd, setPickerEnd] = useState<Date | null>(null);
 
     useEffect(() => {
         setError(null);
@@ -100,10 +77,9 @@ export function CallHistoryTable({ agentId }: CallHistoryTableProps) {
             start = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
         } else if (interval === "30d") {
             start = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-        } else if (interval === "custom" && customStart && customEnd) {
-            // Parse custom dates (HTML datetime-local inputs)
-            start = new Date(customStart);
-            end = new Date(customEnd);
+        } else if (interval === "custom" && pickerStart && pickerEnd) {
+            start = pickerStart;
+            end = pickerEnd;
         }
 
         if (start) {
@@ -130,7 +106,7 @@ export function CallHistoryTable({ agentId }: CallHistoryTableProps) {
         });
 
         return () => unsub();
-    }, [agentId, interval, customStart, customEnd]);
+    }, [agentId, interval, pickerStart, pickerEnd]);
 
     const [expandedSummaries, setExpandedSummaries] = useState<Set<string>>(new Set());
 
@@ -179,6 +155,11 @@ export function CallHistoryTable({ agentId }: CallHistoryTableProps) {
                 <p className="text-sm text-gray-500 max-w-sm mt-1">
                     No se han encontrado llamadas para este agente. Realiza una prueba para ver los resultados aquí.
                 </p>
+                {/* Fallback for picker visible even in empty state if user wants to change filter? 
+                    Actually user might be filtered to empty. 
+                    Let's show the filter bar above invalid/empty states?
+                    For now, I'll stick to the original structure but consider this for UX.
+                */}
             </div>
         );
     }
@@ -215,19 +196,14 @@ export function CallHistoryTable({ agentId }: CallHistoryTableProps) {
                         </select>
 
                         {interval === "custom" && (
-                            <div className="flex items-center gap-2 animate-in fade-in slide-in-from-right-4 duration-300">
-                                <input
-                                    type="datetime-local"
-                                    value={customStart}
-                                    onChange={(e) => setCustomStart(e.target.value)}
-                                    className="h-9 rounded-md border border-gray-200 bg-white px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus:border-blue-500 dark:bg-gray-950 dark:border-gray-800"
-                                />
-                                <span className="text-gray-400">-</span>
-                                <input
-                                    type="datetime-local"
-                                    value={customEnd}
-                                    onChange={(e) => setCustomEnd(e.target.value)}
-                                    className="h-9 rounded-md border border-gray-200 bg-white px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus:border-blue-500 dark:bg-gray-950 dark:border-gray-800"
+                            <div className="animate-in fade-in slide-in-from-right-4 duration-300">
+                                <DateRangePicker
+                                    startDate={pickerStart}
+                                    endDate={pickerEnd}
+                                    onChange={(s, e) => {
+                                        setPickerStart(s);
+                                        setPickerEnd(e);
+                                    }}
                                 />
                             </div>
                         )}
