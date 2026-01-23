@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import Link from "next/link";
@@ -16,12 +16,34 @@ import { CallHistoryTable } from "@/components/calls/CallHistoryTable";
 
 export default function SubworkspacePage() {
     const params = useParams();
+    const router = useRouter();
+    const searchParams = useSearchParams();
     const subId = params.subId as string;
+
+    // Get initial tab from URL or default to 'contacts'
+    const initialTab = searchParams.get("tab") || "contacts";
+
     const [subName, setSubName] = useState("");
     const [agentId, setAgentId] = useState<string | null>(null);
     const [isEditing, setIsEditing] = useState(false);
-    const [activeTab, setActiveTab] = useState("contacts");
+    const [activeTab, setActiveTab] = useState(initialTab);
     const [selectedCampaignId, setSelectedCampaignId] = useState<string | null>(null);
+
+    // Sync state with URL if URL changes (e.g. back button)
+    useEffect(() => {
+        const currentTab = searchParams.get("tab");
+        if (currentTab && currentTab !== activeTab) {
+            setActiveTab(currentTab);
+        }
+    }, [searchParams]);
+
+    const handleTabChange = (value: string) => {
+        setActiveTab(value);
+        // Update URL without reloading
+        const newParams = new URLSearchParams(searchParams.toString());
+        newParams.set("tab", value);
+        router.push(`?${newParams.toString()}`);
+    };
 
     const handleSaveName = async () => {
         if (!subName.trim()) return;
@@ -94,7 +116,7 @@ export default function SubworkspacePage() {
                 />
             ) : (
                 // Tabs containing Campaign List
-                <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+                <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
                     <TabsList className="grid w-full max-w-[600px] grid-cols-3 bg-gray-100 dark:bg-gray-800 p-1 rounded-lg">
                         <TabsTrigger
                             value="contacts"

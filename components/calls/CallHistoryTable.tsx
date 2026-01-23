@@ -20,7 +20,8 @@ import {
     Meh,
     Frown,
     MoreHorizontal,
-    FileText
+    FileText,
+    RefreshCw
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatDistanceToNow } from "date-fns";
@@ -49,7 +50,9 @@ export function CallHistoryTable({ agentId }: CallHistoryTableProps) {
     const [calls, setCalls] = useState<CallRecord[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+
     const [selectedCall, setSelectedCall] = useState<CallRecord | null>(null);
+    const [refreshTrigger, setRefreshTrigger] = useState(0);
 
     const [interval, setInterval] = useState<string>("7d"); // Default to last 7 days
     const [pickerStart, setPickerStart] = useState<Date | null>(null);
@@ -103,7 +106,7 @@ export function CallHistoryTable({ agentId }: CallHistoryTableProps) {
         });
 
         return () => unsub();
-    }, [agentId, interval, pickerStart, pickerEnd]);
+    }, [agentId, interval, pickerStart, pickerEnd, refreshTrigger]);
 
     const [expandedSummaries, setExpandedSummaries] = useState<Set<string>>(new Set());
 
@@ -152,6 +155,19 @@ export function CallHistoryTable({ agentId }: CallHistoryTableProps) {
                     </div>
 
                     <div className="flex flex-wrap items-center gap-3">
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                                setLoading(true);
+                                setRefreshTrigger(prev => prev + 1);
+                            }}
+                            className="bg-white dark:bg-gray-950 border-gray-200 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-900 text-gray-700 dark:text-gray-300"
+                        >
+                            <RefreshCw className={cn("h-4 w-4 mr-2", loading && "animate-spin")} />
+                            Actualizar
+                        </Button>
+
                         <Select value={interval} onValueChange={setInterval}>
                             <SelectTrigger className="w-[180px] h-9 bg-white dark:bg-gray-950 border-gray-200 dark:border-gray-800">
                                 <SelectValue placeholder="Selecciona periodo" />
