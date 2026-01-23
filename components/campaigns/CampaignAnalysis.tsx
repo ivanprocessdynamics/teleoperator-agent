@@ -69,15 +69,14 @@ export function CampaignAnalysis({ config = DEFAULT_CONFIG, onChange }: Campaign
         });
     };
 
-    return (
     const toggleArchiveField = (id: string) => {
-            onChange({
-                ...config,
-                custom_fields: config.custom_fields.map(f =>
-                    f.id === id ? { ...f, isArchived: !f.isArchived } : f
-                )
-            });
-        };
+        onChange({
+            ...config,
+            custom_fields: config.custom_fields.map(f =>
+                f.id === id ? { ...f, isArchived: !f.isArchived } : f
+            )
+        });
+    };
 
     const activeFields = config.custom_fields.filter(f => !f.isArchived);
     const archivedFields = config.custom_fields.filter(f => f.isArchived);
