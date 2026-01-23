@@ -12,7 +12,11 @@ import { AnalysisConfig } from "@/types/campaign";
 
 import { useRef, useCallback } from "react";
 
-// ... (existing imports, remove useDebounce if not used elsewhere)
+
+interface TestingEnvironmentProps {
+    subworkspaceId: string;
+}
+
 
 export function TestingEnvironment({ subworkspaceId }: TestingEnvironmentProps) {
     const [loading, setLoading] = useState(true);
