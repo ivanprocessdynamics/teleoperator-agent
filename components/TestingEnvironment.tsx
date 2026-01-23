@@ -258,7 +258,7 @@ export function TestingEnvironment({ subworkspaceId }: TestingEnvironmentProps) 
                                     Edita en vivo. Se guarda automáticamente.
                                 </p>
                                 {savingDraft ? (
-                                    <span className="text-xs text-blue-500 flex items-center animate-pulse"><Cloud className="h-3 w-3 mr-1" /> Guardando...</span>
+                                    <span className="text-xs text-gray-400 flex items-center animate-pulse"><Cloud className="h-3 w-3 mr-1" /> Guardando...</span>
                                 ) : draftSaved ? (
                                     <span className="text-xs text-gray-400 flex items-center"><Check className="h-3 w-3 mr-1" /> Borrador guardado</span>
                                 ) : null}
@@ -378,7 +378,17 @@ export function TestingEnvironment({ subworkspaceId }: TestingEnvironmentProps) 
                     {showAnalysis && (
                         <div className="p-5 border-t border-gray-100 dark:border-gray-700">
                             <CampaignAnalysis
-                                config={analysisConfig}
+                                config={analysisConfig || {
+                                    enable_transcription: true,
+                                    standard_fields: {
+                                        satisfaction_score: true,
+                                        sentiment: true,
+                                        summary: true,
+                                        user_sentiment: true,
+                                        call_successful: true
+                                    },
+                                    custom_fields: []
+                                }}
                                 onChange={handleUpdateAnalysis}
                             />
                         </div>

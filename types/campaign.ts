@@ -56,4 +56,6 @@ export interface AnalysisConfig {
         call_successful: boolean; // Did it achieve the goal?
     };
     custom_fields: AnalysisField[];
+    hidden_standard_fields?: string[];
 }
+

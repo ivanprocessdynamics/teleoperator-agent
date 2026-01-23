@@ -13,6 +13,7 @@ interface StatsDashboardProps {
     subworkspaceId?: string;
 }
 
+
 export function StatsDashboard(props: StatsDashboardProps) {
     const { agentId } = props;
     const [loading, setLoading] = useState(true);
@@ -22,6 +23,8 @@ export function StatsDashboard(props: StatsDashboardProps) {
         successRate: 0,
         sentimentBreakdown: { positive: 0, neutral: 0, negative: 0 }
     });
+    const [customStats, setCustomStats] = useState<Record<string, any>>({});
+    const [hiddenStandard, setHiddenStandard] = useState<string[]>([]);
     const [period, setPeriod] = useState("7d");
 
     const fetchStats = async () => {
@@ -35,6 +38,8 @@ export function StatsDashboard(props: StatsDashboardProps) {
 
             if (subDoc.exists()) {
                 const data = subDoc.data();
+                setHiddenStandard(data.analysis_config?.hidden_standard_fields || []);
+
                 const customFields = data.analysis_config?.custom_fields || [];
 
                 customFields.forEach((field: any) => {
@@ -47,7 +52,8 @@ export function StatsDashboard(props: StatsDashboardProps) {
                         no: 0,
                         count: 0,
                         totalSum: 0,
-                        description: field.description
+                        description: field.description,
+                        name: field.name // Store proper name
                     };
                 });
             }
@@ -149,9 +155,6 @@ export function StatsDashboard(props: StatsDashboardProps) {
         return `${mins}m ${secs}s`;
     };
 
-    // State for custom stats
-    const [customStats, setCustomStats] = useState<Record<string, any>>({});
-
     if (loading) {
         return <div className="flex justify-center p-12"><Loader2 className="h-8 w-8 animate-spin text-blue-500" /></div>;
     }
@@ -180,6 +183,12 @@ export function StatsDashboard(props: StatsDashboardProps) {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                {/* Always show Total Calls & Duration unless specifically asked to hide basic metrics? 
+                    User asked to hide 'General and Specific'. I'll assume standard ones map to ids. 
+                    I'll use 'total_calls' and 'avg_duration' as informal ids if needed, but for now 
+                    CampaignAnalysis only lists: summary, satisfaction, sentiment, success.
+                    So Calls/Duration likely stay. 
+                */}
                 <Card className="bg-gradient-to-br from-blue-50 to-white dark:from-blue-900/10 dark:to-gray-900 border-blue-100 dark:border-blue-900/30">
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                         <CardTitle className="text-sm font-medium text-blue-900 dark:text-blue-100">
@@ -210,100 +219,126 @@ export function StatsDashboard(props: StatsDashboardProps) {
                     </CardContent>
                 </Card>
 
-                <Card className="bg-gradient-to-br from-green-50 to-white dark:from-green-900/10 dark:to-gray-900 border-green-100 dark:border-green-900/30">
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium text-green-900 dark:text-green-100">
-                            Tasa de Éxito
-                        </CardTitle>
-                        <ThumbsUp className="h-4 w-4 text-green-500" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold text-green-700 dark:text-green-300">{stats.successRate.toFixed(1)}%</div>
-                        <p className="text-xs text-green-600/60 dark:text-green-400/60">
-                            Llamadas marcadas como exitosas
-                        </p>
-                    </CardContent>
-                </Card>
+                {!hiddenStandard.includes('call_successful') && (
+                    <Card className="bg-gradient-to-br from-green-50 to-white dark:from-green-900/10 dark:to-gray-900 border-green-100 dark:border-green-900/30">
+                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                            <CardTitle className="text-sm font-medium text-green-900 dark:text-green-100">
+                                Tasa de Éxito
+                            </CardTitle>
+                            <ThumbsUp className="h-4 w-4 text-green-500" />
+                        </CardHeader>
+                        <CardContent>
+                            <div className="text-2xl font-bold text-green-700 dark:text-green-300">{stats.successRate.toFixed(1)}%</div>
+                            <p className="text-xs text-green-600/60 dark:text-green-400/60">
+                                Llamadas marcadas como exitosas
+                            </p>
+                        </CardContent>
+                    </Card>
+                )}
 
-                <Card className="bg-gradient-to-br from-indigo-50 to-white dark:from-indigo-900/10 dark:to-gray-900 border-indigo-100 dark:border-indigo-900/30">
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium text-indigo-900 dark:text-indigo-100">
-                            Sentimiento Positivo
-                        </CardTitle>
-                        <Activity className="h-4 w-4 text-indigo-500" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold text-indigo-700 dark:text-indigo-300">
-                            {stats.totalCalls > 0 ? ((stats.sentimentBreakdown.positive / stats.totalCalls) * 100).toFixed(1) : 0}%
-                        </div>
-                        <p className="text-xs text-indigo-600/60 dark:text-indigo-400/60">
-                            {stats.sentimentBreakdown.positive} llamadas positivas
-                        </p>
-                    </CardContent>
-                </Card>
+                {!hiddenStandard.includes('sentiment') && (
+                    <Card className="bg-gradient-to-br from-indigo-50 to-white dark:from-indigo-900/10 dark:to-gray-900 border-indigo-100 dark:border-indigo-900/30">
+                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                            <CardTitle className="text-sm font-medium text-indigo-900 dark:text-indigo-100">
+                                Sentimiento Positivo
+                            </CardTitle>
+                            <Activity className="h-4 w-4 text-indigo-500" />
+                        </CardHeader>
+                        <CardContent>
+                            <div className="text-2xl font-bold text-indigo-700 dark:text-indigo-300">
+                                {stats.totalCalls > 0 ? ((stats.sentimentBreakdown.positive / stats.totalCalls) * 100).toFixed(1) : 0}%
+                            </div>
+                            <p className="text-xs text-indigo-600/60 dark:text-indigo-400/60">
+                                {stats.sentimentBreakdown.positive} llamadas positivas
+                            </p>
+                        </CardContent>
+                    </Card>
+                )}
             </div>
 
-            {/* Visual Bar for Sentiment */}
-            <div className="mt-4 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-6">
-                <h4 className="text-sm font-medium mb-4 text-gray-700 dark:text-gray-300">Distribución de Sentimiento</h4>
-                <div className="h-8 w-full rounded-full overflow-hidden flex">
-                    {stats.totalCalls > 0 ? (
-                        <>
-                            <div style={{ width: `${(stats.sentimentBreakdown.positive / stats.totalCalls) * 100}%` }} className="bg-green-400 h-full transition-all duration-500" title="Positivo" />
-                            <div style={{ width: `${(stats.sentimentBreakdown.neutral / stats.totalCalls) * 100}%` }} className="bg-gray-300 dark:bg-gray-600 h-full transition-all duration-500" title="Neutral" />
-                            <div style={{ width: `${(stats.sentimentBreakdown.negative / stats.totalCalls) * 100}%` }} className="bg-red-400 h-full transition-all duration-500" title="Negativo" />
-                        </>
-                    ) : (
-                        <div className="w-full bg-gray-100 dark:bg-gray-800 h-full flex items-center justify-center text-xs text-gray-400">Sin datos</div>
-                    )}
-                </div>
-                <div className="flex gap-4 mt-2 justify-center">
-                    <div className="flex items-center gap-1 text-xs text-gray-500">
-                        <div className="w-3 h-3 rounded-full bg-green-400" /> Positivo ({stats.sentimentBreakdown.positive})
-                    </div>
-                    <div className="flex items-center gap-1 text-xs text-gray-500">
-                        <div className="w-3 h-3 rounded-full bg-gray-300 dark:bg-gray-600" /> Neutral ({stats.sentimentBreakdown.neutral})
-                    </div>
-                    <div className="flex items-center gap-1 text-xs text-gray-500">
-                        <div className="w-3 h-3 rounded-full bg-red-400" /> Negativo ({stats.sentimentBreakdown.negative})
+            {/* Visual Bar for Sentiment (Hide if Sentiment is hidden) */}
+            {!hiddenStandard.includes('sentiment') && (
+                <div className="mt-4 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-6">
+                    <h4 className="text-sm font-medium mb-4 text-gray-700 dark:text-gray-300">Distribución de Sentimiento</h4>
+                    <div className="h-8 w-full rounded-full overflow-hidden flex">
+                        {stats.totalCalls > 0 ? (
+                            <>
+                                <div style={{ width: `${(stats.sentimentBreakdown.positive / stats.totalCalls) * 100}%` }} className="bg-green-400 h-full transition-all duration-500" title="Positivo" />
+                                <div style={{ width: `${(stats.sentimentBreakdown.neutral / stats.totalCalls) * 100}%` }} className="bg-gray-300 dark:bg-gray-600 h-full transition-all duration-500" title="Neutral" />
+                                <div style={{ width: `${(stats.sentimentBreakdown.negative / stats.totalCalls) * 100}%` }} className="bg-red-400 h-full transition-all duration-500" title="Negativo" />
+                            </>
+                        ) : (
+                            <div className="w-full bg-gray-100 dark:bg-gray-800 h-full flex items-center justify-center text-xs text-gray-400">Sin datos</div>
+                        )}
                     </div>
                 </div>
-            </div>
+            )}
 
             {/* Custom Metrics */}
             {Object.keys(customStats).length > 0 && (
-                <div className="mt-4 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-6">
-                    <h4 className="text-sm font-medium mb-4 text-gray-700 dark:text-gray-300">Métricas Personalizadas</h4>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div className="mt-6">
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Métricas Personalizadas</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
                         {Object.entries(customStats).map(([name, data]) => {
-                            if (name === 'resumen_espanol') return null; // Skip summary
+                            if (name === 'resumen_espanol') return null;
+                            const yesPct = data.count > 0 ? (data.yes / data.count) * 100 : 0;
+                            const noPct = data.count > 0 ? (data.no / data.count) * 100 : 0;
+
                             return (
-                                <Card key={name} className="border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50">
-                                    <CardHeader className="pb-2">
-                                        <CardTitle className="text-xs font-semibold uppercase text-gray-500">{name}</CardTitle>
-                                    </CardHeader>
-                                    <CardContent>
+                                <Card key={name} className="overflow-hidden border-gray-100 dark:border-gray-800 shadow-sm hover:shadow-md transition-shadow bg-white dark:bg-gray-800">
+                                    <div className="border-b border-gray-50 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900/50 px-5 py-3 flex justify-between items-center">
+                                        <div>
+                                            <div className="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-0.5">
+                                                {name.replace(/_/g, ' ')}
+                                            </div>
+                                            <div className="text-[10px] text-gray-400 dark:text-gray-500 truncate max-w-[200px]" title={data.description}>
+                                                {data.description}
+                                            </div>
+                                        </div>
+                                        <span className="text-[10px] bg-gray-100 dark:bg-gray-700 text-gray-500 px-2 py-1 rounded-full">
+                                            {data.count} respuestas
+                                        </span>
+                                    </div>
+                                    <div className="p-5">
                                         {data.type === 'boolean' ? (
-                                            <div className="flex flex-col gap-2">
-                                                <div className="flex items-center justify-between text-sm">
-                                                    <span className="text-green-600">Sí: {data.yes}</span>
-                                                    <span className="text-red-500">No: {data.no}</span>
+                                            <div className="space-y-4">
+                                                <div className="flex items-center justify-between">
+                                                    <div className="flex items-center gap-2">
+                                                        <div className="h-2 w-2 rounded-full bg-green-500" />
+                                                        <span className="text-sm font-medium text-gray-700 dark:text-gray-200">Sí</span>
+                                                        <span className="text-xs text-gray-500">({data.yes})</span>
+                                                    </div>
+                                                    <span className="text-sm font-bold text-green-600">{yesPct.toFixed(0)}%</span>
                                                 </div>
-                                                <div className="h-2 w-full bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden flex">
-                                                    <div style={{ width: `${(data.yes / data.count) * 100}%` }} className="bg-green-500 h-full" />
+                                                <div className="w-full h-2 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">
+                                                    <div style={{ width: `${yesPct}%` }} className="h-full bg-green-500 rounded-full" />
+                                                </div>
+
+                                                <div className="flex items-center justify-between pt-1">
+                                                    <div className="flex items-center gap-2">
+                                                        <div className="h-2 w-2 rounded-full bg-red-400" />
+                                                        <span className="text-sm font-medium text-gray-700 dark:text-gray-200">No</span>
+                                                        <span className="text-xs text-gray-500">({data.no})</span>
+                                                    </div>
+                                                    <span className="text-sm font-bold text-red-500">{noPct.toFixed(0)}%</span>
+                                                </div>
+                                                <div className="w-full h-2 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">
+                                                    <div style={{ width: `${noPct}%` }} className="h-full bg-red-400 rounded-full" />
                                                 </div>
                                             </div>
                                         ) : data.type === 'number' ? (
-                                            <div>
-                                                <div className="text-2xl font-bold text-gray-900 dark:text-white">{(data.totalSum / data.count).toFixed(1)}</div>
-                                                <p className="text-xs text-gray-500">Promedio</p>
+                                            <div className="flex items-baseline gap-2">
+                                                <div className="text-4xl font-bold text-gray-900 dark:text-white tracking-tight">
+                                                    {(data.count > 0 ? data.totalSum / data.count : 0).toFixed(1)}
+                                                </div>
+                                                <span className="text-sm text-gray-500 font-medium uppercase tracking-wide">Promedio</span>
                                             </div>
                                         ) : (
-                                            <div className="text-sm text-gray-600">
-                                                {data.count} respuestas recogidas
+                                            <div className="text-sm text-gray-600 dark:text-gray-400 italic bg-gray-50 dark:bg-gray-800/50 p-3 rounded-lg border border-gray-100 dark:border-gray-700">
+                                                Texto libre (ver detalles en tabla)
                                             </div>
                                         )}
-                                    </CardContent>
+                                    </div>
                                 </Card>
                             )
                         })}
@@ -313,3 +348,4 @@ export function StatsDashboard(props: StatsDashboardProps) {
         </div>
     );
 }
+
