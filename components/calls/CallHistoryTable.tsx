@@ -50,14 +50,50 @@ export function CallHistoryTable({ agentId }: CallHistoryTableProps) {
     const [error, setError] = useState<string | null>(null);
     const [selectedCall, setSelectedCall] = useState<CallRecord | null>(null);
 
+    const [interval, setInterval] = useState<string>("7d"); // Default to last 7 days
+    const [customStart, setCustomStart] = useState<string>("");
+    const [customEnd, setCustomEnd] = useState<string>("");
+
     useEffect(() => {
         setError(null);
-        let q = query(collection(db, "calls"), orderBy("timestamp", "desc"), limit(50));
+
+        // Base query setup
+        let constraints: any[] = [orderBy("timestamp", "desc"), limit(50)];
 
         if (agentId) {
-            // Filter by agentId
-            q = query(collection(db, "calls"), where("agent_id", "==", agentId), orderBy("timestamp", "desc"), limit(50));
+            constraints.unshift(where("agent_id", "==", agentId));
         }
+
+        // Calculate Date Range
+        const now = new Date();
+        let start: Date | null = null;
+        let end: Date | null = null;
+
+        if (interval === "1h") {
+            start = new Date(now.getTime() - 60 * 60 * 1000);
+        } else if (interval === "24h") {
+            start = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+        } else if (interval === "7d") {
+            start = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        } else if (interval === "30d") {
+            start = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+        } else if (interval === "custom" && customStart && customEnd) {
+            // Parse custom dates (HTML datetime-local inputs)
+            start = new Date(customStart);
+            end = new Date(customEnd);
+        }
+
+        if (start) {
+            constraints.push(where("timestamp", ">=", Timestamp.fromDate(start)));
+        }
+        if (end) {
+            constraints.push(where("timestamp", "<=", Timestamp.fromDate(end)));
+        }
+
+        // NOTE: Combining multiple 'where' filters with 'orderBy' usually requires a Composite Index in Firestore.
+        // If sorting or filtering breaks, check console for the index creation link.
+
+        const q = query(collection(db, "calls"), ...constraints);
 
         const unsub = onSnapshot(q, (snapshot) => {
             const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as CallRecord));
@@ -71,7 +107,7 @@ export function CallHistoryTable({ agentId }: CallHistoryTableProps) {
         });
 
         return () => unsub();
-    }, [agentId]);
+    }, [agentId, interval, customStart, customEnd]);
 
     const [expandedSummaries, setExpandedSummaries] = useState<Set<string>>(new Set());
 
@@ -127,14 +163,52 @@ export function CallHistoryTable({ agentId }: CallHistoryTableProps) {
     return (
         <>
             <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                    <h2 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
-                        <Clock className="h-5 w-5 text-gray-500" />
-                        Historial Reciente
-                    </h2>
-                    <Badge variant="outline" className="text-xs font-normal">
-                        Últimas {calls.length} llamadas
-                    </Badge>
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between bg-white dark:bg-gray-900 p-4 rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm">
+                    <div className="flex items-center gap-2">
+                        <div className="bg-blue-100 dark:bg-blue-900/30 p-2 rounded-lg text-blue-600">
+                            <Clock className="h-5 w-5" />
+                        </div>
+                        <div>
+                            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                                Historial de Llamadas
+                            </h2>
+                            <p className="text-xs text-gray-500">
+                                {calls.length} resultados encontrados
+                            </p>
+                        </div>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-3">
+                        <select
+                            value={interval}
+                            onChange={(e) => setInterval(e.target.value)}
+                            className="h-9 rounded-md border border-gray-200 bg-white px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-gray-950 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-50 focus:border-blue-500"
+                        >
+                            <option value="1h">Última hora</option>
+                            <option value="24h">Últimas 24 horas</option>
+                            <option value="7d">Última semana</option>
+                            <option value="30d">Último mes</option>
+                            <option value="custom">Personalizado</option>
+                        </select>
+
+                        {interval === "custom" && (
+                            <div className="flex items-center gap-2 animate-in fade-in slide-in-from-right-4 duration-300">
+                                <input
+                                    type="datetime-local"
+                                    value={customStart}
+                                    onChange={(e) => setCustomStart(e.target.value)}
+                                    className="h-9 rounded-md border border-gray-200 bg-white px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus:border-blue-500 dark:bg-gray-950 dark:border-gray-800"
+                                />
+                                <span className="text-gray-400">-</span>
+                                <input
+                                    type="datetime-local"
+                                    value={customEnd}
+                                    onChange={(e) => setCustomEnd(e.target.value)}
+                                    className="h-9 rounded-md border border-gray-200 bg-white px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus:border-blue-500 dark:bg-gray-950 dark:border-gray-800"
+                                />
+                            </div>
+                        )}
+                    </div>
                 </div>
 
                 <div className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900/50 shadow-sm overflow-hidden">
@@ -160,7 +234,10 @@ export function CallHistoryTable({ agentId }: CallHistoryTableProps) {
                                             <div className="flex flex-col">
                                                 <span className="font-medium text-gray-900 dark:text-white">
                                                     {call.timestamp?.toDate ?
-                                                        formatDistanceToNow(call.timestamp.toDate(), { addSuffix: true, locale: es })
+                                                        (() => {
+                                                            const dist = formatDistanceToNow(call.timestamp.toDate(), { addSuffix: true, locale: es });
+                                                            return dist.charAt(0).toUpperCase() + dist.slice(1);
+                                                        })()
                                                         : "Reciente"}
                                                 </span>
                                                 <span className="text-xs text-gray-500 flex items-center gap-1 mt-0.5">

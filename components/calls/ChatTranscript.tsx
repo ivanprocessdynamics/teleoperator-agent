@@ -98,9 +98,13 @@ export function ChatTranscript({ messages, audioUrl }: ChatTranscriptProps) {
                             type="range"
                             min="0"
                             max={duration || 100}
+                            step="0.01"
                             value={currentTime}
                             onChange={handleSeek}
-                            className="w-full h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-700 accent-blue-600"
+                            className="w-full h-1.5 rounded-lg appearance-none cursor-pointer bg-gray-200 dark:bg-gray-700 accent-blue-600"
+                            style={{
+                                background: `linear-gradient(to right, #2563eb ${(currentTime / (duration || 1)) * 100}%, #e5e7eb ${(currentTime / (duration || 1)) * 100}%)`
+                            }}
                         />
                     </div>
 
