@@ -291,6 +291,7 @@ export function TestingEnvironment({ subworkspaceId }: TestingEnvironmentProps) 
                                 <VoiceOrb
                                     agentId={retellAgentId}
                                     prompt={getPromptWithVariables()}
+                                    analysisConfig={analysisConfig}
                                 />
                             </div>
                         ) : (

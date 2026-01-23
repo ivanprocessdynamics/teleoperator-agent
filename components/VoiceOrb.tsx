@@ -6,13 +6,16 @@ import { RetellWebClient } from "retell-client-js-sdk";
 
 type OrbState = "idle" | "connecting" | "listening";
 
+import { AnalysisConfig } from "@/types/campaign";
+
 interface VoiceOrbProps {
     agentId: string;
     prompt?: string;
     className?: string;
+    analysisConfig?: AnalysisConfig;
 }
 
-export function VoiceOrb({ agentId, prompt, className = "" }: VoiceOrbProps) {
+export function VoiceOrb({ agentId, prompt, className = "", analysisConfig }: VoiceOrbProps) {
     const [state, setState] = useState<OrbState>("idle");
     const [timer, setTimer] = useState(0);
     const webClientRef = useRef<RetellWebClient | null>(null);
@@ -82,7 +85,8 @@ export function VoiceOrb({ agentId, prompt, className = "" }: VoiceOrbProps) {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     agent_id: agentId,
-                    prompt: prompt
+                    prompt: prompt,
+                    analysis_config: analysisConfig
                 }),
             });
 
@@ -106,7 +110,7 @@ export function VoiceOrb({ agentId, prompt, className = "" }: VoiceOrbProps) {
             setState("idle");
             isCallingRef.current = false;
         }
-    }, [agentId, prompt]);
+    }, [agentId, prompt, analysisConfig]);
 
     const handleClick = () => {
         if (webClientRef.current && state === "listening") {

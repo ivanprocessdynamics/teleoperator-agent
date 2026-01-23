@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef, useLayoutEffect } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
@@ -29,6 +29,9 @@ export default function SubworkspacePage() {
     const [activeTab, setActiveTab] = useState(initialTab);
     const [selectedCampaignId, setSelectedCampaignId] = useState<string | null>(null);
 
+    // Track scroll positions for each tab
+    const scrollPositions = useRef<Record<string, number>>({});
+
     // Sync state with URL if URL changes (e.g. back button)
     useEffect(() => {
         const currentTab = searchParams.get("tab");
@@ -37,7 +40,27 @@ export default function SubworkspacePage() {
         }
     }, [searchParams]);
 
+    // Restore scroll position when tab changes
+    useLayoutEffect(() => {
+        const savedPosition = scrollPositions.current[activeTab] || 0;
+        // Restore scroll on main window or specific container if needed
+        // Since layout has overflow-y-auto on main, we need to find that element?
+        // Actually the layout shows main has overflow-y-auto. Window scroll might be 0.
+        // Let's try to target the main element.
+        const main = document.querySelector('main');
+        if (main) {
+            main.scrollTop = savedPosition;
+        } else {
+            window.scrollTo(0, savedPosition);
+        }
+    }, [activeTab]);
+
     const handleTabChange = (value: string) => {
+        // Save current scroll position before changing
+        const main = document.querySelector('main');
+        const currentScroll = main ? main.scrollTop : window.scrollY;
+        scrollPositions.current[activeTab] = currentScroll;
+
         setActiveTab(value);
         // Update URL without reloading
         const newParams = new URLSearchParams(searchParams.toString());
@@ -138,18 +161,18 @@ export default function SubworkspacePage() {
                         </TabsTrigger>
                     </TabsList>
 
-                    <TabsContent value="contacts" className="mt-6">
+                    <TabsContent value="contacts" forceMount className="mt-6 data-[state=inactive]:hidden">
                         <CampaignList
                             subworkspaceId={subId}
                             onSelectCampaign={setSelectedCampaignId}
                         />
                     </TabsContent>
 
-                    <TabsContent value="test" className="mt-6">
+                    <TabsContent value="test" forceMount className="mt-6 data-[state=inactive]:hidden">
                         <TestingEnvironment subworkspaceId={subId} />
                     </TabsContent>
 
-                    <TabsContent value="history" className="mt-6">
+                    <TabsContent value="history" forceMount className="mt-6 data-[state=inactive]:hidden">
                         <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-800 p-6">
                             <h2 className="text-xl font-semibold mb-4 text-gray-900 dark:text-white">Historial de Llamadas</h2>
                             {agentId ? (
