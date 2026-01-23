@@ -98,7 +98,8 @@ export function TestingEnvironment({ subworkspaceId }: TestingEnvironmentProps) 
 
                     <div className="p-5 space-y-4">
                         <Textarea
-                            value={prompt}
+                            key={initialLoadKey}
+                            defaultValue={prompt}
                             onChange={(e) => setPrompt(e.target.value)}
                             placeholder="Escribe aquí el prompt para tu agente de voz..."
                             className="min-h-[250px] resize-none border-gray-200 dark:border-gray-600 dark:bg-gray-900 dark:text-white dark:placeholder:text-gray-500 focus:border-blue-500 dark:focus:border-blue-400 font-sans text-base leading-relaxed"
