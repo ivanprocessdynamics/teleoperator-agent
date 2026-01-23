@@ -1,12 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { collection, query, where, getDocs, Timestamp, orderBy, doc, getDoc } from "firebase/firestore";
+import { collection, query, where, getDocs, Timestamp, orderBy, doc, getDoc, updateDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Loader2, TrendingUp, Clock, Phone, ThumbsUp, Activity, RefreshCcw } from "lucide-react";
+import { Loader2, TrendingUp, Clock, Phone, ThumbsUp, Activity, RefreshCcw, EyeOff, Eye, Archive, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
 
 interface StatsDashboardProps {
     agentId?: string;
@@ -25,6 +26,7 @@ export function StatsDashboard(props: StatsDashboardProps) {
     });
     const [customStats, setCustomStats] = useState<Record<string, any>>({});
     const [hiddenStandard, setHiddenStandard] = useState<string[]>([]);
+    const [archivedCustom, setArchivedCustom] = useState<any[]>([]);
     const [period, setPeriod] = useState("7d");
 
     const fetchStats = async () => {
@@ -35,6 +37,7 @@ export function StatsDashboard(props: StatsDashboardProps) {
             // 1. Fetch Subworkspace Config for Custom Fields definition
             const subDoc = await getDoc(doc(db, "subworkspaces", props.subworkspaceId));
             let initialCustomStats: Record<string, any> = {};
+            let archivedList: any[] = [];
 
             if (subDoc.exists()) {
                 const data = subDoc.data();
@@ -43,19 +46,23 @@ export function StatsDashboard(props: StatsDashboardProps) {
                 const customFields = data.analysis_config?.custom_fields || [];
 
                 customFields.forEach((field: any) => {
-                    // Skip archived fields
-                    if (field.isArchived) return;
+                    if (field.isArchived) {
+                        archivedList.push(field);
+                        return;
+                    }
 
                     initialCustomStats[field.name] = {
+                        id: field.id, // Store ID for archiving
                         type: field.type,
                         yes: 0,
                         no: 0,
                         count: 0,
                         totalSum: 0,
                         description: field.description,
-                        name: field.name // Store proper name
+                        name: field.name
                     };
                 });
+                setArchivedCustom(archivedList);
             }
 
             // 2. Determine date range
@@ -149,6 +156,60 @@ export function StatsDashboard(props: StatsDashboardProps) {
         fetchStats();
     }, [agentId, period, props.subworkspaceId]);
 
+    const handleHideStandard = async (metricId: string) => {
+        if (!props.subworkspaceId) return;
+        const newHidden = [...hiddenStandard, metricId];
+        setHiddenStandard(newHidden);
+
+        try {
+            await updateDoc(doc(db, "subworkspaces", props.subworkspaceId), {
+                "analysis_config.hidden_standard_fields": newHidden
+            });
+        } catch (e) {
+            console.error("Error hiding metric", e);
+        }
+    };
+
+    const handleRestoreStandard = async (metricId: string) => {
+        if (!props.subworkspaceId) return;
+        const newHidden = hiddenStandard.filter(id => id !== metricId);
+        setHiddenStandard(newHidden);
+
+        try {
+            await updateDoc(doc(db, "subworkspaces", props.subworkspaceId), {
+                "analysis_config.hidden_standard_fields": newHidden
+            });
+        } catch (e) {
+            console.error("Error restoring metric", e);
+        }
+    };
+
+    const handleToggleCustomArchive = async (fieldId: string, archive: boolean) => {
+        if (!props.subworkspaceId) return;
+
+        // Optimistic update
+        fetchStats(); // Trigger re-fetch/re-calc after update logic
+
+        try {
+            const docRef = doc(db, "subworkspaces", props.subworkspaceId);
+            const snap = await getDoc(docRef);
+            if (snap.exists()) {
+                const currentFields = snap.data().analysis_config?.custom_fields || [];
+                const updatedFields = currentFields.map((f: any) =>
+                    f.id === fieldId ? { ...f, isArchived: archive } : f
+                );
+
+                await updateDoc(docRef, {
+                    "analysis_config.custom_fields": updatedFields
+                });
+                // Reload to reflect changes in lists
+                fetchStats();
+            }
+        } catch (e) {
+            console.error("Error toggling archive", e);
+        }
+    };
+
     const formatDuration = (seconds: number) => {
         const mins = Math.floor(seconds / 60);
         const secs = Math.floor(seconds % 60);
@@ -159,8 +220,10 @@ export function StatsDashboard(props: StatsDashboardProps) {
         return <div className="flex justify-center p-12"><Loader2 className="h-8 w-8 animate-spin text-blue-500" /></div>;
     }
 
+    const hasHiddenMetrics = hiddenStandard.length > 0 || archivedCustom.length > 0;
+
     return (
-        <div className="space-y-6 animate-fade-in">
+        <div className="space-y-6 animate-fade-in pb-10">
             <div className="flex justify-between items-center">
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Resumen de Rendimiento</h3>
                 <div className="flex items-center gap-2">
@@ -183,13 +246,7 @@ export function StatsDashboard(props: StatsDashboardProps) {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                {/* Always show Total Calls & Duration unless specifically asked to hide basic metrics? 
-                    User asked to hide 'General and Specific'. I'll assume standard ones map to ids. 
-                    I'll use 'total_calls' and 'avg_duration' as informal ids if needed, but for now 
-                    CampaignAnalysis only lists: summary, satisfaction, sentiment, success.
-                    So Calls/Duration likely stay. 
-                */}
-                <Card className="bg-gradient-to-br from-blue-50 to-white dark:from-blue-900/10 dark:to-gray-900 border-blue-100 dark:border-blue-900/30">
+                <Card className="group relative bg-gradient-to-br from-blue-50 to-white dark:from-blue-900/10 dark:to-gray-900 border-blue-100 dark:border-blue-900/30">
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                         <CardTitle className="text-sm font-medium text-blue-900 dark:text-blue-100">
                             Total Llamadas
@@ -204,7 +261,7 @@ export function StatsDashboard(props: StatsDashboardProps) {
                     </CardContent>
                 </Card>
 
-                <Card className="bg-gradient-to-br from-purple-50 to-white dark:from-purple-900/10 dark:to-gray-900 border-purple-100 dark:border-purple-900/30">
+                <Card className="group relative bg-gradient-to-br from-purple-50 to-white dark:from-purple-900/10 dark:to-gray-900 border-purple-100 dark:border-purple-900/30">
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                         <CardTitle className="text-sm font-medium text-purple-900 dark:text-purple-100">
                             Duración Media
@@ -220,7 +277,10 @@ export function StatsDashboard(props: StatsDashboardProps) {
                 </Card>
 
                 {!hiddenStandard.includes('call_successful') && (
-                    <Card className="bg-gradient-to-br from-green-50 to-white dark:from-green-900/10 dark:to-gray-900 border-green-100 dark:border-green-900/30">
+                    <Card className="group relative bg-gradient-to-br from-green-50 to-white dark:from-green-900/10 dark:to-gray-900 border-green-100 dark:border-green-900/30">
+                        <Button variant="ghost" size="icon" onClick={() => handleHideStandard('call_successful')} className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity h-6 w-6 text-gray-400 hover:text-red-500">
+                            <EyeOff className="h-3.5 w-3.5" />
+                        </Button>
                         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                             <CardTitle className="text-sm font-medium text-green-900 dark:text-green-100">
                                 Tasa de Éxito
@@ -237,7 +297,10 @@ export function StatsDashboard(props: StatsDashboardProps) {
                 )}
 
                 {!hiddenStandard.includes('sentiment') && (
-                    <Card className="bg-gradient-to-br from-indigo-50 to-white dark:from-indigo-900/10 dark:to-gray-900 border-indigo-100 dark:border-indigo-900/30">
+                    <Card className="group relative bg-gradient-to-br from-indigo-50 to-white dark:from-indigo-900/10 dark:to-gray-900 border-indigo-100 dark:border-indigo-900/30">
+                        <Button variant="ghost" size="icon" onClick={() => handleHideStandard('sentiment')} className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity h-6 w-6 text-gray-400 hover:text-red-500">
+                            <EyeOff className="h-3.5 w-3.5" />
+                        </Button>
                         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                             <CardTitle className="text-sm font-medium text-indigo-900 dark:text-indigo-100">
                                 Sentimiento Positivo
@@ -271,6 +334,17 @@ export function StatsDashboard(props: StatsDashboardProps) {
                             <div className="w-full bg-gray-100 dark:bg-gray-800 h-full flex items-center justify-center text-xs text-gray-400">Sin datos</div>
                         )}
                     </div>
+                    <div className="flex gap-4 mt-2 justify-center">
+                        <div className="flex items-center gap-1 text-xs text-gray-500">
+                            <div className="w-3 h-3 rounded-full bg-green-400" /> Positivo ({stats.sentimentBreakdown.positive})
+                        </div>
+                        <div className="flex items-center gap-1 text-xs text-gray-500">
+                            <div className="w-3 h-3 rounded-full bg-gray-300 dark:bg-gray-600" /> Neutral ({stats.sentimentBreakdown.neutral})
+                        </div>
+                        <div className="flex items-center gap-1 text-xs text-gray-500">
+                            <div className="w-3 h-3 rounded-full bg-red-400" /> Negativo ({stats.sentimentBreakdown.negative})
+                        </div>
+                    </div>
                 </div>
             )}
 
@@ -285,7 +359,10 @@ export function StatsDashboard(props: StatsDashboardProps) {
                             const noPct = data.count > 0 ? (data.no / data.count) * 100 : 0;
 
                             return (
-                                <Card key={name} className="overflow-hidden border-gray-100 dark:border-gray-800 shadow-sm hover:shadow-md transition-shadow bg-white dark:bg-gray-800">
+                                <Card key={name} className="group relative overflow-hidden border-gray-100 dark:border-gray-800 shadow-sm hover:shadow-md transition-shadow bg-white dark:bg-gray-800">
+                                    <Button variant="ghost" size="icon" onClick={() => handleToggleCustomArchive(data.id, true)} className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity h-6 w-6 text-gray-400 hover:text-red-500 z-10">
+                                        <EyeOff className="h-3.5 w-3.5" />
+                                    </Button>
                                     <div className="border-b border-gray-50 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900/50 px-5 py-3 flex justify-between items-center">
                                         <div>
                                             <div className="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-0.5">
@@ -345,7 +422,48 @@ export function StatsDashboard(props: StatsDashboardProps) {
                     </div>
                 </div>
             )}
+
+            {/* Hidden/Archived Config Logic */}
+            {hasHiddenMetrics && (
+                <div className="mt-8 border-t border-gray-200 dark:border-gray-800 pt-6">
+                    <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-4 flex items-center gap-2">
+                        <Archive className="h-4 w-4" />
+                        Métricas Ocultas / Archivadas
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 opacity-75">
+                        {/* Standard Hidden */}
+                        {hiddenStandard.map(id => {
+                            const labels: any = { 'sentiment': 'Sentimiento General', 'call_successful': 'Tasa de Éxito' };
+                            return (
+                                <div key={id} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-100 dark:border-gray-800">
+                                    <div className="flex items-center gap-2">
+                                        <Badge variant="outline" className="bg-white dark:bg-gray-900 text-xs">Estándar</Badge>
+                                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{labels[id] || id}</span>
+                                    </div>
+                                    <Button variant="ghost" size="sm" onClick={() => handleRestoreStandard(id)} className="text-blue-500 hover:text-blue-700 hover:bg-blue-50">
+                                        <Eye className="h-3.5 w-3.5 mr-1.5" />
+                                        Mostrar
+                                    </Button>
+                                </div>
+                            )
+                        })}
+
+                        {/* Custom Archived */}
+                        {archivedCustom.map(field => (
+                            <div key={field.id} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-100 dark:border-gray-800">
+                                <div className="flex items-center gap-2">
+                                    <Badge variant="outline" className="bg-purple-50 dark:bg-purple-900/10 text-purple-600 border-purple-100 text-xs">Personalizada</Badge>
+                                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{field.name}</span>
+                                </div>
+                                <Button variant="ghost" size="sm" onClick={() => handleToggleCustomArchive(field.id, false)} className="text-green-500 hover:text-green-700 hover:bg-green-50">
+                                    <RefreshCcw className="h-3.5 w-3.5 mr-1.5" />
+                                    Restaurar
+                                </Button>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
-

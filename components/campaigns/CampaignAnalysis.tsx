@@ -38,31 +38,12 @@ export function CampaignAnalysis({ config = DEFAULT_CONFIG, onChange }: Campaign
 
     const [isAddingField, setIsAddingField] = useState(false);
 
-    const toggleStandardVisibility = (key: string) => {
-        const currentHidden = config.hidden_standard_fields || [];
-        const isHidden = currentHidden.includes(key);
-
-        const newHidden = isHidden
-            ? currentHidden.filter(k => k !== key)
-            : [...currentHidden, key];
-
-        onChange({
-            ...config,
-            hidden_standard_fields: newHidden,
-            // Ensure standard fields are always enabled for collection
-            standard_fields: {
-                ...config.standard_fields,
-                [key]: true
-            }
-        });
-    };
-
     const addCustomField = () => {
         if (!newField.name || !newField.description || !newField.type) return;
 
         const field: AnalysisField = {
             id: Math.random().toString(36).substr(2, 9),
-            name: newField.name.toLowerCase().replace(/\s+/g, '_'),
+            name: newField.name,
             description: newField.description,
             type: newField.type as any,
             isArchived: false
@@ -96,52 +77,8 @@ export function CampaignAnalysis({ config = DEFAULT_CONFIG, onChange }: Campaign
     const activeFields = config.custom_fields.filter(f => !f.isArchived);
     const archivedFields = config.custom_fields.filter(f => f.isArchived);
 
-    // Helper to render Standard Metric row
-    const StandardMetricRow = ({ id, label, description }: { id: string, label: string, description: string }) => {
-        const isHidden = (config.hidden_standard_fields || []).includes(id);
-
-        return (
-            <div className="flex items-center justify-between p-3 rounded-lg border border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-900/50 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
-                <div className="flex flex-col gap-1">
-                    <span className="font-medium text-sm text-gray-900 dark:text-gray-100">{label}</span>
-                    <span className="text-xs text-gray-500 dark:text-gray-400">{description}</span>
-                </div>
-                <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => toggleStandardVisibility(id)}
-                    className={isHidden ? "text-gray-400" : "text-blue-500 bg-blue-50 dark:bg-blue-900/20"}
-                    title={isHidden ? "Mostrar en estadísticas" : "Ocultar de estadísticas"}
-                >
-                    {isHidden ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </Button>
-            </div>
-        );
-    };
-
     return (
         <div className="space-y-6 max-w-5xl mx-auto">
-            {/* Standard Metrics */}
-            <Card className="bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 shadow-sm">
-                <CardHeader>
-                    <div className="flex items-center gap-3">
-                        <div className="p-2.5 bg-blue-100 dark:bg-blue-900/30 rounded-xl text-blue-600 dark:text-blue-400 ring-4 ring-blue-50 dark:ring-blue-900/10">
-                            <BarChart3 className="h-5 w-5" />
-                        </div>
-                        <div>
-                            <CardTitle className="text-lg">Métricas Estándar</CardTitle>
-                            <CardDescription>Datos extraídos automáticamente. Controla su visibilidad en el panel.</CardDescription>
-                        </div>
-                    </div>
-                </CardHeader>
-                <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <StandardMetricRow id="summary" label="Resumen de Llamada" description="Resumen conciso del contenido" />
-                    <StandardMetricRow id="satisfaction_score" label="Puntuación de Satisfacción" description="Escala 0-10 de satisfacción" />
-                    <StandardMetricRow id="sentiment" label="Sentimiento General" description="Positivo, Neutro o Negativo" />
-                    <StandardMetricRow id="call_successful" label="Éxito de la Llamada" description="¿Se cumplió el objetivo?" />
-                </CardContent>
-            </Card>
-
             {/* Custom Extraction */}
             <Card className="bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden">
                 <CardHeader className="bg-gray-50/50 dark:bg-gray-900/50 border-b border-gray-100 dark:border-gray-800 pb-4">
@@ -184,12 +121,11 @@ export function CampaignAnalysis({ config = DEFAULT_CONFIG, onChange }: Campaign
                                     <div className="space-y-2">
                                         <Label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Nombre del Dato</Label>
                                         <Input
-                                            placeholder="ej: motivo_rechazo"
+                                            placeholder="ej: Motivo del Rechazo"
                                             value={newField.name}
                                             onChange={(e) => setNewField({ ...newField, name: e.target.value })}
                                             className="bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 h-10"
                                         />
-                                        <p className="text-[10px] text-gray-400">Nombre interno para la base de datos (sin espacios)</p>
                                     </div>
                                     <div className="space-y-2">
                                         <Label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Tipo de Respuesta</Label>
@@ -217,7 +153,6 @@ export function CampaignAnalysis({ config = DEFAULT_CONFIG, onChange }: Campaign
                                         onChange={(e) => setNewField({ ...newField, description: e.target.value })}
                                         className="bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 h-10"
                                     />
-                                    <p className="text-[10px] text-gray-400">Describe qué debe buscar la IA en la conversación para extraer este dato.</p>
                                 </div>
 
                                 <div className="pt-2 flex justify-end">
