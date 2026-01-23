@@ -194,7 +194,8 @@ export function CampaignDetail({ campaignId, subworkspaceId, onBack }: CampaignD
 
             // 3. Update Agent Prompt AND Analysis Config (Push to Retell)
             if (retellAgentId) {
-                await fetch('/api/retell/update-agent', {
+                console.log("Updating Retell agent with prompt...");
+                const updateResponse = await fetch('/api/retell/update-agent', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -203,6 +204,24 @@ export function CampaignDetail({ campaignId, subworkspaceId, onBack }: CampaignD
                         analysis_config: campaign.analysis_config
                     })
                 });
+
+                const updateResult = await updateResponse.json();
+                console.log("Update agent result:", updateResult);
+
+                if (!updateResponse.ok || updateResult.updates?.prompt_error) {
+                    console.error("Failed to update agent prompt:", updateResult);
+                    alert(`Error al actualizar el prompt del agente: ${updateResult.error || updateResult.updates?.prompt_error || 'Unknown error'}`);
+                    setIsActivating(false);
+                    return;
+                }
+
+                if (!updateResult.updates?.prompt_updated) {
+                    console.warn("Prompt was not updated - agent may not use Retell LLM");
+                }
+            } else {
+                alert("No se encontró el agente de Retell. Verifica la configuración del subworkspace.");
+                setIsActivating(false);
+                return;
             }
 
             // 4. Start the campaign executor

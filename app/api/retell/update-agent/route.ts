@@ -14,22 +14,43 @@ export async function POST(req: Request) {
         const body = await req.json();
         const { agent_id, prompt, analysis_config } = body;
 
+        console.log("=== UPDATE AGENT REQUEST ===");
+        console.log("Agent ID:", agent_id);
+        console.log("Prompt provided:", prompt ? `"${prompt.substring(0, 100)}..."` : "NO");
+        console.log("Analysis config:", analysis_config ? "YES" : "NO");
+
         if (!agent_id) {
             return NextResponse.json({ error: "Missing agent_id" }, { status: 400 });
         }
 
         const updates: any = {};
 
-        // 1. Handle Prompt Update (Push)
-        // Note: We are moving to Dynamic Variables, but we keep this for backward compat 
-        // or if the user explicitly wants to "Reset" the hardcoded prompt.
+        // 1. Handle Prompt Update (Push to LLM)
         if (prompt) {
-            // Find LLM and update
+            console.log("Retrieving agent to find LLM ID...");
             const agent = await retell.agent.retrieve(agent_id);
+            console.log("Agent response_engine:", JSON.stringify(agent.response_engine));
+
             if (agent.response_engine?.type === 'retell-llm' && agent.response_engine.llm_id) {
                 const llmId = agent.response_engine.llm_id;
-                await retell.llm.update(llmId, { general_prompt: prompt });
-                updates.prompt_updated = true;
+                console.log("Found LLM ID:", llmId);
+                console.log("Updating LLM with new prompt...");
+
+                try {
+                    const llmUpdateResult = await retell.llm.update(llmId, {
+                        general_prompt: prompt
+                    });
+                    console.log("LLM update successful:", llmUpdateResult.llm_id);
+                    updates.prompt_updated = true;
+                    updates.llm_id = llmId;
+                } catch (llmError: any) {
+                    console.error("LLM update FAILED:", llmError);
+                    updates.prompt_error = llmError.message;
+                }
+            } else {
+                console.warn("Agent does not use Retell LLM or LLM ID not found");
+                console.warn("Response engine type:", agent.response_engine?.type);
+                updates.prompt_error = "Agent does not use Retell LLM";
             }
         }
 
@@ -40,7 +61,7 @@ export async function POST(req: Request) {
             // Map Standard Fields to Custom Data (unless native)
             // 'summary' and 'sentiment' are native fields in post_call_analysis_data
 
-            if (analysis_config.standard_fields.satisfaction_score) {
+            if (analysis_config.standard_fields?.satisfaction_score) {
                 customData.push({
                     name: "satisfaction_score",
                     description: "Rate the customer's satisfaction on a scale from 0 to 10 based on their tone and responses.",
@@ -48,7 +69,7 @@ export async function POST(req: Request) {
                 });
             }
 
-            if (analysis_config.standard_fields.call_successful) {
+            if (analysis_config.standard_fields?.call_successful) {
                 customData.push({
                     name: "call_successful",
                     description: "Did the AI agent successfully achieve the primary goal of the call?",
@@ -56,7 +77,7 @@ export async function POST(req: Request) {
                 });
             }
 
-            if (analysis_config.standard_fields.user_sentiment) {
+            if (analysis_config.standard_fields?.user_sentiment) {
                 customData.push({
                     name: "user_sentiment_label",
                     description: "Determine the user's overall sentiment: Positive, Negative, Neutral, or Angry.",
@@ -65,7 +86,7 @@ export async function POST(req: Request) {
             }
 
             // Add Spanish Summary only if summary is enabled
-            if (analysis_config.standard_fields.summary) {
+            if (analysis_config.standard_fields?.summary) {
                 customData.push({
                     name: "resumen_espanol",
                     description: "Resumen detallado de la llamada en español.",
@@ -85,15 +106,18 @@ export async function POST(req: Request) {
             }
 
             // Update Agent
+            console.log("Updating agent analysis config with", customData.length, "custom fields");
             await retell.agent.update(agent_id, {
                 post_call_analysis_data: {
-                    post_call_summary: analysis_config.standard_fields.summary || false,
-                    post_call_sentiment: analysis_config.standard_fields.sentiment || false,
+                    post_call_summary: analysis_config.standard_fields?.summary || false,
+                    post_call_sentiment: analysis_config.standard_fields?.sentiment || false,
                     custom_analysis_data: customData
                 } as any
             });
             updates.analysis_updated = true;
         }
+
+        console.log("=== UPDATE COMPLETE ===", updates);
 
         return NextResponse.json({
             success: true,
