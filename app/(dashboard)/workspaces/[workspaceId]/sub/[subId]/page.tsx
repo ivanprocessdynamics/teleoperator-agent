@@ -13,6 +13,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { TestingEnvironment } from "@/components/TestingEnvironment";
 import { CallHistoryTable } from "@/components/calls/CallHistoryTable";
+import { StatsDashboard } from "@/components/stats/StatsDashboard";
+import { BarChart3 } from "lucide-react";
 
 export default function SubworkspacePage() {
     const params = useParams();
@@ -140,7 +142,7 @@ export default function SubworkspacePage() {
             ) : (
                 // Tabs containing Campaign List
                 <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
-                    <TabsList className="grid w-full max-w-[600px] grid-cols-3 bg-gray-100 dark:bg-gray-800 p-1 rounded-lg">
+                    <TabsList className="grid w-full max-w-[800px] grid-cols-4 bg-gray-100 dark:bg-gray-800 p-1 rounded-lg">
                         <TabsTrigger
                             value="contacts"
                             className="gap-2 text-gray-900 dark:text-gray-300 data-[state=active]:bg-white dark:data-[state=active]:bg-gray-700 data-[state=active]:text-gray-900 dark:data-[state=active]:text-white data-[state=active]:shadow-sm transition-all"
@@ -158,6 +160,12 @@ export default function SubworkspacePage() {
                             className="gap-2 text-gray-900 dark:text-gray-300 data-[state=active]:bg-white dark:data-[state=active]:bg-gray-700 data-[state=active]:text-gray-900 dark:data-[state=active]:text-white data-[state=active]:shadow-sm transition-all"
                         >
                             <History className="h-4 w-4" /> Historial
+                        </TabsTrigger>
+                        <TabsTrigger
+                            value="stats"
+                            className="gap-2 text-gray-900 dark:text-gray-300 data-[state=active]:bg-white dark:data-[state=active]:bg-gray-700 data-[state=active]:text-gray-900 dark:data-[state=active]:text-white data-[state=active]:shadow-sm transition-all"
+                        >
+                            <BarChart3 className="h-4 w-4" /> Estadísticas
                         </TabsTrigger>
                     </TabsList>
 
@@ -177,6 +185,16 @@ export default function SubworkspacePage() {
                             <h2 className="text-xl font-semibold mb-4 text-gray-900 dark:text-white">Historial de Llamadas</h2>
                             {agentId ? (
                                 <CallHistoryTable agentId={agentId} />
+                            ) : (
+                                <div className="text-center py-10 text-gray-500">Cargando agente...</div>
+                            )}
+                        </div>
+                    </TabsContent>
+
+                    <TabsContent value="stats" forceMount className="mt-6 data-[state=inactive]:hidden">
+                        <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-800 p-6">
+                            {agentId ? (
+                                <StatsDashboard agentId={agentId} />
                             ) : (
                                 <div className="text-center py-10 text-gray-500">Cargando agente...</div>
                             )}
