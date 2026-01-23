@@ -10,11 +10,9 @@ import { Button } from "@/components/ui/button";
 import { Save, Check, Loader2, FileText, Mic, Brain, ChevronDown, ChevronUp, Cloud } from "lucide-react";
 import { AnalysisConfig } from "@/types/campaign";
 
-import { useDebounce } from "@/hooks/use-debounce";
+import { useRef, useCallback } from "react";
 
-interface TestingEnvironmentProps {
-    subworkspaceId: string;
-}
+// ... (existing imports, remove useDebounce if not used elsewhere)
 
 export function TestingEnvironment({ subworkspaceId }: TestingEnvironmentProps) {
     const [loading, setLoading] = useState(true);
@@ -37,8 +35,10 @@ export function TestingEnvironment({ subworkspaceId }: TestingEnvironmentProps) 
     const [analysisConfig, setAnalysisConfig] = useState<AnalysisConfig | undefined>(undefined);
     const [showAnalysis, setShowAnalysis] = useState(false);
 
-    // Debounced prompt for auto-saving
-    const debouncedPrompt = useDebounce(prompt, 2000);
+    // Ref to hold immediate value (for Activar button and avoiding stale closures)
+    const promptRef = useRef("");
+    // Ref for debounce timer
+    const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
 
     // Key to reset uncontrolled Textarea
     const [initialLoadKey, setInitialLoadKey] = useState(0);
@@ -61,6 +61,7 @@ export function TestingEnvironment({ subworkspaceId }: TestingEnvironmentProps) 
                     const initialPrompt = liveDraft !== undefined ? liveDraft : liveActive;
 
                     setPrompt(initialPrompt);
+                    promptRef.current = initialPrompt; // Sync Ref
                     setActivePrompt(liveActive);
 
                     setRetellAgentId(data.retell_agent_id || "");
@@ -80,15 +81,41 @@ export function TestingEnvironment({ subworkspaceId }: TestingEnvironmentProps) 
         loadData();
     }, [subworkspaceId]);
 
-    // Auto-save Draft
+    // Handle Text Change (Decoupled & Debounced)
+    const handlePromptChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
+        const value = e.target.value;
+        promptRef.current = value; // Immediate update for logic that needs it
+
+        // Clear existing timer
+        if (debounceTimerRef.current) {
+            clearTimeout(debounceTimerRef.current);
+        }
+
+        // Set state after delay (fixes Undo & Perf)
+        // Shorter delay (800ms) aligns with "save always" feeling
+        debounceTimerRef.current = setTimeout(() => {
+            setPrompt(value); // This triggers re-render + effect
+        }, 800);
+    }, []);
+
+    // Cleanup timer
+    useEffect(() => {
+        return () => {
+            if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+        };
+    }, []);
+
+    // Auto-save Draft (Triggered when 'prompt' state updates)
     useEffect(() => {
         if (loading || !subworkspaceId) return;
 
         const saveDraft = async () => {
+            // Avoid saving if empty on initial load (though checking prompt against active might be better)
+            // We'll save whatever is in the state.
             setSavingDraft(true);
             try {
                 await updateDoc(doc(db, "subworkspaces", subworkspaceId), {
-                    draft_prompt: debouncedPrompt
+                    draft_prompt: prompt
                 });
                 setDraftSaved(true);
                 setTimeout(() => setDraftSaved(false), 2000);
@@ -99,11 +126,19 @@ export function TestingEnvironment({ subworkspaceId }: TestingEnvironmentProps) 
             }
         };
 
-        if (debouncedPrompt !== undefined) {
+        // Only save if prompt matches the Ref (meaning the debounce settled)
+        // Actually, 'prompt' IS the settled value.
+        // We skip initial mount by checking if promptRef is set, or just use a mounted flag?
+        // Simple check: if prompt is different from saved/active? No, just save.
+        // But preventing 'empty' save on first render? 
+        // prompt is initialized in loadData. 
+        // This effect runs on prompt change.
+        // We'll rely on dependency array.
+        if (prompt !== "") {
             saveDraft();
         }
 
-    }, [debouncedPrompt, subworkspaceId, loading]);
+    }, [prompt, subworkspaceId, loading]);
 
     // Helper Functions
     const extractVariables = (text: string) => {
@@ -113,14 +148,14 @@ export function TestingEnvironment({ subworkspaceId }: TestingEnvironmentProps) 
         return uniqueVars.filter(v => v !== 'campaign_prompt');
     };
 
-    const foundVariables = extractVariables(prompt);
+    const foundVariables = extractVariables(prompt); // Uses settled state
 
     const handleVariableChange = (name: string, value: string) => {
         setVariables(prev => ({ ...prev, [name]: value }));
     };
 
     const getPromptWithVariables = () => {
-        let finalPrompt = prompt;
+        let finalPrompt = prompt; // Uses settled state
         foundVariables.forEach(v => {
             const value = variables[v] || `[${v}]`;
             finalPrompt = finalPrompt.replace(new RegExp(`\\{\\{${v}\\}\\}`, 'g'), value);
@@ -131,14 +166,20 @@ export function TestingEnvironment({ subworkspaceId }: TestingEnvironmentProps) 
     const handleActivate = async () => {
         if (!subworkspaceId) return;
 
+        // Use promptRef.current to get the VERY LATEST text even if debounce hasn't fired
+        const latestPrompt = promptRef.current;
+
         setActivating(true);
         try {
             await updateDoc(doc(db, "subworkspaces", subworkspaceId), {
-                active_prompt: prompt,
-                draft_prompt: prompt
+                active_prompt: latestPrompt,
+                draft_prompt: latestPrompt
             });
 
-            setActivePrompt(prompt);
+            // Force update state immediately if needed
+            setPrompt(latestPrompt);
+            setActivePrompt(latestPrompt);
+
             setActiveSuccess(true);
             setTimeout(() => setActiveSuccess(false), 3000);
         } catch (error) {
@@ -225,10 +266,11 @@ export function TestingEnvironment({ subworkspaceId }: TestingEnvironmentProps) 
                         <Textarea
                             key={initialLoadKey}
                             defaultValue={prompt}
-                            onChange={(e) => setPrompt(e.target.value)}
+                            onChange={handlePromptChange}
                             placeholder="Escribe aquí el prompt para tu agente de voz..."
                             className="min-h-[250px] resize-none border-gray-200 dark:border-gray-600 dark:bg-gray-900 dark:text-white dark:placeholder:text-gray-500 focus:border-blue-500 dark:focus:border-blue-400 font-sans text-base leading-relaxed"
                         />
+
 
                         <div className="flex items-center justify-between">
                             <div className="text-xs">
