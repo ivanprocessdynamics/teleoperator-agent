@@ -179,46 +179,56 @@ export function CampaignAnalysis({ config = DEFAULT_CONFIG, onChange }: Campaign
                                 </Button>
                             </div>
 
-                            <div className="grid grid-cols-1 md:grid-cols-12 gap-5">
-                                <div className="md:col-span-4 space-y-2">
-                                    <Label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Nombre del Dato</Label>
-                                    <Input
-                                        placeholder="ej: motivo_rechazo"
-                                        value={newField.name}
-                                        onChange={(e) => setNewField({ ...newField, name: e.target.value })}
-                                        className="bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700"
-                                    />
-                                    <p className="text-[10px] text-gray-400">Nombre interno (sin espacios)</p>
-                                </div>
-                                <div className="md:col-span-3 space-y-2">
-                                    <Label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Tipo de Respuesta</Label>
-                                    <Select
-                                        value={newField.type}
-                                        onValueChange={(v) => setNewField({ ...newField, type: v as any })}
-                                    >
-                                        <SelectTrigger className="bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
-                                            <SelectValue />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="string">Texto Libre</SelectItem>
-                                            <SelectItem value="boolean">Sí / No</SelectItem>
-                                            <SelectItem value="number">Numérico</SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-                                <div className="md:col-span-5 space-y-2">
-                                    <Label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Instrucción para la IA</Label>
-                                    <div className="flex gap-2">
+                            <div className="flex flex-col gap-4">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div className="space-y-2">
+                                        <Label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Nombre del Dato</Label>
                                         <Input
-                                            placeholder="ej: ¿Por qué dijo que no?"
-                                            value={newField.description}
-                                            onChange={(e) => setNewField({ ...newField, description: e.target.value })}
-                                            className="bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700"
+                                            placeholder="ej: motivo_rechazo"
+                                            value={newField.name}
+                                            onChange={(e) => setNewField({ ...newField, name: e.target.value })}
+                                            className="bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 h-10"
                                         />
-                                        <Button onClick={addCustomField} disabled={!newField.name || !newField.description} className="shrink-0 bg-purple-600 hover:bg-purple-700 text-white">
-                                            Añadir
-                                        </Button>
+                                        <p className="text-[10px] text-gray-400">Nombre interno para la base de datos (sin espacios)</p>
                                     </div>
+                                    <div className="space-y-2">
+                                        <Label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Tipo de Respuesta</Label>
+                                        <Select
+                                            value={newField.type}
+                                            onValueChange={(v) => setNewField({ ...newField, type: v as any })}
+                                        >
+                                            <SelectTrigger className="bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 h-10">
+                                                <SelectValue />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="string">Texto Libre</SelectItem>
+                                                <SelectItem value="boolean">Sí / No</SelectItem>
+                                                <SelectItem value="number">Numérico</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                </div>
+
+                                <div className="space-y-2">
+                                    <Label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Instrucción para la IA</Label>
+                                    <Input
+                                        placeholder="ej: ¿Cuál fue la razón exacta por la que el cliente dijo que no?"
+                                        value={newField.description}
+                                        onChange={(e) => setNewField({ ...newField, description: e.target.value })}
+                                        className="bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 h-10"
+                                    />
+                                    <p className="text-[10px] text-gray-400">Describe qué debe buscar la IA en la conversación para extraer este dato.</p>
+                                </div>
+
+                                <div className="pt-2 flex justify-end">
+                                    <Button
+                                        onClick={addCustomField}
+                                        disabled={!newField.name || !newField.description}
+                                        className="bg-purple-600 hover:bg-purple-700 text-white w-full md:w-auto min-w-[120px]"
+                                    >
+                                        <Plus className="h-4 w-4 mr-2" />
+                                        Añadir Campo
+                                    </Button>
                                 </div>
                             </div>
                         </div>
