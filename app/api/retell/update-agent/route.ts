@@ -64,6 +64,13 @@ export async function POST(req: Request) {
                 });
             }
 
+            // Always add Spanish Summary
+            customData.push({
+                name: "resumen_espanol",
+                description: "Resumen detallado de la llamada en español.",
+                type: "string" as const
+            });
+
             // Map User's Custom Fields
             if (analysis_config.custom_fields) {
                 for (const field of analysis_config.custom_fields) {
