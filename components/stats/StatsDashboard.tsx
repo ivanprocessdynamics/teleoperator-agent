@@ -14,10 +14,19 @@ interface StatsDashboardProps {
     subworkspaceId?: string;
 }
 
-
 export function StatsDashboard(props: StatsDashboardProps) {
     const { agentId } = props;
     const [loading, setLoading] = useState(true);
+
+    // Data State
+    const [rawCalls, setRawCalls] = useState<any[]>([]);
+    const [allFields, setAllFields] = useState<any[]>([]);
+
+    // Config State
+    const [hiddenStandard, setHiddenStandard] = useState<string[]>([]);
+    const [period, setPeriod] = useState("7d");
+
+    // Derived UI State
     const [stats, setStats] = useState({
         totalCalls: 0,
         avgDuration: 0,
@@ -25,54 +34,30 @@ export function StatsDashboard(props: StatsDashboardProps) {
         sentimentBreakdown: { positive: 0, neutral: 0, negative: 0 }
     });
     const [customStats, setCustomStats] = useState<Record<string, any>>({});
-    const [hiddenStandard, setHiddenStandard] = useState<string[]>([]);
     const [archivedCustom, setArchivedCustom] = useState<any[]>([]);
-    const [period, setPeriod] = useState("7d");
 
+    // 1. Fetch Data (Calls + Config)
     const fetchStats = async () => {
         if (!agentId || !props.subworkspaceId) return;
         setLoading(true);
 
         try {
-            // 1. Fetch Subworkspace Config for Custom Fields definition
+            // Fetch Config
             const subDoc = await getDoc(doc(db, "subworkspaces", props.subworkspaceId));
-            let initialCustomStats: Record<string, any> = {};
-            let archivedList: any[] = [];
-
             if (subDoc.exists()) {
                 const data = subDoc.data();
                 setHiddenStandard(data.analysis_config?.hidden_standard_fields || []);
-
-                const customFields = data.analysis_config?.custom_fields || [];
-
-                customFields.forEach((field: any) => {
-                    if (field.isArchived) {
-                        archivedList.push(field);
-                        return;
-                    }
-
-                    initialCustomStats[field.name] = {
-                        id: field.id, // Store ID for archiving
-                        type: field.type,
-                        yes: 0,
-                        no: 0,
-                        count: 0,
-                        totalSum: 0,
-                        description: field.description,
-                        name: field.name
-                    };
-                });
-                setArchivedCustom(archivedList);
+                setAllFields(data.analysis_config?.custom_fields || []);
             }
 
-            // 2. Determine date range
+            // Fetch Calls
             const now = new Date();
             let start = new Date();
 
             if (period === "24h") start.setTime(now.getTime() - 24 * 60 * 60 * 1000);
             else if (period === "7d") start.setTime(now.getTime() - 7 * 24 * 60 * 60 * 1000);
             else if (period === "30d") start.setTime(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-            else start = new Date(0); // All time
+            else start = new Date(0);
 
             const q = query(
                 collection(db, "calls"),
@@ -82,84 +67,100 @@ export function StatsDashboard(props: StatsDashboardProps) {
             );
 
             const snapshot = await getDocs(q);
-
-            let totalDuration = 0;
-            let successfulCalls = 0;
-            let sentimentCounts = { positive: 0, neutral: 0, negative: 0 };
-
-            snapshot.docs.forEach(doc => {
-                const data = doc.data();
-
-                // Duration
-                if (typeof data.duration === 'number') {
-                    totalDuration += data.duration;
-                }
-
-                // Success
-                if (data.analysis?.call_successful) {
-                    successfulCalls++;
-                }
-
-                // Sentiment
-                const sentiment = (data.analysis?.user_sentiment || "Neutral").toLowerCase();
-                if (sentiment.includes('positive')) sentimentCounts.positive++;
-                else if (sentiment.includes('negative')) sentimentCounts.negative++;
-                else sentimentCounts.neutral++;
-            });
-
-            const total = snapshot.size;
-
-            setStats({
-                totalCalls: total,
-                avgDuration: total > 0 ? totalDuration / total : 0,
-                successRate: total > 0 ? (successfulCalls / total) * 100 : 0,
-                sentimentBreakdown: sentimentCounts
-            });
-
-            // 3. Aggregate Custom Fields over the initialized base
-            const customAgg = { ...initialCustomStats };
-
-            snapshot.docs.forEach(doc => {
-                const data = doc.data();
-                const customs = data.analysis?.custom_analysis_data;
-                if (Array.isArray(customs)) {
-                    customs.forEach((c: any) => {
-                        // Only aggregate into fields that exist in our initialized set (not archived)
-                        if (customAgg[c.name]) {
-                            const entry = customAgg[c.name];
-                            entry.count++;
-
-                            if (typeof c.value === 'boolean') {
-                                entry.type = 'boolean';
-                                if (c.value) entry.yes++; else entry.no++;
-                            } else if (typeof c.value === 'number') {
-                                entry.type = 'number';
-                                entry.totalSum += c.value;
-                            } else {
-                                entry.type = 'string';
-                            }
-                        }
-                    });
-                }
-            });
-
-            setCustomStats(customAgg);
+            const calls = snapshot.docs.map(doc => doc.data());
+            setRawCalls(calls);
 
         } catch (error) {
-            console.error("Error fetching stats:", error);
+            console.error("Error fetching data:", error);
         } finally {
             setLoading(false);
         }
     };
 
+    // 2. Refresh data when context changes
     useEffect(() => {
         fetchStats();
     }, [agentId, period, props.subworkspaceId]);
 
+    // 3. Calculate Stats when data or visibility changes
+    useEffect(() => {
+        // Basic Stats
+        let totalDuration = 0;
+        let successfulCalls = 0;
+        let sentimentCounts = { positive: 0, neutral: 0, negative: 0 };
+
+        rawCalls.forEach(data => {
+            if (typeof data.duration === 'number') totalDuration += data.duration;
+            if (data.analysis?.call_successful) successfulCalls++;
+
+            const sentiment = (data.analysis?.user_sentiment || "Neutral").toLowerCase();
+            if (sentiment.includes('positive')) sentimentCounts.positive++;
+            else if (sentiment.includes('negative')) sentimentCounts.negative++;
+            else sentimentCounts.neutral++;
+        });
+
+        const total = rawCalls.length;
+        setStats({
+            totalCalls: total,
+            avgDuration: total > 0 ? totalDuration / total : 0,
+            successRate: total > 0 ? (successfulCalls / total) * 100 : 0,
+            sentimentBreakdown: sentimentCounts
+        });
+
+        // Custom Stats
+        const initialCustomStats: Record<string, any> = {};
+        const archivedList: any[] = [];
+
+        allFields.forEach(field => {
+            if (field.isArchived) {
+                archivedList.push(field);
+                return;
+            }
+            initialCustomStats[field.name] = {
+                id: field.id,
+                type: field.type,
+                yes: 0,
+                no: 0,
+                count: 0,
+                totalSum: 0,
+                description: field.description,
+                name: field.name
+            };
+        });
+        setArchivedCustom(archivedList);
+
+        const customAgg = { ...initialCustomStats };
+
+        rawCalls.forEach(data => {
+            const customs = data.analysis?.custom_analysis_data;
+            if (Array.isArray(customs)) {
+                customs.forEach((c: any) => {
+                    // Only aggregate into fields that exist in our initialized set (not archived)
+                    if (customAgg[c.name]) {
+                        const entry = customAgg[c.name];
+                        entry.count++;
+                        if (typeof c.value === 'boolean') {
+                            entry.type = 'boolean';
+                            if (c.value) entry.yes++; else entry.no++;
+                        } else if (typeof c.value === 'number') {
+                            entry.type = 'number';
+                            entry.totalSum += c.value;
+                        } else {
+                            entry.type = 'string';
+                        }
+                    }
+                });
+            }
+        });
+
+        setCustomStats(customAgg);
+    }, [rawCalls, allFields]);
+
+
     const handleHideStandard = async (metricId: string) => {
         if (!props.subworkspaceId) return;
         const newHidden = [...hiddenStandard, metricId];
-        setHiddenStandard(newHidden);
+        setHiddenStandard(newHidden); // Instant update
 
         try {
             await updateDoc(doc(db, "subworkspaces", props.subworkspaceId), {
@@ -173,7 +174,7 @@ export function StatsDashboard(props: StatsDashboardProps) {
     const handleRestoreStandard = async (metricId: string) => {
         if (!props.subworkspaceId) return;
         const newHidden = hiddenStandard.filter(id => id !== metricId);
-        setHiddenStandard(newHidden);
+        setHiddenStandard(newHidden); // Instant update
 
         try {
             await updateDoc(doc(db, "subworkspaces", props.subworkspaceId), {
@@ -187,24 +188,16 @@ export function StatsDashboard(props: StatsDashboardProps) {
     const handleToggleCustomArchive = async (fieldId: string, archive: boolean) => {
         if (!props.subworkspaceId) return;
 
-        // Optimistic update
-        fetchStats(); // Trigger re-fetch/re-calc after update logic
+        // Optimistic local update
+        const updatedFields = allFields.map(f =>
+            f.id === fieldId ? { ...f, isArchived: archive } : f
+        );
+        setAllFields(updatedFields);
 
         try {
-            const docRef = doc(db, "subworkspaces", props.subworkspaceId);
-            const snap = await getDoc(docRef);
-            if (snap.exists()) {
-                const currentFields = snap.data().analysis_config?.custom_fields || [];
-                const updatedFields = currentFields.map((f: any) =>
-                    f.id === fieldId ? { ...f, isArchived: archive } : f
-                );
-
-                await updateDoc(docRef, {
-                    "analysis_config.custom_fields": updatedFields
-                });
-                // Reload to reflect changes in lists
-                fetchStats();
-            }
+            await updateDoc(doc(db, "subworkspaces", props.subworkspaceId), {
+                "analysis_config.custom_fields": updatedFields
+            });
         } catch (e) {
             console.error("Error toggling archive", e);
         }
