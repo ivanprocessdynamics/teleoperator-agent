@@ -4,15 +4,23 @@ export interface CampaignColumn {
     id: string; // e.g. "col_1"
     key: string; // e.g. "nombre" (sanitized for variable use)
     label: string; // e.g. "Nombre del Cliente"
+    isPhoneColumn?: boolean; // If true, this column holds phone numbers
 }
 
 export interface CampaignRow {
     id: string;
     campaign_id: string;
     data: Record<string, string>; // { "col_1": "Juan", "col_2": "500€" }
-    status: 'pending' | 'calling' | 'completed' | 'failed';
+    status: 'pending' | 'calling' | 'completed' | 'failed' | 'no_answer';
     call_id?: string; // Reference to Retell Call ID
     last_error?: string;
+    called_at?: any; // Firestore Timestamp of last call attempt
+}
+
+export interface CallingConfig {
+    from_number: string;         // Your Retell number (E.164)
+    concurrency_limit: number;   // Max parallel calls (default: 1)
+    retry_failed: boolean;       // Auto-retry failed calls?
 }
 
 export interface Campaign {
@@ -25,6 +33,7 @@ export interface Campaign {
 
     // Schema definition
     columns: CampaignColumn[];
+    phone_column_id?: string; // ID of the column containing phone numbers
 
     // Prompt Configuration
     prompt_template: string;
@@ -32,6 +41,9 @@ export interface Campaign {
     // Visual Customization
     icon?: string;
     color?: string;
+
+    // Calling Configuration
+    calling_config?: CallingConfig;
 
     // Analysis Configuration
     analysis_config?: AnalysisConfig;

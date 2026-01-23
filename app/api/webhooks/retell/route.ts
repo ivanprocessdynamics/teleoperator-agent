@@ -1,23 +1,50 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/firebase";
-import { collection, query, where, getDocs, updateDoc, doc } from "firebase/firestore";
+import { collection, query, where, getDocs, updateDoc, doc, Timestamp } from "firebase/firestore";
 
 export async function POST(req: Request) {
     try {
         const event = await req.json();
-        const { event_type, call_id, transcript, call_analysis } = event;
+        const { event_type, call_id, transcript, call_analysis, metadata, disconnection_reason } = event;
 
-        // Use retell_call_id to match our contacts
-        // Note: In a real app, we'd store the call_id when we launch the campaign
-        // For now, let's assume we can match or we just log.
+        console.log("Received Webhook:", event_type, call_id, "Metadata:", metadata);
 
-        console.log("Received Webhook:", event_type, call_id);
+        // ====================================================================
+        // CAMPAIGN ROW UPDATES
+        // When we launch a campaign call, we store campaign_id and row_id in metadata.
+        // ====================================================================
+        if (metadata?.campaign_id && metadata?.row_id) {
+            const rowRef = doc(db, "campaign_rows", metadata.row_id);
 
-        // If we have a mechanism to map call_id -> contact_id, we update status here.
-        // Since we didn't implement storing call_id on 'Launch Campaign', 
-        // we will simulate finding the contact by some metadata or just log successful receipt.
+            if (event_type === "call_started") {
+                await updateDoc(rowRef, {
+                    status: "calling",
+                    call_id: call_id,
+                    called_at: Timestamp.now(),
+                });
+            } else if (event_type === "call_ended") {
+                // Determine final status based on disconnection_reason
+                let finalStatus: 'completed' | 'failed' | 'no_answer' = 'completed';
 
-        // Example logic if we had stored retell_call_id on the contact:
+                const failedReasons = ['dial_failed', 'dial_busy', 'error_unknown', 'error_retell', 'scam_detected'];
+                const noAnswerReasons = ['dial_no_answer', 'voicemail_reached', 'user_not_joined'];
+
+                if (failedReasons.includes(disconnection_reason)) {
+                    finalStatus = 'failed';
+                } else if (noAnswerReasons.includes(disconnection_reason)) {
+                    finalStatus = 'no_answer';
+                }
+
+                await updateDoc(rowRef, {
+                    status: finalStatus,
+                    last_error: finalStatus !== 'completed' ? disconnection_reason : null,
+                });
+            }
+        }
+
+        // ====================================================================
+        // LEGACY: Contact-based updates (for backward compatibility)
+        // ====================================================================
         if (call_id) {
             const q = query(collection(db, "contacts"), where("retell_call_id", "==", call_id));
             const querySnapshot = await getDocs(q);
@@ -26,16 +53,15 @@ export async function POST(req: Request) {
                 const contactDoc = querySnapshot.docs[0];
                 let newStatus = contactDoc.data().status;
 
-                if (event_type === "call.started") {
+                if (event_type === "call_started") {
                     newStatus = "on_call";
-                } else if (event_type === "call.ended") {
-                    // Determine if answered based on analysis or duration
-                    newStatus = "answered"; // Simplify for MVP
+                } else if (event_type === "call_ended") {
+                    newStatus = "answered";
                 }
 
                 await updateDoc(doc(db, "contacts", contactDoc.id), {
                     status: newStatus,
-                    transcript: transcript, // This might be the final transcript object
+                    transcript: transcript,
                     last_updated: new Date()
                 });
             }

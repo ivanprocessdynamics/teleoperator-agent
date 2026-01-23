@@ -3,9 +3,9 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import { doc, onSnapshot, updateDoc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { Campaign, CampaignColumn, AnalysisConfig } from "@/types/campaign";
+import { Campaign, CampaignColumn, AnalysisConfig, CallingConfig } from "@/types/campaign";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Play, Save, Check, Loader2, FileText, Phone, Users, Target, Zap, Star, MessageCircle, Mail } from "lucide-react";
+import { ArrowLeft, Play, Save, Check, Loader2, FileText, Phone, Users, Target, Zap, Star, MessageCircle, Mail, Pause, Square, Settings } from "lucide-react";
 import { CampaignTable } from "./CampaignTable";
 import { CampaignPrompt } from "./CampaignPrompt";
 import { CampaignAnalysis } from "./CampaignAnalysis";
@@ -17,6 +17,8 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useCampaignExecutor } from "@/hooks/useCampaignExecutor";
+import { Progress } from "@/components/ui/progress";
 
 interface CampaignDetailProps {
     campaignId: string;
@@ -72,6 +74,20 @@ export function CampaignDetail({ campaignId, subworkspaceId, onBack }: CampaignD
     // Debounce Refs
     const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
+    // Retell Agent ID
+    const [retellAgentId, setRetellAgentId] = useState<string | null>(null);
+
+    // Get phone column ID
+    const phoneColumnId = campaign?.columns.find(c => c.isPhoneColumn)?.id || 'col_phone';
+
+    // Campaign Executor
+    const executor = useCampaignExecutor({
+        campaignId: campaignId,
+        agentId: retellAgentId || '',
+        callingConfig: campaign?.calling_config || { from_number: '+34877450708', concurrency_limit: 1, retry_failed: false },
+        phoneColumnId: phoneColumnId
+    });
+
     useEffect(() => {
         if (!campaignId) return;
         const unsub = onSnapshot(doc(db, "campaigns", campaignId), (doc) => {
@@ -88,6 +104,18 @@ export function CampaignDetail({ campaignId, subworkspaceId, onBack }: CampaignD
         });
         return () => unsub();
     }, [campaignId]);
+
+    // Fetch Retell Agent ID from subworkspace
+    useEffect(() => {
+        if (!subworkspaceId) return;
+        const fetchAgentId = async () => {
+            const subSnap = await getDoc(doc(db, "subworkspaces", subworkspaceId));
+            if (subSnap.exists()) {
+                setRetellAgentId(subSnap.data().retell_agent_id || null);
+            }
+        };
+        fetchAgentId();
+    }, [subworkspaceId]);
 
     // Helpers for Debounced Save
     const debouncedSave = useCallback((updates: Partial<Campaign>) => {
@@ -142,6 +170,13 @@ export function CampaignDetail({ campaignId, subworkspaceId, onBack }: CampaignD
     const handleActivateCampaign = async () => {
         if (!campaign || !subworkspaceId) return;
 
+        // Validate phone numbers exist
+        const rowsWithPhones = executor.rows.filter(r => r.data[phoneColumnId]?.trim());
+        if (rowsWithPhones.length === 0) {
+            alert("No hay números de teléfono válidos en la tabla. Añade al menos un número.");
+            return;
+        }
+
         setIsActivating(true);
         try {
             const subRef = doc(db, "subworkspaces", subworkspaceId);
@@ -157,31 +192,41 @@ export function CampaignDetail({ campaignId, subworkspaceId, onBack }: CampaignD
             });
 
             // 3. Update Analysis Config (Push to Retell)
-            if (campaign.analysis_config) {
-                const subSnap = await getDoc(subRef);
-                const subData = subSnap.data();
-                const retellAgentId = subData?.retell_agent_id;
-
-                if (retellAgentId) {
-                    await fetch('/api/retell/update-agent', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            agent_id: retellAgentId,
-                            analysis_config: campaign.analysis_config
-                            // We do NOT send prompt here anymore
-                        })
-                    });
-                }
+            if (campaign.analysis_config && retellAgentId) {
+                await fetch('/api/retell/update-agent', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        agent_id: retellAgentId,
+                        analysis_config: campaign.analysis_config
+                    })
+                });
             }
 
+            // 4. Start the campaign executor
+            executor.start();
+
             setIsActivated(true);
-            setTimeout(() => setIsActivated(false), 3000);
         } catch (error) {
             console.error("Error activating campaign:", error);
             alert("Error al activar la campaña. Revisa la consola.");
         } finally {
             setIsActivating(false);
+        }
+    };
+
+    const handlePauseCampaign = () => {
+        executor.pause();
+    };
+
+    const handleResumeCampaign = () => {
+        executor.resume();
+    };
+
+    const handleStopCampaign = async () => {
+        executor.stop();
+        if (campaign) {
+            await updateDoc(doc(db, "campaigns", campaign.id), { status: "paused" });
         }
     };
 
@@ -282,29 +327,77 @@ export function CampaignDetail({ campaignId, subworkspaceId, onBack }: CampaignD
                         </div>
                     </div>
                 </div>
-                <div className="flex gap-2">
-                    <Button
-                        onClick={handleActivateCampaign}
-                        disabled={isActivating || !subworkspaceId}
-                        className={cn("shadow-sm transition-colors", styles.button)}
-                    >
-                        {isActivating ? (
-                            <>
-                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                Activando...
-                            </>
-                        ) : isActivated ? (
-                            <>
-                                <Check className="mr-2 h-4 w-4" />
-                                Campaña Activa
-                            </>
-                        ) : (
-                            <>
-                                <Play className="mr-2 h-4 w-4" />
-                                Lanzar Campaña
-                            </>
-                        )}
-                    </Button>
+                <div className="flex items-center gap-3">
+                    {/* Progress Display when running */}
+                    {executor.state.isRunning && (
+                        <div className="flex items-center gap-3 bg-white dark:bg-gray-800 px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700">
+                            <div className="flex flex-col min-w-[120px]">
+                                <span className="text-[10px] uppercase tracking-wider text-gray-500 font-medium">Progreso</span>
+                                <div className="flex items-center gap-2">
+                                    <Progress
+                                        value={executor.state.totalRows > 0
+                                            ? ((executor.state.completedCount + executor.state.failedCount) / executor.state.totalRows) * 100
+                                            : 0
+                                        }
+                                        className="w-24 h-1.5"
+                                    />
+                                    <span className="text-xs font-mono text-gray-600 dark:text-gray-300">
+                                        {executor.state.completedCount + executor.state.failedCount}/{executor.state.totalRows}
+                                    </span>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-1 text-[10px] text-gray-500">
+                                <span className="text-green-600">{executor.state.completedCount} ✓</span>
+                                <span className="text-red-500">{executor.state.failedCount} ✗</span>
+                                {executor.state.activeCalls > 0 && (
+                                    <span className="text-blue-500 flex items-center gap-0.5">
+                                        <Loader2 className="h-3 w-3 animate-spin" />{executor.state.activeCalls}
+                                    </span>
+                                )}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Control Buttons */}
+                    {executor.state.isRunning ? (
+                        <div className="flex gap-2">
+                            {executor.state.isPaused ? (
+                                <Button onClick={handleResumeCampaign} variant="outline" size="sm" className="bg-green-50 text-green-600 border-green-200 hover:bg-green-100">
+                                    <Play className="mr-1.5 h-3.5 w-3.5" /> Reanudar
+                                </Button>
+                            ) : (
+                                <Button onClick={handlePauseCampaign} variant="outline" size="sm" className="bg-yellow-50 text-yellow-600 border-yellow-200 hover:bg-yellow-100">
+                                    <Pause className="mr-1.5 h-3.5 w-3.5" /> Pausar
+                                </Button>
+                            )}
+                            <Button onClick={handleStopCampaign} variant="outline" size="sm" className="bg-red-50 text-red-600 border-red-200 hover:bg-red-100">
+                                <Square className="mr-1.5 h-3.5 w-3.5" /> Detener
+                            </Button>
+                        </div>
+                    ) : (
+                        <Button
+                            onClick={handleActivateCampaign}
+                            disabled={isActivating || !subworkspaceId || !retellAgentId}
+                            className={cn("shadow-sm transition-colors", styles.button)}
+                        >
+                            {isActivating ? (
+                                <>
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                    Iniciando...
+                                </>
+                            ) : isActivated ? (
+                                <>
+                                    <Check className="mr-2 h-4 w-4" />
+                                    Campaña en Marcha
+                                </>
+                            ) : (
+                                <>
+                                    <Play className="mr-2 h-4 w-4" />
+                                    Lanzar Campaña
+                                </>
+                            )}
+                        </Button>
+                    )}
                 </div>
             </div>
 
@@ -321,9 +414,10 @@ export function CampaignDetail({ campaignId, subworkspaceId, onBack }: CampaignD
                 {/* Right: Prompt Editor & Analysis (5 cols) - Sticky */}
                 <div className="col-span-12 lg:col-span-5 h-full overflow-y-auto pr-2">
                     <Tabs defaultValue="prompt" className="w-full">
-                        <TabsList className="grid w-full grid-cols-2 mb-4 bg-gray-100 dark:bg-gray-800">
+                        <TabsList className="grid w-full grid-cols-3 mb-4 bg-gray-100 dark:bg-gray-800">
                             <TabsTrigger value="prompt">Prompt (Guion)</TabsTrigger>
                             <TabsTrigger value="analysis">Análisis & IA</TabsTrigger>
+                            <TabsTrigger value="calling"><Phone className="h-3.5 w-3.5 mr-1.5" />Llamadas</TabsTrigger>
                         </TabsList>
 
                         <TabsContent value="prompt">
@@ -350,6 +444,102 @@ export function CampaignDetail({ campaignId, subworkspaceId, onBack }: CampaignD
                                 }}
                                 onChange={handleUpdateAnalysis}
                             />
+                        </TabsContent>
+
+                        <TabsContent value="calling">
+                            <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-5 space-y-6">
+                                <div>
+                                    <h3 className="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-2 mb-4">
+                                        <Settings className="h-4 w-4" /> Configuración de Llamadas
+                                    </h3>
+
+                                    <div className="space-y-4">
+                                        {/* From Number */}
+                                        <div>
+                                            <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1.5">
+                                                Número de Origen (E.164)
+                                            </label>
+                                            <div className="flex items-center gap-2">
+                                                <Phone className="h-4 w-4 text-gray-400" />
+                                                <input
+                                                    type="text"
+                                                    placeholder="+34877450708"
+                                                    value={campaign.calling_config?.from_number || "+34877450708"}
+                                                    onChange={(e) => {
+                                                        const newConfig: CallingConfig = {
+                                                            from_number: e.target.value,
+                                                            concurrency_limit: campaign.calling_config?.concurrency_limit || 1,
+                                                            retry_failed: campaign.calling_config?.retry_failed || false
+                                                        };
+                                                        debouncedSave({ calling_config: newConfig });
+                                                    }}
+                                                    className="flex-1 px-3 py-2 text-sm border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                                />
+                                            </div>
+                                            <p className="text-[10px] text-gray-400 mt-1">Formato E.164: +34XXXXXXXXX</p>
+                                        </div>
+
+                                        {/* Concurrency Limit */}
+                                        <div>
+                                            <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1.5">
+                                                Llamadas Simultáneas
+                                            </label>
+                                            <div className="flex items-center gap-3">
+                                                <input
+                                                    type="range"
+                                                    min="1"
+                                                    max="5"
+                                                    value={campaign.calling_config?.concurrency_limit || 1}
+                                                    onChange={(e) => {
+                                                        const newConfig: CallingConfig = {
+                                                            from_number: campaign.calling_config?.from_number || "+34877450708",
+                                                            concurrency_limit: parseInt(e.target.value),
+                                                            retry_failed: campaign.calling_config?.retry_failed || false
+                                                        };
+                                                        debouncedSave({ calling_config: newConfig });
+                                                    }}
+                                                    className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-700"
+                                                />
+                                                <span className="text-lg font-bold text-gray-900 dark:text-white w-8 text-center">
+                                                    {campaign.calling_config?.concurrency_limit || 1}
+                                                </span>
+                                            </div>
+                                            <p className="text-[10px] text-gray-400 mt-1">Máximo de llamadas en paralelo (recomendado: 1-2)</p>
+                                        </div>
+
+                                        {/* Retry Failed */}
+                                        <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                                            <div>
+                                                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Reintentar fallidas</span>
+                                                <p className="text-[10px] text-gray-400">Volver a llamar si no contestan</p>
+                                            </div>
+                                            <label className="relative inline-flex items-center cursor-pointer">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={campaign.calling_config?.retry_failed || false}
+                                                    onChange={(e) => {
+                                                        const newConfig: CallingConfig = {
+                                                            from_number: campaign.calling_config?.from_number || "+34877450708",
+                                                            concurrency_limit: campaign.calling_config?.concurrency_limit || 1,
+                                                            retry_failed: e.target.checked
+                                                        };
+                                                        debouncedSave({ calling_config: newConfig });
+                                                    }}
+                                                    className="sr-only peer"
+                                                />
+                                                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Info Box */}
+                                <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-100 dark:border-blue-800">
+                                    <p className="text-sm text-blue-700 dark:text-blue-300">
+                                        <strong>Nota:</strong> Al pulsar "Lanzar Campaña", el sistema comenzará a llamar secuencialmente a cada número de la tabla, respetando el límite de concurrencia configurado.
+                                    </p>
+                                </div>
+                            </div>
                         </TabsContent>
                     </Tabs>
                 </div>

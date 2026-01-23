@@ -8,6 +8,7 @@ import { Loader2, TrendingUp, Clock, Phone, ThumbsUp, Activity, RefreshCcw, EyeO
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { DateRangePicker } from "@/components/ui/date-range-picker";
 
 interface StatsDashboardProps {
     agentId?: string;
@@ -25,6 +26,8 @@ export function StatsDashboard(props: StatsDashboardProps) {
     // Config State
     const [hiddenStandard, setHiddenStandard] = useState<string[]>([]);
     const [period, setPeriod] = useState("7d");
+    const [pickerStart, setPickerStart] = useState<Date | null>(null);
+    const [pickerEnd, setPickerEnd] = useState<Date | null>(null);
 
     // Derived UI State
     const [stats, setStats] = useState({
@@ -53,18 +56,34 @@ export function StatsDashboard(props: StatsDashboardProps) {
             // Fetch Calls
             const now = new Date();
             let start = new Date();
+            let end: Date | null = null;
 
-            if (period === "24h") start.setTime(now.getTime() - 24 * 60 * 60 * 1000);
-            else if (period === "7d") start.setTime(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-            else if (period === "30d") start.setTime(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-            else start = new Date(0);
+            if (period === "24h") {
+                start.setTime(now.getTime() - 24 * 60 * 60 * 1000);
+            } else if (period === "7d") {
+                start.setTime(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+            } else if (period === "30d") {
+                start.setTime(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+            } else if (period === "custom" && pickerStart && pickerEnd) {
+                start = pickerStart;
+                end = pickerEnd;
+            } else if (period === "custom") {
+                start = new Date(0);
+            } else {
+                start = new Date(0); // All time
+            }
 
-            const q = query(
-                collection(db, "calls"),
+            const constraints: any[] = [
                 where("agent_id", "==", agentId),
                 where("timestamp", ">=", Timestamp.fromDate(start)),
                 orderBy("timestamp", "desc")
-            );
+            ];
+
+            if (end) {
+                constraints.push(where("timestamp", "<=", Timestamp.fromDate(end)));
+            }
+
+            const q = query(collection(db, "calls"), ...constraints);
 
             const snapshot = await getDocs(q);
             const calls = snapshot.docs.map(doc => doc.data());
@@ -79,8 +98,9 @@ export function StatsDashboard(props: StatsDashboardProps) {
 
     // 2. Refresh data when context changes
     useEffect(() => {
+        if (period === "custom" && (!pickerStart || !pickerEnd)) return;
         fetchStats();
-    }, [agentId, period, props.subworkspaceId]);
+    }, [agentId, period, props.subworkspaceId, pickerStart, pickerEnd]);
 
     // 3. Calculate Stats when data or visibility changes
     useEffect(() => {
@@ -135,7 +155,6 @@ export function StatsDashboard(props: StatsDashboardProps) {
             const customs = data.analysis?.custom_analysis_data;
             if (Array.isArray(customs)) {
                 customs.forEach((c: any) => {
-                    // Only aggregate into fields that exist in our initialized set (not archived)
                     if (customAgg[c.name]) {
                         const entry = customAgg[c.name];
                         entry.count++;
@@ -219,7 +238,7 @@ export function StatsDashboard(props: StatsDashboardProps) {
         <div className="space-y-6 animate-fade-in pb-10">
             <div className="flex justify-between items-center">
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Resumen de Rendimiento</h3>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                     <Button variant="outline" size="sm" onClick={() => fetchStats()} disabled={loading} className="bg-white dark:bg-gray-800">
                         <RefreshCcw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
                         Actualizar
@@ -233,8 +252,22 @@ export function StatsDashboard(props: StatsDashboardProps) {
                             <SelectItem value="7d">Últimos 7 días</SelectItem>
                             <SelectItem value="30d">Últimos 30 días</SelectItem>
                             <SelectItem value="all">Todo el tiempo</SelectItem>
+                            <SelectItem value="custom">Personalizado</SelectItem>
                         </SelectContent>
                     </Select>
+
+                    {period === "custom" && (
+                        <div className="animate-in fade-in slide-in-from-right-4 duration-300">
+                            <DateRangePicker
+                                startDate={pickerStart}
+                                endDate={pickerEnd}
+                                onChange={(s, e) => {
+                                    setPickerStart(s);
+                                    setPickerEnd(e);
+                                }}
+                            />
+                        </div>
+                    )}
                 </div>
             </div>
 

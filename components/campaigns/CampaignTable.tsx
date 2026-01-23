@@ -3,7 +3,8 @@
 import { useState, useEffect, useRef, memo, useCallback, useMemo } from "react";
 import { Campaign, CampaignColumn, CampaignRow } from "@/types/campaign";
 import { Button } from "@/components/ui/button";
-import { Plus, Trash2, MoreHorizontal, ArrowDown, Maximize2, Minimize2 } from "lucide-react";
+import { Plus, Trash2, MoreHorizontal, ArrowDown, Maximize2, Minimize2, Phone, CheckCircle, XCircle, PhoneOff, Loader2, Clock } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import {
     DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
@@ -301,6 +302,21 @@ export function CampaignTable({ campaign, onColumnsChange }: CampaignTableProps)
 
 
     // -------------------- COLUMN ACTIONS --------------------
+    // Ensure phone column exists as first column
+    useEffect(() => {
+        const hasPhoneCol = campaign.columns.some(c => c.isPhoneColumn);
+        if (!hasPhoneCol && campaign.columns.length >= 0) {
+            // Add phone column as first if not exists
+            const phoneCol: CampaignColumn = {
+                id: 'col_phone',
+                key: 'telefono',
+                label: 'TELÉFONO',
+                isPhoneColumn: true
+            };
+            onColumnsChange([phoneCol, ...campaign.columns.filter(c => c.id !== 'col_phone')]);
+        }
+    }, [campaign.id]);
+
     const addColumn = () => {
         const newColId = `col_${Date.now()}`;
         const newCols = [...campaign.columns, { id: newColId, key: newColId, label: "Nueva Variable" }];
@@ -319,9 +335,31 @@ export function CampaignTable({ campaign, onColumnsChange }: CampaignTableProps)
     };
 
     const removeColumn = (colId: string) => {
+        // Prevent deleting the phone column
+        const col = campaign.columns.find(c => c.id === colId);
+        if (col?.isPhoneColumn) {
+            alert("La columna de teléfono es obligatoria y no se puede eliminar.");
+            return;
+        }
         if (confirm("Se borrarán los datos de esta columna.")) {
             const newCols = campaign.columns.filter(c => c.id !== colId);
             onColumnsChange(newCols);
+        }
+    };
+
+    // Row status helper
+    const getRowStatusConfig = (status: string) => {
+        switch (status) {
+            case 'completed':
+                return { icon: CheckCircle, color: 'text-green-500', label: 'Completada' };
+            case 'calling':
+                return { icon: Loader2, color: 'text-blue-500 animate-spin', label: 'Llamando...' };
+            case 'failed':
+                return { icon: XCircle, color: 'text-red-500', label: 'Fallida' };
+            case 'no_answer':
+                return { icon: PhoneOff, color: 'text-orange-500', label: 'Sin respuesta' };
+            default:
+                return { icon: Clock, color: 'text-gray-400', label: 'Pendiente' };
         }
     };
 
@@ -648,6 +686,9 @@ export function CampaignTable({ campaign, onColumnsChange }: CampaignTableProps)
                     <thead className="bg-gray-50 dark:bg-gray-800 z-10 sticky top-0">
                         <tr>
                             <th className="w-[40px] border-b border-r border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-800"></th>
+                            <th className="w-[50px] border-b border-r border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 px-2 py-2 text-center">
+                                <span className="text-[10px] font-bold text-gray-500 uppercase">Estado</span>
+                            </th>
                             {campaign.columns.map((col) => (
                                 <th key={col.id} className="w-[150px] border-b border-r border-gray-200 dark:border-gray-600 px-2 py-2 text-left bg-gray-50 dark:bg-gray-800">
                                     <div className="flex items-center justify-between group">
@@ -663,9 +704,16 @@ export function CampaignTable({ campaign, onColumnsChange }: CampaignTableProps)
                                                 </Button>
                                             </DropdownMenuTrigger>
                                             <DropdownMenuContent>
-                                                <DropdownMenuItem onClick={() => removeColumn(col.id)} className="text-red-600">
-                                                    <Trash2 className="mr-2 h-4 w-4" /> Eliminar Columna
-                                                </DropdownMenuItem>
+                                                {!col.isPhoneColumn && (
+                                                    <DropdownMenuItem onClick={() => removeColumn(col.id)} className="text-red-600">
+                                                        <Trash2 className="mr-2 h-4 w-4" /> Eliminar Columna
+                                                    </DropdownMenuItem>
+                                                )}
+                                                {col.isPhoneColumn && (
+                                                    <DropdownMenuItem disabled className="text-gray-400">
+                                                        <Phone className="mr-2 h-4 w-4" /> Columna obligatoria
+                                                    </DropdownMenuItem>
+                                                )}
                                             </DropdownMenuContent>
                                         </DropdownMenu>
                                     </div>
@@ -681,6 +729,22 @@ export function CampaignTable({ campaign, onColumnsChange }: CampaignTableProps)
                             <tr key={row.id}>
                                 <td className="text-center text-xs text-gray-400 dark:text-gray-500 bg-gray-50 dark:bg-gray-800 border-r border-b border-gray-200 dark:border-gray-600">
                                     {rowIndex + 1}
+                                </td>
+                                <td className="text-center border-r border-b border-gray-200 dark:border-gray-600 bg-gray-50/50 dark:bg-gray-800/50 px-1">
+                                    <TooltipProvider>
+                                        <Tooltip>
+                                            <TooltipTrigger>
+                                                {(() => {
+                                                    const config = getRowStatusConfig(row.status);
+                                                    const Icon = config.icon;
+                                                    return <Icon className={`h-4 w-4 mx-auto ${config.color}`} />;
+                                                })()}
+                                            </TooltipTrigger>
+                                            <TooltipContent side="right">
+                                                <p>{getRowStatusConfig(row.status).label}</p>
+                                            </TooltipContent>
+                                        </Tooltip>
+                                    </TooltipProvider>
                                 </td>
                                 {campaign.columns.map((col) => (
                                     <CampaignCell
