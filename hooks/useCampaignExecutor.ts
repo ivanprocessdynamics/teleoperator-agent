@@ -20,13 +20,15 @@ interface UseCampaignExecutorProps {
     agentId: string;
     callingConfig: CallingConfig;
     phoneColumnId: string;
+    campaignPrompt: string;  // The prompt template for the agent
 }
 
 export function useCampaignExecutor({
     campaignId,
     agentId,
     callingConfig,
-    phoneColumnId
+    phoneColumnId,
+    campaignPrompt
 }: UseCampaignExecutorProps) {
     const [state, setState] = useState<ExecutorState>({
         isRunning: false,
@@ -82,7 +84,14 @@ export function useCampaignExecutor({
     }, [campaignId]);
 
     const processNextCalls = useCallback((currentRows: CampaignRow[]) => {
-        const pendingRows = currentRows.filter(r => r.status === 'pending');
+        // Filter pending rows that HAVE a valid phone number
+        const pendingRows = currentRows.filter(r => {
+            if (r.status !== 'pending') return false;
+            const phone = r.data[phoneColumnId]?.trim();
+            // Must have phone and it should look like a valid number
+            return phone && phone.length >= 7;
+        });
+
         const callingCount = currentRows.filter(r => r.status === 'calling').length;
         const availableSlots = callingConfig.concurrency_limit - callingCount;
 
@@ -94,7 +103,7 @@ export function useCampaignExecutor({
         nextBatch.forEach(row => {
             initiateCall(row);
         });
-    }, [callingConfig.concurrency_limit]);
+    }, [callingConfig.concurrency_limit, phoneColumnId]);
 
     const initiateCall = useCallback(async (row: CampaignRow) => {
         const phoneNumber = row.data[phoneColumnId];
@@ -132,7 +141,10 @@ export function useCampaignExecutor({
                     from_number: callingConfig.from_number,
                     to_number: normalizedPhone,
                     agent_id: agentId,
-                    dynamic_variables: dynamicVariables,
+                    dynamic_variables: {
+                        ...dynamicVariables,
+                        campaign_prompt: campaignPrompt  // Pass the prompt to the agent
+                    },
                     metadata: {
                         campaign_id: campaignId,
                         row_id: row.id,
@@ -186,6 +198,29 @@ export function useCampaignExecutor({
         // Note: Active calls will continue until they end naturally
     }, []);
 
+    // Reset rows for relaunch
+    const resetRows = useCallback(async (startFromIndex: number = 0) => {
+        const sortedRows = [...rows].sort((a, b) => a.id.localeCompare(b.id));
+        const rowsToReset = sortedRows.slice(startFromIndex);
+
+        // Reset each row to pending
+        for (const row of rowsToReset) {
+            // Only reset rows that have phone numbers
+            const phone = row.data[phoneColumnId]?.trim();
+            if (phone && phone.length >= 7) {
+                await updateDoc(doc(db, "campaign_rows", row.id), {
+                    status: 'pending',
+                    call_id: null,
+                    last_error: null,
+                    called_at: null
+                });
+            }
+        }
+    }, [rows, phoneColumnId]);
+
+    // Check if campaign was previously run
+    const hasBeenRun = rows.some(r => ['completed', 'failed', 'no_answer'].includes(r.status));
+
     return {
         state,
         start,
@@ -193,5 +228,7 @@ export function useCampaignExecutor({
         resume,
         stop,
         rows,
+        resetRows,
+        hasBeenRun,
     };
 }

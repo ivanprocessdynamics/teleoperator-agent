@@ -85,7 +85,8 @@ export function CampaignDetail({ campaignId, subworkspaceId, onBack }: CampaignD
         campaignId: campaignId,
         agentId: retellAgentId || '',
         callingConfig: campaign?.calling_config || { from_number: '+34877450708', concurrency_limit: 1, retry_failed: false },
-        phoneColumnId: phoneColumnId
+        phoneColumnId: phoneColumnId,
+        campaignPrompt: campaign?.prompt_template || ''
     });
 
     useEffect(() => {
@@ -400,6 +401,54 @@ export function CampaignDetail({ campaignId, subworkspaceId, onBack }: CampaignD
                     )}
                 </div>
             </div>
+
+            {/* Relaunch Card - Shows when campaign was previously run */}
+            {executor.hasBeenRun && !executor.state.isRunning && (
+                <div className="bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-900/20 dark:to-orange-900/20 border border-amber-200 dark:border-amber-800 rounded-xl p-4 flex items-center justify-between animate-in fade-in slide-in-from-top-2">
+                    <div className="flex items-center gap-3">
+                        <div className="h-10 w-10 rounded-full bg-amber-100 dark:bg-amber-900/50 flex items-center justify-center">
+                            <Phone className="h-5 w-5 text-amber-600" />
+                        </div>
+                        <div>
+                            <h4 className="text-sm font-semibold text-amber-900 dark:text-amber-100">Campaña Ejecutada Anteriormente</h4>
+                            <p className="text-xs text-amber-700 dark:text-amber-300">
+                                {executor.state.completedCount} completadas, {executor.state.failedCount} fallidas de {executor.state.totalRows} filas
+                            </p>
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={async () => {
+                                const startLine = prompt("¿Desde qué línea quieres relanzar? (1 = primera línea)");
+                                if (startLine) {
+                                    const idx = parseInt(startLine) - 1;
+                                    if (!isNaN(idx) && idx >= 0) {
+                                        await executor.resetRows(idx);
+                                        executor.start();
+                                    }
+                                }
+                            }}
+                            className="bg-white dark:bg-gray-800 text-amber-700 border-amber-300 hover:bg-amber-50"
+                        >
+                            Desde línea X...
+                        </Button>
+                        <Button
+                            size="sm"
+                            onClick={async () => {
+                                if (confirm("¿Estás seguro de relanzar TODA la campaña? Se resetearán todas las filas.")) {
+                                    await executor.resetRows(0);
+                                    executor.start();
+                                }
+                            }}
+                            className="bg-amber-600 text-white hover:bg-amber-700"
+                        >
+                            <Play className="mr-1.5 h-3.5 w-3.5" /> Relanzar Todo
+                        </Button>
+                    </div>
+                </div>
+            )}
 
             {/* Main Split View */}
             <div className="flex-1 grid grid-cols-12 gap-6 min-h-0">
