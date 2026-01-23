@@ -159,11 +159,11 @@ async function handleCallAnalyzed(callId: string, data: any) {
         transcriptText = data.transcript;
     }
 
-    // AI Fallback for Custom Extraction
-    // If we have an agent_id but NO custom_analysis_data, try to generate it
-    if (data.agent_id && (!analysis.custom_analysis_data || analysis.custom_analysis_data.length === 0)) {
+    // AI Extraction (Primary for Custom Fields)
+    // We prioritize our own OpenAI extraction for custom fields if any are configured.
+    if (data.agent_id) {
         try {
-            console.log(`[AI Fallback] Checking if custom extraction is needed for agent ${data.agent_id}`);
+            console.log(`[AI Extraction] Checking for custom field config for agent ${data.agent_id}`);
 
             // 1. Find Subworkspace config for this agent
             const q = query(collection(db, "subworkspaces"), where("retell_agent_id", "==", data.agent_id));
@@ -173,8 +173,11 @@ async function handleCallAnalyzed(callId: string, data: any) {
                 const subSettings = snapshot.docs[0].data();
                 const customFields = subSettings.analysis_config?.custom_fields || [];
 
-                if (customFields.length > 0 && transcriptText) {
-                    console.log(`[AI Fallback] Generating analysis for ${customFields.length} fields using OpenAI...`);
+                // Filter out archived fields
+                const activeFields = customFields.filter((f: any) => !f.isArchived);
+
+                if (activeFields.length > 0 && transcriptText) {
+                    console.log(`[AI Extraction] Generating analysis for ${activeFields.length} active custom fields using OpenAI...`);
 
                     const OpenAI = require("openai");
                     const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
@@ -185,7 +188,7 @@ async function handleCallAnalyzed(callId: string, data: any) {
                         Each object must have: "name" (string), "value" (string, number, or boolean), and "rationale" (string).
                         
                         Variables to extract:
-                        ${customFields.map((f: any) => `- Name: ${f.name}, Type: ${f.type}, Description: ${f.description}`).join('\n')}
+                        ${activeFields.map((f: any) => `- Name: ${f.name}, Type: ${f.type}, Description: ${f.description}`).join('\n')}
                         
                         Transcript:
                         ${transcriptText}
@@ -200,13 +203,19 @@ async function handleCallAnalyzed(callId: string, data: any) {
                     const result = JSON.parse(completion.choices[0].message.content || "{}");
 
                     if (result.custom_analysis_data) {
+                        // Merge or Overwrite? User said "OpenAI principal", so we overwrite custom_analysis_data
+                        // but we preserve other analysis fields (sentiment, summary) that came from Retell if not configured otherwise.
                         analysis.custom_analysis_data = result.custom_analysis_data;
-                        console.log(`[AI Fallback] Successfully generated ${result.custom_analysis_data.length} data points.`);
+                        console.log(`[AI Extraction] Successfully generated ${result.custom_analysis_data.length} data points.`);
                     }
+                } else {
+                    console.log(`[AI Extraction] No active custom fields found or empty transcript.`);
                 }
+            } else {
+                console.log(`[AI Extraction] No subworkspace found for agent ${data.agent_id}`);
             }
         } catch (err) {
-            console.error("[AI Fallback] Error generating analysis:", err);
+            console.error("[AI Extraction] Error generating analysis:", err);
         }
     }
 

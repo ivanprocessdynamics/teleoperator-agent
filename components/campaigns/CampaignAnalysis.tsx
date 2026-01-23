@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Plus, Trash2, Brain, FileText, BarChart3 } from "lucide-react";
+import { Plus, Trash2, Brain, FileText, BarChart3, Archive, RefreshCcw } from "lucide-react";
 
 interface CampaignAnalysisProps {
     config?: AnalysisConfig;
@@ -68,6 +68,19 @@ export function CampaignAnalysis({ config = DEFAULT_CONFIG, onChange }: Campaign
             custom_fields: config.custom_fields.filter(f => f.id !== id)
         });
     };
+
+    return (
+    const toggleArchiveField = (id: string) => {
+            onChange({
+                ...config,
+                custom_fields: config.custom_fields.map(f =>
+                    f.id === id ? { ...f, isArchived: !f.isArchived } : f
+                )
+            });
+        };
+
+    const activeFields = config.custom_fields.filter(f => !f.isArchived);
+    const archivedFields = config.custom_fields.filter(f => f.isArchived);
 
     return (
         <div className="space-y-6 max-w-4xl">
@@ -196,9 +209,9 @@ export function CampaignAnalysis({ config = DEFAULT_CONFIG, onChange }: Campaign
                     </div>
 
                     {/* List of Fields */}
-                    {config.custom_fields.length > 0 ? (
+                    {activeFields.length > 0 ? (
                         <div className="grid grid-cols-1 gap-3">
-                            {config.custom_fields.map((field) => (
+                            {activeFields.map((field) => (
                                 <div key={field.id} className="flex items-start justify-between p-3 rounded-lg border border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-750 transition-colors group">
                                     <div>
                                         <div className="flex items-center gap-2">
@@ -207,15 +220,47 @@ export function CampaignAnalysis({ config = DEFAULT_CONFIG, onChange }: Campaign
                                         </div>
                                         <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">{field.description}</p>
                                     </div>
-                                    <Button variant="ghost" size="icon" onClick={() => removeCustomField(field.id)} className="text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity">
-                                        <Trash2 className="h-4 w-4" />
-                                    </Button>
+                                    <div className="flex items-center gap-1">
+                                        <Button variant="ghost" size="icon" onClick={() => toggleArchiveField(field.id)} className="text-gray-400 hover:text-orange-500 opacity-0 group-hover:opacity-100 transition-opacity" title="Archivar">
+                                            <Archive className="h-4 w-4" />
+                                        </Button>
+                                    </div>
                                 </div>
                             ))}
                         </div>
                     ) : (
                         <div className="text-center py-8 text-gray-400 dark:text-gray-500 text-sm italic">
-                            No hay campos personalizados definidos
+                            No hay campos activos
+                        </div>
+                    )}
+
+                    {/* Archived Fields Section */}
+                    {archivedFields.length > 0 && (
+                        <div className="pt-6 border-t border-gray-100 dark:border-gray-800">
+                            <h5 className="text-sm font-semibold text-gray-500 mb-3 flex items-center gap-2">
+                                <Archive className="h-4 w-4" /> Campos Archivados
+                            </h5>
+                            <div className="grid grid-cols-1 gap-3 opacity-75">
+                                {archivedFields.map((field) => (
+                                    <div key={field.id} className="flex items-start justify-between p-3 rounded-lg bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-800">
+                                        <div>
+                                            <div className="flex items-center gap-2">
+                                                <span className="font-mono text-sm font-semibold text-gray-500">{field.name}</span>
+                                                <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-500 capitalize">{field.type}</span>
+                                            </div>
+                                            <p className="text-sm text-gray-400 mt-1">{field.description}</p>
+                                        </div>
+                                        <div className="flex items-center gap-1">
+                                            <Button variant="ghost" size="icon" onClick={() => toggleArchiveField(field.id)} className="text-gray-400 hover:text-green-500" title="Restaurar">
+                                                <RefreshCcw className="h-3 w-3" />
+                                            </Button>
+                                            <Button variant="ghost" size="icon" onClick={() => removeCustomField(field.id)} className="text-gray-400 hover:text-red-500" title="Eliminar permanentemente">
+                                                <Trash2 className="h-3 w-3" />
+                                            </Button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
                         </div>
                     )}
                 </CardContent>

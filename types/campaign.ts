@@ -43,6 +43,7 @@ export interface AnalysisField {
     description: string; // instruction for AI
     type: 'string' | 'boolean' | 'number' | 'enum';
     options?: string[]; // for enum
+    isArchived?: boolean;
 }
 
 export interface AnalysisConfig {
