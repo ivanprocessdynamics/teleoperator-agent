@@ -7,7 +7,7 @@ import { VoiceOrb } from "@/components/VoiceOrb";
 import { CampaignAnalysis } from "@/components/campaigns/CampaignAnalysis";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import { Save, Check, Loader2, FileText, Mic, Brain, ChevronDown, ChevronUp } from "lucide-react";
+import { Save, Check, Loader2, FileText, Mic, Brain, ChevronDown, ChevronUp, Cloud } from "lucide-react";
 import { AnalysisConfig } from "@/types/campaign";
 
 import { useDebounce } from "@/hooks/use-debounce";
