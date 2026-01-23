@@ -7,6 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ChatTranscript } from "./ChatTranscript";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 import {
@@ -89,9 +90,6 @@ export function CallHistoryTable({ agentId }: CallHistoryTableProps) {
             constraints.push(where("timestamp", "<=", Timestamp.fromDate(end)));
         }
 
-        // NOTE: Combining multiple 'where' filters with 'orderBy' usually requires a Composite Index in Firestore.
-        // If sorting or filtering breaks, check console for the index creation link.
-
         const q = query(collection(db, "calls"), ...constraints);
 
         const unsub = onSnapshot(q, (snapshot) => {
@@ -100,7 +98,6 @@ export function CallHistoryTable({ agentId }: CallHistoryTableProps) {
             setLoading(false);
         }, (err) => {
             console.error("Error fetching calls:", err);
-            // Show the actual error message to help identify index issues
             setError(err.message || "Error cargando el historial.");
             setLoading(false);
         });
@@ -135,38 +132,10 @@ export function CallHistoryTable({ agentId }: CallHistoryTableProps) {
         return `${mins}:${secs.toString().padStart(2, '0')}`;
     };
 
-    if (loading) return <div className="flex justify-center p-12"><Loader2 className="h-8 w-8 animate-spin text-blue-500" /></div>;
-
-    if (error) {
-        return (
-            <div className="flex flex-col items-center justify-center py-16 px-4 text-center border-2 border-dashed border-red-200 bg-red-50 rounded-xl text-red-600">
-                <p>{error}</p>
-            </div>
-        );
-    }
-
-    if (calls.length === 0) {
-        return (
-            <div className="flex flex-col items-center justify-center py-16 px-4 text-center border-2 border-dashed border-gray-200 dark:border-gray-800 rounded-xl bg-gray-50/50 dark:bg-gray-900/50">
-                <div className="bg-white dark:bg-gray-800 p-4 rounded-full shadow-sm mb-4">
-                    <PhoneIncoming className="h-8 w-8 text-gray-400" />
-                </div>
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Sin llamadas registradas</h3>
-                <p className="text-sm text-gray-500 max-w-sm mt-1">
-                    No se han encontrado llamadas para este agente. Realiza una prueba para ver los resultados aquí.
-                </p>
-                {/* Fallback for picker visible even in empty state if user wants to change filter? 
-                    Actually user might be filtered to empty. 
-                    Let's show the filter bar above invalid/empty states?
-                    For now, I'll stick to the original structure but consider this for UX.
-                */}
-            </div>
-        );
-    }
-
     return (
         <>
             <div className="space-y-4">
+                {/* Header & Controls - ALWAYS VISIBLE */}
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between bg-white dark:bg-gray-900 p-4 rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm">
                     <div className="flex items-center gap-2">
                         <div className="bg-blue-100 dark:bg-blue-900/30 p-2 rounded-lg text-blue-600">
@@ -183,17 +152,18 @@ export function CallHistoryTable({ agentId }: CallHistoryTableProps) {
                     </div>
 
                     <div className="flex flex-wrap items-center gap-3">
-                        <select
-                            value={interval}
-                            onChange={(e) => setInterval(e.target.value)}
-                            className="h-9 rounded-md border border-gray-200 bg-white px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-gray-950 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-50 focus:border-blue-500"
-                        >
-                            <option value="1h">Última hora</option>
-                            <option value="24h">Últimas 24 horas</option>
-                            <option value="7d">Última semana</option>
-                            <option value="30d">Último mes</option>
-                            <option value="custom">Personalizado</option>
-                        </select>
+                        <Select value={interval} onValueChange={setInterval}>
+                            <SelectTrigger className="w-[180px] h-9 bg-white dark:bg-gray-950 border-gray-200 dark:border-gray-800">
+                                <SelectValue placeholder="Selecciona periodo" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="1h">Última hora</SelectItem>
+                                <SelectItem value="24h">Últimas 24 horas</SelectItem>
+                                <SelectItem value="7d">Última semana</SelectItem>
+                                <SelectItem value="30d">Último mes</SelectItem>
+                                <SelectItem value="custom">Personalizado</SelectItem>
+                            </SelectContent>
+                        </Select>
 
                         {interval === "custom" && (
                             <div className="animate-in fade-in slide-in-from-right-4 duration-300">
@@ -210,113 +180,130 @@ export function CallHistoryTable({ agentId }: CallHistoryTableProps) {
                     </div>
                 </div>
 
-                <div className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900/50 shadow-sm overflow-hidden">
-                    <Table>
-                        <TableHeader className="bg-gray-50/50 dark:bg-gray-900">
-                            <TableRow>
-                                <TableHead className="w-[180px]">Fecha y Hora</TableHead>
-                                <TableHead className="w-[100px]">Duración</TableHead>
-                                <TableHead className="w-[140px]">Sentimiento</TableHead>
-                                <TableHead>Resumen de la Conversación</TableHead>
-                                <TableHead className="text-right w-[120px]">Acciones</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {calls.map((call) => {
-                                const sentiment = getSentimentConfig(call.analysis?.user_sentiment);
-                                const SentimentIcon = sentiment.icon;
-                                const isExpanded = expandedSummaries.has(call.id);
+                {/* Content Area */}
+                {loading ? (
+                    <div className="flex justify-center p-12"><Loader2 className="h-8 w-8 animate-spin text-blue-500" /></div>
+                ) : error ? (
+                    <div className="flex flex-col items-center justify-center py-16 px-4 text-center border-2 border-dashed border-red-200 bg-red-50 rounded-xl text-red-600">
+                        <p>{error}</p>
+                    </div>
+                ) : calls.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-16 px-4 text-center border-2 border-dashed border-gray-200 dark:border-gray-800 rounded-xl bg-gray-50/50 dark:bg-gray-900/50">
+                        <div className="bg-white dark:bg-gray-800 p-4 rounded-full shadow-sm mb-4">
+                            <PhoneIncoming className="h-8 w-8 text-gray-400" />
+                        </div>
+                        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Sin llamadas registradas</h3>
+                        <p className="text-sm text-gray-500 max-w-sm mt-1">
+                            No se han encontrado llamadas en este periodo. Prueba a cambiar el filtro de tiempo.
+                        </p>
+                    </div>
+                ) : (
+                    <div className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900/50 shadow-sm overflow-hidden">
+                        <Table>
+                            <TableHeader className="bg-gray-50/50 dark:bg-gray-900">
+                                <TableRow>
+                                    <TableHead className="w-[180px]">Fecha y Hora</TableHead>
+                                    <TableHead className="w-[100px]">Duración</TableHead>
+                                    <TableHead className="w-[140px]">Sentimiento</TableHead>
+                                    <TableHead>Resumen de la Conversación</TableHead>
+                                    <TableHead className="text-right w-[120px]">Acciones</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {calls.map((call) => {
+                                    const sentiment = getSentimentConfig(call.analysis?.user_sentiment);
+                                    const SentimentIcon = sentiment.icon;
+                                    const isExpanded = expandedSummaries.has(call.id);
 
-                                return (
-                                    <TableRow key={call.id} className="group hover:bg-blue-50/50 dark:hover:bg-blue-900/10 transition-colors">
-                                        <TableCell>
-                                            <div className="flex flex-col">
-                                                <span className="font-medium text-gray-900 dark:text-white">
-                                                    {call.timestamp?.toDate ?
-                                                        (() => {
-                                                            const dist = formatDistanceToNow(call.timestamp.toDate(), { addSuffix: true, locale: es });
-                                                            return dist.charAt(0).toUpperCase() + dist.slice(1);
-                                                        })()
-                                                        : "Reciente"}
-                                                </span>
-                                                <span className="text-xs text-gray-500 flex items-center gap-1 mt-0.5">
-                                                    <Calendar className="h-3 w-3" />
-                                                    {call.timestamp?.toDate?.().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                                </span>
-                                            </div>
-                                        </TableCell>
-                                        <TableCell>
-                                            <Badge variant="secondary" className="font-mono font-normal text-xs bg-gray-100 dark:bg-gray-800">
-                                                {formatDuration(call.duration)}
-                                            </Badge>
-                                        </TableCell>
-                                        <TableCell>
-                                            <div className={cn("flex items-center gap-1.5 px-2.5 py-1 rounded-full w-fit text-xs font-medium border", sentiment.color)}>
-                                                <SentimentIcon className="h-3.5 w-3.5" />
-                                                {sentiment.label}
-                                            </div>
-                                        </TableCell>
-                                        <TableCell>
-                                            <div className="max-w-md">
-                                                <div
-                                                    onClick={() => toggleSummary(call.id)}
-                                                    className={cn(
-                                                        "text-sm text-gray-600 dark:text-gray-300 cursor-pointer transition-all duration-300",
-                                                        isExpanded ? "" : "line-clamp-2"
-                                                    )}
-                                                    title={isExpanded ? "Click para reducir" : "Click para expandir"}
-                                                >
+                                    return (
+                                        <TableRow key={call.id} className="group hover:bg-blue-50/50 dark:hover:bg-blue-900/10 transition-colors">
+                                            <TableCell>
+                                                <div className="flex flex-col">
+                                                    <span className="font-medium text-gray-900 dark:text-white">
+                                                        {call.timestamp?.toDate ?
+                                                            (() => {
+                                                                const dist = formatDistanceToNow(call.timestamp.toDate(), { addSuffix: true, locale: es });
+                                                                return dist.charAt(0).toUpperCase() + dist.slice(1);
+                                                            })()
+                                                            : "Reciente"}
+                                                    </span>
+                                                    <span className="text-xs text-gray-500 flex items-center gap-1 mt-0.5">
+                                                        <Calendar className="h-3 w-3" />
+                                                        {call.timestamp?.toDate?.().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                    </span>
+                                                </div>
+                                            </TableCell>
+                                            <TableCell>
+                                                <Badge variant="secondary" className="font-mono font-normal text-xs bg-gray-100 dark:bg-gray-800">
+                                                    {formatDuration(call.duration)}
+                                                </Badge>
+                                            </TableCell>
+                                            <TableCell>
+                                                <div className={cn("flex items-center gap-1.5 px-2.5 py-1 rounded-full w-fit text-xs font-medium border", sentiment.color)}>
+                                                    <SentimentIcon className="h-3.5 w-3.5" />
+                                                    {sentiment.label}
+                                                </div>
+                                            </TableCell>
+                                            <TableCell>
+                                                <div className="max-w-md">
+                                                    <div
+                                                        onClick={() => toggleSummary(call.id)}
+                                                        className={cn(
+                                                            "text-sm text-gray-600 dark:text-gray-300 cursor-pointer transition-all duration-300",
+                                                            isExpanded ? "" : "line-clamp-2"
+                                                        )}
+                                                        title={isExpanded ? "Click para reducir" : "Click para expandir"}
+                                                    >
+                                                        {(() => {
+                                                            const customData = call.analysis?.custom_analysis_data;
+                                                            const spanishSummary = Array.isArray(customData)
+                                                                ? customData.find(d => d.name === "resumen_espanol")?.value
+                                                                : null;
+
+                                                            return spanishSummary || call.analysis?.call_summary || (
+                                                                <span className="text-gray-400 italic flex items-center gap-1">
+                                                                    <Loader2 className="h-3 w-3 animate-spin" /> Procesando resumen...
+                                                                </span>
+                                                            );
+                                                        })()}
+                                                    </div>
                                                     {(() => {
-                                                        // Look for Spanish summary in custom data safely
                                                         const customData = call.analysis?.custom_analysis_data;
-                                                        const spanishSummary = Array.isArray(customData)
-                                                            ? customData.find(d => d.name === "resumen_espanol")?.value
-                                                            : null;
-
-                                                        return spanishSummary || call.analysis?.call_summary || (
-                                                            <span className="text-gray-400 italic flex items-center gap-1">
-                                                                <Loader2 className="h-3 w-3 animate-spin" /> Procesando resumen...
-                                                            </span>
-                                                        );
+                                                        if (Array.isArray(customData) && customData.length > 0) {
+                                                            return (
+                                                                <div className="flex gap-2 mt-2 flex-wrap">
+                                                                    {customData
+                                                                        .filter(d => d.name !== "resumen_espanol")
+                                                                        .slice(0, 3).map((d, i) => (
+                                                                            <span key={i} className="inline-flex items-center text-[10px] bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 px-2 py-0.5 rounded border border-indigo-100 dark:border-indigo-800 font-medium">
+                                                                                {d.name}: {String(d.value)}
+                                                                            </span>
+                                                                        ))}
+                                                                </div>
+                                                            );
+                                                        }
+                                                        return null;
                                                     })()}
                                                 </div>
-                                                {/* Custom Data Tags (excluding summary) */}
-                                                {(() => {
-                                                    const customData = call.analysis?.custom_analysis_data;
-                                                    if (Array.isArray(customData) && customData.length > 0) {
-                                                        return (
-                                                            <div className="flex gap-2 mt-2 flex-wrap">
-                                                                {customData
-                                                                    .filter(d => d.name !== "resumen_espanol")
-                                                                    .slice(0, 3).map((d, i) => (
-                                                                        <span key={i} className="inline-flex items-center text-[10px] bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 px-2 py-0.5 rounded border border-indigo-100 dark:border-indigo-800 font-medium">
-                                                                            {d.name}: {String(d.value)}
-                                                                        </span>
-                                                                    ))}
-                                                            </div>
-                                                        );
-                                                    }
-                                                    return null;
-                                                })()}
-                                            </div>
-                                        </TableCell>
-                                        <TableCell className="text-right">
-                                            <Button
-                                                variant="outline"
-                                                size="sm"
-                                                onClick={() => setSelectedCall(call)}
-                                                className="opacity-0 group-hover:opacity-100 transition-opacity hover:bg-blue-50 text-blue-600 border-blue-200"
-                                            >
-                                                <MessageSquare className="h-4 w-4 mr-2" />
-                                                Chat
-                                            </Button>
-                                        </TableCell>
-                                    </TableRow>
-                                );
-                            })}
-                        </TableBody>
-                    </Table>
-                </div>
+                                            </TableCell>
+                                            <TableCell className="text-right">
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    onClick={() => setSelectedCall(call)}
+                                                    className="opacity-0 group-hover:opacity-100 transition-opacity hover:bg-blue-50 text-blue-600 border-blue-200"
+                                                >
+                                                    <MessageSquare className="h-4 w-4 mr-2" />
+                                                    Chat
+                                                </Button>
+                                            </TableCell>
+                                        </TableRow>
+                                    );
+                                })}
+                            </TableBody>
+                        </Table>
+                    </div>
+                )}
             </div>
 
             <Dialog open={!!selectedCall} onOpenChange={(open) => !open && setSelectedCall(null)}>
