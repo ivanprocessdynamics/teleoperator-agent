@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/firebase";
+import { adminDb } from "@/lib/firebase-admin";
 import { doc, setDoc, serverTimestamp, getDoc, query, collection, where, getDocs, updateDoc, Timestamp } from "firebase/firestore";
 import crypto from 'crypto';
 
@@ -39,26 +40,73 @@ function normalizeTranscript(transcript: any[]) {
 
 // Helper to update campaign row status
 async function updateCampaignRowStatus(callId: string, data: any, eventType: 'started' | 'ended') {
+    const result = { success: false, method: 'none', error: null as any };
     try {
-        // Try to find the campaign row by call_id
+        console.log(`[Campaign Row] Updating status for call ${callId} (${eventType})`);
+
+        // 1. Try with Admin SDK (Preferred for permissions)
+        if (adminDb) {
+            console.log("[Campaign Row] Using Admin SDK");
+            try {
+                const rowsSnapshot = await adminDb.collection("campaign_rows").where("call_id", "==", callId).get();
+                if (!rowsSnapshot.empty) {
+                    const rowDoc = rowsSnapshot.docs[0];
+                    console.log(`[Campaign Row] Found row ${rowDoc.id} (Admin)`);
+
+                    if (eventType === 'started') {
+                        await rowDoc.ref.update({
+                            status: 'calling',
+                            called_at: new Date(), // Admin SDK uses calling Date or Firestore Timestamp
+                        });
+                    } else if (eventType === 'ended') {
+                        let finalStatus = 'completed';
+                        const disconnectionReason = data.disconnection_reason;
+                        const failedReasons = ['dial_failed', 'dial_busy', 'error_unknown', 'error_retell', 'scam_detected', 'error_llm_websocket_open', 'error_llm_websocket_lost_connection'];
+                        const noAnswerReasons = ['dial_no_answer', 'voicemail_reached', 'user_not_joined', 'registered_call_timeout'];
+
+                        if (disconnectionReason && failedReasons.includes(disconnectionReason)) {
+                            finalStatus = 'failed';
+                        } else if (disconnectionReason && noAnswerReasons.includes(disconnectionReason)) {
+                            finalStatus = 'no_answer';
+                        }
+
+                        await rowDoc.ref.update({
+                            status: finalStatus,
+                            last_error: finalStatus !== 'completed' ? disconnectionReason : null,
+                        });
+                    }
+                    console.log(`[Campaign Row] Updated successfully (Admin)`);
+                    result.success = true;
+                    result.method = 'admin-sdk';
+                    return result; // Done
+                } else {
+                    result.error = 'row-not-found-admin';
+                }
+            } catch (adminErr: any) {
+                console.error("[Campaign Row] Admin SDK error:", adminErr);
+                result.error = `admin-error: ${adminErr.message}`;
+                // Fallthrough to client SDK
+            }
+        } else {
+            result.error = 'admin-sdk-not-initialized';
+        }
+
+        // 2. Fallback to Client SDK (Local dev / Misconfigured Admin)
         const q = query(collection(db, "campaign_rows"), where("call_id", "==", callId));
         const snapshot = await getDocs(q);
 
         if (!snapshot.empty) {
             const rowDoc = snapshot.docs[0];
-            console.log(`[Campaign Row] Found row ${rowDoc.id} for call ${callId}`);
+            console.log(`[Campaign Row] Found row ${rowDoc.id} (Client SDK)`);
 
             if (eventType === 'started') {
                 await updateDoc(doc(db, "campaign_rows", rowDoc.id), {
                     status: 'calling',
                     called_at: Timestamp.now(),
                 });
-                console.log(`[Campaign Row] Updated ${rowDoc.id} to 'calling'`);
             } else if (eventType === 'ended') {
-                // Determine final status based on disconnection_reason
                 let finalStatus: 'completed' | 'failed' | 'no_answer' = 'completed';
                 const disconnectionReason = data.disconnection_reason;
-
                 const failedReasons = ['dial_failed', 'dial_busy', 'error_unknown', 'error_retell', 'scam_detected', 'error_llm_websocket_open', 'error_llm_websocket_lost_connection'];
                 const noAnswerReasons = ['dial_no_answer', 'voicemail_reached', 'user_not_joined', 'registered_call_timeout'];
 
@@ -72,14 +120,19 @@ async function updateCampaignRowStatus(callId: string, data: any, eventType: 'st
                     status: finalStatus,
                     last_error: finalStatus !== 'completed' ? disconnectionReason : null,
                 });
-                console.log(`[Campaign Row] Updated ${rowDoc.id} to '${finalStatus}'`);
             }
+            console.log(`[Campaign Row] Updated successfully (Client SDK)`);
+            result.success = true;
+            result.method = 'client-sdk';
         } else {
             console.log(`[Campaign Row] No row found for call_id ${callId}`);
+            if (!result.error) result.error = 'row-not-found-client';
         }
-    } catch (error) {
+    } catch (error: any) {
         console.error(`[Campaign Row] Error updating row for call ${callId}:`, error);
+        result.error = `client-error: ${error.message}`;
     }
+    return result;
 }
 
 export async function POST(req: Request) {
@@ -113,12 +166,14 @@ export async function POST(req: Request) {
         const callData = call || body; // 'call_ended' puts data in 'call', 'call.analyzed' might be at root or 'call'
 
         // 2. Event Routing
+        let rowUpdateResult = null;
+
         if (event === "call_ended") {
             // Priority: Save Transcript IMMEDIATELY
             await handleCallEnded(callId, callData);
 
             // Update Campaign Row Status (if this call was part of a campaign)
-            await updateCampaignRowStatus(callId, callData, 'ended');
+            rowUpdateResult = await updateCampaignRowStatus(callId, callData, 'ended');
         }
         else if (event === "call.analyzed" || event === "call_analyzed") {
             // Secondary: enrich with Analysis later
@@ -127,10 +182,10 @@ export async function POST(req: Request) {
         else if (event === "call_started") {
             console.log("Call started event received");
             // Update Campaign Row Status to 'calling'
-            await updateCampaignRowStatus(callId, callData, 'started');
+            rowUpdateResult = await updateCampaignRowStatus(callId, callData, 'started');
         }
 
-        return NextResponse.json({ received: true }, { status: 200 });
+        return NextResponse.json({ received: true, row_update: rowUpdateResult }, { status: 200 });
 
     } catch (error: any) {
         console.error("Webhook Error:", error);
