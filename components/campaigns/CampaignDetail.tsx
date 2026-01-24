@@ -61,12 +61,69 @@ const THEME_STYLES: Record<string, { badge: string; button: string; variable: st
 };
 
 export function CampaignDetail({ campaignId, subworkspaceId, onBack }: CampaignDetailProps) {
-    // ... (existing state)
+    const [campaign, setCampaign] = useState<Campaign | null>(null);
+    const [retellAgentId, setRetellAgentId] = useState<string | null>(null);
+    const [isLoading, setIsLoading] = useState(true);
+
     const [showRelaunchDialog, setShowRelaunchDialog] = useState(false);
     const [relaunchStartLine, setRelaunchStartLine] = useState("1");
     const [showRelaunchLineDialog, setShowRelaunchLineDialog] = useState(false);
 
-    // ...
+    // Fetch Campaign
+    useEffect(() => {
+        if (!campaignId) return;
+        const unsub = onSnapshot(doc(db, "campaigns", campaignId), (doc) => {
+            if (doc.exists()) {
+                setCampaign({ id: doc.id, ...doc.data() } as Campaign);
+            }
+            setIsLoading(false);
+        });
+        return () => unsub();
+    }, [campaignId]);
+
+    // Fetch Subworkspace (for Retell Agent ID)
+    useEffect(() => {
+        async function fetchSubworkspace() {
+            if (!subworkspaceId) return;
+            try {
+                const docRef = doc(db, "subworkspaces", subworkspaceId);
+                const snap = await getDoc(docRef);
+                if (snap.exists()) {
+                    setRetellAgentId(snap.data().retell_agent_id);
+                }
+            } catch (err) {
+                console.error("Error fetching subworkspace:", err);
+            }
+        }
+        fetchSubworkspace();
+    }, [subworkspaceId]);
+
+    const debouncedSave = useCallback(async (updates: Partial<Campaign>) => {
+        if (!campaignId) return;
+        await updateDoc(doc(db, "campaigns", campaignId), updates);
+    }, [campaignId]);
+
+    const handleUpdateColumns = (columns: CampaignColumn[]) => debouncedSave({ columns });
+    const handleUpdatePrompt = (prompt_template: string) => debouncedSave({ prompt_template });
+    const handleUpdateAnalysis = (analysis_config: AnalysisConfig) => debouncedSave({ analysis_config });
+
+    const phoneColumnId = campaign?.phone_column_id || campaign?.columns?.find(c => c.isPhoneColumn)?.id || "col_phone";
+
+    if (isLoading) {
+        return (
+            <div className="flex items-center justify-center h-full">
+                <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+            </div>
+        );
+    }
+
+    if (!campaign) {
+        return (
+            <div className="flex items-center justify-center h-full text-gray-500">
+                Campaña no encontrada
+            </div>
+        );
+    }
 
     // Campaign Executor
     const executor = useCampaignExecutor({
