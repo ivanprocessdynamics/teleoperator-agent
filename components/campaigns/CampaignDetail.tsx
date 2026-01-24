@@ -104,7 +104,29 @@ export function CampaignDetail({ campaignId, subworkspaceId, onBack }: CampaignD
     }, [campaignId]);
 
     const handleUpdateColumns = (columns: CampaignColumn[]) => debouncedSave({ columns });
-    const handleUpdatePrompt = (prompt_template: string) => debouncedSave({ prompt_template });
+
+    const handleUpdatePrompt = useCallback(async (prompt_template: string) => {
+        // 1. Save to Firestore
+        await debouncedSave({ prompt_template });
+
+        // 2. Sync to Retell Agent (if agent exists)
+        if (retellAgentId) {
+            try {
+                await fetch('/api/retell/update-agent', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        agent_id: retellAgentId,
+                        prompt: prompt_template
+                    })
+                });
+                console.log('✅ Prompt synced to Retell agent');
+            } catch (error) {
+                console.error('❌ Failed to sync prompt to Retell:', error);
+            }
+        }
+    }, [campaignId, retellAgentId, debouncedSave]);
+
     const handleUpdateAnalysis = (analysis_config: AnalysisConfig) => debouncedSave({ analysis_config });
 
     const phoneColumnId = campaign?.phone_column_id || campaign?.columns?.find(c => c.isPhoneColumn)?.id || "col_phone";
