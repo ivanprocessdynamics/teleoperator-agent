@@ -15,11 +15,33 @@ interface CampaignPromptProps {
 }
 
 export function CampaignPrompt({ prompt, columns, onChange, variableClass }: CampaignPromptProps) {
+    const [localPrompt, setLocalPrompt] = useState(prompt);
+    const [isFocused, setIsFocused] = useState(false);
+    const timeoutRef = useRef<NodeJS.Timeout>(null);
+
+    // Sync from props only if not focused (to avoid overwriting user input with old server data)
+    useEffect(() => {
+        if (!isFocused) {
+            setLocalPrompt(prompt);
+        }
+    }, [prompt, isFocused]);
+
+    const handleChange = (newValue: string) => {
+        setLocalPrompt(newValue);
+
+        if (timeoutRef.current) {
+            clearTimeout(timeoutRef.current);
+        }
+
+        timeoutRef.current = setTimeout(() => {
+            onChange(newValue);
+        }, 1000); // 1 second debounce
+    };
 
     const insertVariable = (variable: string) => {
-        // Simple append for now, ideally insertion at cursor
         const toInsert = `{{${variable}}}`;
-        onChange(prompt + (prompt.slice(-1) === " " ? "" : " ") + toInsert);
+        const newValue = localPrompt + (localPrompt.slice(-1) === " " ? "" : " ") + toInsert;
+        handleChange(newValue);
     };
 
     return (
@@ -33,8 +55,10 @@ export function CampaignPrompt({ prompt, columns, onChange, variableClass }: Cam
 
             <div className="flex flex-col p-4 gap-4">
                 <Textarea
-                    value={prompt}
-                    onChange={(e) => onChange(e.target.value)}
+                    value={localPrompt}
+                    onChange={(e) => handleChange(e.target.value)}
+                    onFocus={() => setIsFocused(true)}
+                    onBlur={() => setIsFocused(false)}
                     placeholder="Escribe las instrucciones para el agente aquí. Usa las variables de abajo para personalizar el mensaje..."
                     rows={10}
                     className="resize-none border-gray-200 dark:border-gray-600 dark:bg-gray-900 dark:text-white focus:border-gray-900 dark:focus:border-gray-500 focus:ring-0 text-base leading-relaxed p-4 placeholder:text-gray-400 dark:placeholder:text-gray-500"

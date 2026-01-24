@@ -84,3 +84,10 @@ body {
 .animate-progress {
   animation: progress-bar 1.2s ease-in-out infinite;
 }
+
+/* Hide Vercel Toolbar and other overlays */
+vercel-live-feedback,
+#vercel-toolbar,
+[data-vercel-toolbar] {
+  display: none !important;
+}
