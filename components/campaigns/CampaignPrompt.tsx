@@ -27,6 +27,7 @@ export function CampaignPrompt({ prompt, columns, onChange, variableClass }: Cam
     }, [prompt, isFocused]);
 
     const handleChange = (newValue: string) => {
+        console.log('[CampaignPrompt] handleChange called, new value length:', newValue.length);
         setLocalPrompt(newValue);
 
         if (timeoutRef.current) {
@@ -34,6 +35,7 @@ export function CampaignPrompt({ prompt, columns, onChange, variableClass }: Cam
         }
 
         timeoutRef.current = setTimeout(() => {
+            console.log('[CampaignPrompt] Debounce complete, calling onChange...');
             onChange(newValue);
         }, 1000); // 1 second debounce
     };
