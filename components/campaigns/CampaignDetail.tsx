@@ -5,7 +5,7 @@ import { doc, onSnapshot, updateDoc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { Campaign, CampaignColumn, AnalysisConfig, CallingConfig } from "@/types/campaign";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Play, Save, Check, Loader2, FileText, Phone, Users, Target, Zap, Star, MessageCircle, Mail, Pause, Square, Settings } from "lucide-react";
+import { ArrowLeft, Play, Save, Check, Loader2, FileText, Phone, Users, Target, Zap, Star, MessageCircle, Mail, Pause, Square, Settings, Activity } from "lucide-react";
 import { CampaignTable } from "./CampaignTable";
 import { CampaignPrompt } from "./CampaignPrompt";
 import { CampaignAnalysis } from "./CampaignAnalysis";
@@ -139,6 +139,113 @@ export function CampaignDetail({ campaignId, subworkspaceId, onBack }: CampaignD
 
     return (
         <div className="h-full flex flex-col bg-gray-50 dark:bg-gray-950 p-6">
+            {/* Active Campaign Dashboard */}
+            {
+                (executor.state.isRunning || executor.state.isPaused || executor.state.activeCalls > 0) && (
+                    <div className="mb-6 bg-white dark:bg-gray-900 border border-blue-200 dark:border-blue-800 rounded-xl p-6 shadow-md animate-in fade-in slide-in-from-top-2 relative overflow-hidden">
+                        {/* Background Pulse Animation */}
+                        {executor.state.isRunning && !executor.state.isPaused && (
+                            <div className="absolute top-0 right-0 w-full h-1 bg-gradient-to-r from-transparent via-blue-500 to-transparent opacity-50 animate-pulse" />
+                        )}
+
+                        <div className="flex flex-col gap-6">
+                            {/* Header & Status */}
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-4">
+                                    <div className={cn(
+                                        "h-12 w-12 rounded-2xl flex items-center justify-center shadow-inner transition-colors",
+                                        executor.state.isPaused ? "bg-amber-100 dark:bg-amber-900/30" : "bg-blue-100 dark:bg-blue-900/30"
+                                    )}>
+                                        {executor.state.isPaused ? (
+                                            <Pause className="h-6 w-6 text-amber-600 dark:text-amber-400" />
+                                        ) : (
+                                            <Activity className="h-6 w-6 text-blue-600 dark:text-blue-400 animate-pulse" />
+                                        )}
+                                    </div>
+                                    <div>
+                                        <h4 className="text-lg font-bold text-gray-900 dark:text-gray-100 flex items-center gap-2">
+                                            {executor.state.isPaused ? "Campaña Pausada" : "Campaña en Curso"}
+                                            <span className={cn(
+                                                "text-xs font-medium px-2.5 py-0.5 rounded-full border",
+                                                executor.state.isPaused
+                                                    ? "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/20 dark:text-amber-400 dark:border-amber-800"
+                                                    : "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/20 dark:text-blue-400 dark:border-blue-800"
+                                            )}>
+                                                {executor.state.isPaused ? "En espera" : "Llamando..."}
+                                            </span>
+                                        </h4>
+                                        <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
+                                            {executor.state.activeCalls} llamadas activas ahora mismo
+                                        </p>
+                                    </div>
+                                </div>
+
+                                {/* Controls */}
+                                <div className="flex items-center gap-3">
+                                    {executor.state.isPaused ? (
+                                        <Button
+                                            onClick={executor.resume}
+                                            className="bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-500/20"
+                                        >
+                                            <Play className="mr-2 h-4 w-4 fill-current" /> Reanudar
+                                        </Button>
+                                    ) : (
+                                        <Button
+                                            variant="outline"
+                                            onClick={executor.pause}
+                                            className="border-amber-200 text-amber-700 hover:bg-amber-50 hover:border-amber-300 dark:border-amber-800 dark:text-amber-400 dark:hover:bg-amber-900/20"
+                                        >
+                                            <Pause className="mr-2 h-4 w-4" /> Pausar
+                                        </Button>
+                                    )}
+
+                                    <Button
+                                        variant="destructive"
+                                        onClick={executor.stop}
+                                        className="bg-red-50 text-red-600 hover:bg-red-100 border border-red-200 shadow-none dark:bg-red-900/10 dark:text-red-400 dark:border-red-900/50 dark:hover:bg-red-900/30"
+                                    >
+                                        <Square className="mr-2 h-4 w-4 fill-current" /> Detener
+                                    </Button>
+                                </div>
+                            </div>
+
+                            {/* Progress Stats */}
+                            <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-4 grid grid-cols-1 md:grid-cols-3 gap-4 border border-gray-100 dark:border-gray-800">
+                                {/* Progress Bar */}
+                                <div className="md:col-span-3 space-y-2">
+                                    <div className="flex justify-between text-xs font-medium text-gray-600 dark:text-gray-400">
+                                        <span>Progreso Total</span>
+                                        <span>{Math.round((executor.state.completedCount / Math.max(executor.state.totalRows, 1)) * 100)}%</span>
+                                    </div>
+                                    <Progress value={(executor.state.completedCount / Math.max(executor.state.totalRows, 1)) * 100} className="h-2" />
+                                </div>
+
+                                <div className="flex flex-col items-center justify-center p-2">
+                                    <span className="text-2xl font-bold text-gray-900 dark:text-white">{executor.state.completedCount}</span>
+                                    <span className="text-xs text-green-600 dark:text-green-400 font-medium flex items-center gap-1">
+                                        <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span> Completadas
+                                    </span>
+                                </div>
+
+                                <div className="flex flex-col items-center justify-center p-2 border-l border-r border-gray-200 dark:border-gray-700">
+                                    <span className="text-2xl font-bold text-gray-900 dark:text-white">{executor.state.pendingCount}</span>
+                                    <span className="text-xs text-gray-500 dark:text-gray-400 font-medium flex items-center gap-1">
+                                        <span className="w-1.5 h-1.5 rounded-full bg-gray-400"></span> Pendientes
+                                    </span>
+                                </div>
+
+                                <div className="flex flex-col items-center justify-center p-2">
+                                    <span className="text-2xl font-bold text-gray-900 dark:text-white">{executor.state.failedCount}</span>
+                                    <span className="text-xs text-red-500 dark:text-red-400 font-medium flex items-center gap-1">
+                                        <span className="w-1.5 h-1.5 rounded-full bg-red-500"></span> Fallidas
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )
+            }
+
             {/* Relaunch Card - Premium Redesign */}
             {
                 executor.hasBeenRun && !executor.state.isRunning && (

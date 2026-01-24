@@ -155,6 +155,14 @@ export function useCampaignExecutor({
                 dynamicVariables[varName] = value;
             });
 
+            // Hydrate the prompt with variables (Client-side interpolation)
+            let hydratedPrompt = campaignPrompt;
+            Object.entries(dynamicVariables).forEach(([key, value]) => {
+                // Replace {{key}}, {{ key }}, {{Key}} etc. case-insensitive
+                const regex = new RegExp(`\\{\\{\\s*${key}\\s*\\}\\}`, 'gi');
+                hydratedPrompt = hydratedPrompt.replace(regex, value);
+            });
+
             const response = await fetch('/api/retell/create-phone-call', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -164,7 +172,7 @@ export function useCampaignExecutor({
                     agent_id: agentId,
                     dynamic_variables: {
                         ...dynamicVariables,
-                        campaign_prompt: campaignPrompt
+                        campaign_prompt: hydratedPrompt // Send the fully substituted prompt
                     },
                     metadata: {
                         campaign_id: campaignId,
