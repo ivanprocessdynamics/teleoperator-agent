@@ -109,6 +109,16 @@ export function CampaignDetail({ campaignId, subworkspaceId, onBack }: CampaignD
 
     const phoneColumnId = campaign?.phone_column_id || campaign?.columns?.find(c => c.isPhoneColumn)?.id || "col_phone";
 
+    // Campaign Executor - Moved up to avoid conditional hook call
+    const executor = useCampaignExecutor({
+        campaignId: campaignId,
+        agentId: retellAgentId || '',
+        callingConfig: campaign?.calling_config || { from_number: '+34877450708', concurrency_limit: 1, retry_failed: false },
+        phoneColumnId: phoneColumnId,
+        campaignPrompt: campaign?.prompt_template || '',
+        columns: campaign?.columns || [] // Pass columns for dynamic variables
+    });
+
     if (isLoading) {
         return (
             <div className="flex items-center justify-center h-full">
@@ -126,16 +136,6 @@ export function CampaignDetail({ campaignId, subworkspaceId, onBack }: CampaignD
     }
 
     const styles = THEME_STYLES[campaign.color || 'blue'] || THEME_STYLES.blue;
-
-    // Campaign Executor
-    const executor = useCampaignExecutor({
-        campaignId: campaignId,
-        agentId: retellAgentId || '',
-        callingConfig: campaign?.calling_config || { from_number: '+34877450708', concurrency_limit: 1, retry_failed: false },
-        phoneColumnId: phoneColumnId,
-        campaignPrompt: campaign?.prompt_template || '',
-        columns: campaign?.columns || [] // Pass columns for dynamic variables
-    });
 
     return (
         <div className="h-full flex flex-col bg-gray-50 dark:bg-gray-950 p-6">
