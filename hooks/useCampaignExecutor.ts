@@ -169,18 +169,21 @@ export function useCampaignExecutor({
 
             // Hydrate the prompt with variables (Client-side interpolation)
             let hydratedPrompt = campaignPrompt;
-            console.log("[Hydration] Raw Prompt:", hydratedPrompt);
-            console.log("[Hydration] Available Vars:", Object.keys(dynamicVariables));
 
+            // Build normalized lookup map for case-insensitive matching
+            const varLookup: Record<string, string> = {};
             Object.entries(dynamicVariables).forEach(([key, value]) => {
-                // Replace {{key}}, {{ key }}, {{Key}} etc. case-insensitive
-                const regex = new RegExp(`\\{\\{\\s*${key}\\s*\\}\\}`, 'gi');
-                const match = hydratedPrompt.match(regex);
-                if (match) {
-                    console.log(`[Hydration] Replacing ${match[0]} with ${value} (Key: ${key})`);
-                    hydratedPrompt = hydratedPrompt.replace(regex, value);
-                }
+                varLookup[key.trim().toLowerCase()] = String(value || '');
             });
+
+            // Replace all {{ key }} occurrences using regex that captures the key
+            // Supports: {{name}}, {{ Name }}, {{ NOMBRE }}
+            hydratedPrompt = hydratedPrompt.replace(/\{\{\s*([a-zA-Z0-9_À-ÿ\s]+?)\s*\}\}/g, (match, capturedKey) => {
+                const searchKey = capturedKey.trim().toLowerCase();
+                const replacement = varLookup[searchKey];
+                return replacement !== undefined ? replacement : match;
+            });
+
             console.log("[Hydration] Final Prompt:", hydratedPrompt);
 
             const response = await fetch('/api/retell/create-phone-call', {
