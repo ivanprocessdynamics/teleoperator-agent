@@ -28,8 +28,9 @@ export function useCampaignExecutor({
     agentId,
     callingConfig,
     phoneColumnId,
-    campaignPrompt
-}: UseCampaignExecutorProps) {
+    campaignPrompt,
+    columns // New prop
+}: UseCampaignExecutorProps & { columns: any[] }) { // Quick fix for interface up top
     const [state, setState] = useState<ExecutorState>({
         isRunning: false,
         isPaused: false,
@@ -41,8 +42,6 @@ export function useCampaignExecutor({
     });
 
     const [rows, setRows] = useState<CampaignRow[]>([]);
-    const callQueueRef = useRef<string[]>([]); // IDs of pending rows
-    const activeCallsRef = useRef<Set<string>>(new Set());
     const isRunningRef = useRef(false);
     const isPausedRef = useRef(false);
 
@@ -58,53 +57,61 @@ export function useCampaignExecutor({
         const unsub = onSnapshot(q, (snapshot) => {
             const data = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as CampaignRow));
             setRows(data);
-
-            // Update counts - only count rows with valid phone numbers
-            const rowsWithPhones = data.filter(r => {
-                const phone = r.data[phoneColumnId]?.trim();
-                return phone && phone.length >= 7;
-            });
-
-            const completed = rowsWithPhones.filter(r => r.status === 'completed').length;
-            const failed = rowsWithPhones.filter(r => ['failed', 'no_answer'].includes(r.status)).length;
-            const pending = rowsWithPhones.filter(r => r.status === 'pending').length;
-            const calling = rowsWithPhones.filter(r => r.status === 'calling').length;
-
-            setState(prev => ({
-                ...prev,
-                totalRows: rowsWithPhones.length,  // Only count rows with phones
-                completedCount: completed,
-                failedCount: failed,
-                pendingCount: pending,
-                activeCalls: calling,
-            }));
-
-            // If a call just finished and we're running, process next
-            if (isRunningRef.current && !isPausedRef.current) {
-                // Check if campaign is complete (no pending, no calling)
-                if (pending === 0 && calling === 0 && rowsWithPhones.length > 0) {
-                    console.log("Campaign complete - all calls finished");
-                    isRunningRef.current = false;
-                    setState(prev => ({ ...prev, isRunning: false }));
-                } else {
-                    processNextCalls(data);
-                }
-            }
         });
 
         return () => unsub();
     }, [campaignId]);
 
-    const processNextCalls = useCallback((currentRows: CampaignRow[]) => {
-        // Filter pending rows that HAVE a valid phone number
-        const pendingRows = currentRows.filter(r => {
-            if (r.status !== 'pending') return false;
+    // Derived state and stats calculation
+    useEffect(() => {
+        // Only count rows with valid phone numbers
+        const rowsWithPhones = rows.filter(r => {
             const phone = r.data[phoneColumnId]?.trim();
-            // Must have phone and it should look like a valid number
             return phone && phone.length >= 7;
         });
 
-        const callingCount = currentRows.filter(r => r.status === 'calling').length;
+        const completed = rowsWithPhones.filter(r => r.status === 'completed').length;
+        const failed = rowsWithPhones.filter(r => ['failed', 'no_answer'].includes(r.status)).length;
+        const pending = rowsWithPhones.filter(r => r.status === 'pending').length;
+        const calling = rowsWithPhones.filter(r => r.status === 'calling').length;
+
+        setState(prev => ({
+            ...prev,
+            totalRows: rowsWithPhones.length,
+            completedCount: completed,
+            failedCount: failed,
+            pendingCount: pending,
+            activeCalls: calling,
+        }));
+
+        // Check for completion
+        if (isRunningRef.current && !isPausedRef.current) {
+            if (pending === 0 && calling === 0 && rowsWithPhones.length > 0) {
+                console.log("Campaign complete - all calls finished");
+                isRunningRef.current = false;
+                setState(prev => ({ ...prev, isRunning: false }));
+            }
+        }
+    }, [rows, phoneColumnId]);
+
+    // Orchestration Effect: Trigger calls when state allows
+    useEffect(() => {
+        if (state.isRunning && !state.isPaused) {
+            processNextCalls();
+        }
+    }, [state.isRunning, state.isPaused, rows, callingConfig.concurrency_limit]); // Re-run when rows update
+
+    const processNextCalls = useCallback(() => {
+        if (!isRunningRef.current || isPausedRef.current) return;
+
+        // Filter pending rows that HAVE a valid phone number
+        const pendingRows = rows.filter(r => {
+            if (r.status !== 'pending') return false;
+            const phone = r.data[phoneColumnId]?.trim();
+            return phone && phone.length >= 7;
+        });
+
+        const callingCount = rows.filter(r => r.status === 'calling').length;
         const availableSlots = callingConfig.concurrency_limit - callingCount;
 
         if (availableSlots <= 0 || pendingRows.length === 0) return;
@@ -115,13 +122,12 @@ export function useCampaignExecutor({
         nextBatch.forEach(row => {
             initiateCall(row);
         });
-    }, [callingConfig.concurrency_limit, phoneColumnId]);
+    }, [rows, callingConfig.concurrency_limit, phoneColumnId]);
 
     const initiateCall = useCallback(async (row: CampaignRow) => {
         const phoneNumber = row.data[phoneColumnId];
 
         if (!phoneNumber) {
-            // Mark as failed - no phone number
             await updateDoc(doc(db, "campaign_rows", row.id), {
                 status: 'failed',
                 last_error: 'No phone number provided'
@@ -129,21 +135,24 @@ export function useCampaignExecutor({
             return;
         }
 
-        // Normalize phone number (remove spaces, ensure E.164)
         const normalizedPhone = phoneNumber.replace(/\s+/g, '');
 
         try {
-            // Mark as calling immediately (optimistic)
             await updateDoc(doc(db, "campaign_rows", row.id), {
                 status: 'calling',
                 called_at: Timestamp.now(),
             });
 
-            // Build dynamic variables from row data
+            // Map IDs to Names for dynamic variables
             const dynamicVariables: Record<string, string> = {};
             Object.entries(row.data).forEach(([key, value]) => {
-                // Use column ID as variable name
-                dynamicVariables[key] = value;
+                // If we have column definitions, use the Name, otherwise ID
+                const colDef = columns?.find(c => c.id === key);
+                // Retell variables are case-sensitive usually? Use Name as is.
+                // Sanitize name to be safe? (remove spaces? Retell might handle spaces in {{Name}}?)
+                // Usually {{Name}} matches "Name".
+                const varName = colDef ? colDef.name : key;
+                dynamicVariables[varName] = value;
             });
 
             const response = await fetch('/api/retell/create-phone-call', {
@@ -155,7 +164,7 @@ export function useCampaignExecutor({
                     agent_id: agentId,
                     dynamic_variables: {
                         ...dynamicVariables,
-                        campaign_prompt: campaignPrompt  // Pass the prompt to the agent
+                        campaign_prompt: campaignPrompt
                     },
                     metadata: {
                         campaign_id: campaignId,
@@ -171,7 +180,6 @@ export function useCampaignExecutor({
 
             const result = await response.json();
 
-            // Store call_id on the row
             await updateDoc(doc(db, "campaign_rows", row.id), {
                 call_id: result.call_id,
             });
@@ -183,14 +191,14 @@ export function useCampaignExecutor({
                 last_error: error.message || 'Unknown error',
             });
         }
-    }, [campaignId, agentId, callingConfig.from_number, phoneColumnId]);
+    }, [campaignId, agentId, callingConfig.from_number, phoneColumnId, columns, campaignPrompt]);
 
     const start = useCallback(() => {
         isRunningRef.current = true;
         isPausedRef.current = false;
         setState(prev => ({ ...prev, isRunning: true, isPaused: false }));
-        processNextCalls(rows);
-    }, [rows, processNextCalls]);
+        // Effect will pick up processing
+    }, []);
 
     const pause = useCallback(() => {
         isPausedRef.current = true;
@@ -200,24 +208,19 @@ export function useCampaignExecutor({
     const resume = useCallback(() => {
         isPausedRef.current = false;
         setState(prev => ({ ...prev, isPaused: false }));
-        processNextCalls(rows);
-    }, [rows, processNextCalls]);
+    }, []);
 
     const stop = useCallback(() => {
         isRunningRef.current = false;
         isPausedRef.current = false;
         setState(prev => ({ ...prev, isRunning: false, isPaused: false }));
-        // Note: Active calls will continue until they end naturally
     }, []);
 
-    // Reset rows for relaunch
     const resetRows = useCallback(async (startFromIndex: number = 0) => {
         const sortedRows = [...rows].sort((a, b) => a.id.localeCompare(b.id));
         const rowsToReset = sortedRows.slice(startFromIndex);
 
-        // Reset each row to pending
         for (const row of rowsToReset) {
-            // Only reset rows that have phone numbers
             const phone = row.data[phoneColumnId]?.trim();
             if (phone && phone.length >= 7) {
                 await updateDoc(doc(db, "campaign_rows", row.id), {
@@ -230,7 +233,6 @@ export function useCampaignExecutor({
         }
     }, [rows, phoneColumnId]);
 
-    // Check if campaign was previously run
     const hasBeenRun = rows.some(r => ['completed', 'failed', 'no_answer'].includes(r.status));
 
     return {
