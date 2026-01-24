@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Campaign, CampaignColumn } from "@/types/campaign";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
