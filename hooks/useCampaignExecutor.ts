@@ -104,20 +104,31 @@ export function useCampaignExecutor({
     const processNextCalls = useCallback(() => {
         if (!isRunningRef.current || isPausedRef.current) return;
 
+
+
         // Filter pending rows that HAVE a valid phone number
         const pendingRows = rows.filter(r => {
             if (r.status !== 'pending') return false;
             const phone = r.data[phoneColumnId]?.trim();
-            return phone && phone.length >= 7;
+            const isValid = phone && phone.length >= 7;
+            if (!isValid && r.status === 'pending') {
+                // Warn about pending rows with invalid phones?
+                // console.log("Skipping row due to invalid phone:", r.id, phone);
+            }
+            return isValid;
         });
 
         const callingCount = rows.filter(r => r.status === 'calling').length;
         const availableSlots = callingConfig.concurrency_limit - callingCount;
 
+
+
         if (availableSlots <= 0 || pendingRows.length === 0) return;
 
         // Take next rows up to available slots
         const nextBatch = pendingRows.slice(0, availableSlots);
+
+
 
         nextBatch.forEach(row => {
             initiateCall(row);
@@ -126,6 +137,7 @@ export function useCampaignExecutor({
 
     const initiateCall = useCallback(async (row: CampaignRow) => {
         const phoneNumber = row.data[phoneColumnId];
+        console.log(`[Executor] Initiating call for row ${row.id}. PhoneCol: ${phoneColumnId}, Val: ${phoneNumber}`);
 
         if (!phoneNumber) {
             await updateDoc(doc(db, "campaign_rows", row.id), {
@@ -157,11 +169,19 @@ export function useCampaignExecutor({
 
             // Hydrate the prompt with variables (Client-side interpolation)
             let hydratedPrompt = campaignPrompt;
+            console.log("[Hydration] Raw Prompt:", hydratedPrompt);
+            console.log("[Hydration] Available Vars:", Object.keys(dynamicVariables));
+
             Object.entries(dynamicVariables).forEach(([key, value]) => {
                 // Replace {{key}}, {{ key }}, {{Key}} etc. case-insensitive
                 const regex = new RegExp(`\\{\\{\\s*${key}\\s*\\}\\}`, 'gi');
-                hydratedPrompt = hydratedPrompt.replace(regex, value);
+                const match = hydratedPrompt.match(regex);
+                if (match) {
+                    console.log(`[Hydration] Replacing ${match[0]} with ${value} (Key: ${key})`);
+                    hydratedPrompt = hydratedPrompt.replace(regex, value);
+                }
             });
+            console.log("[Hydration] Final Prompt:", hydratedPrompt);
 
             const response = await fetch('/api/retell/create-phone-call', {
                 method: 'POST',
