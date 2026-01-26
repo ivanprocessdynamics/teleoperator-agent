@@ -1,16 +1,50 @@
 "use client";
 
-import { useState, useEffect } from "react";
-// ... imports
+import { useState, useEffect, useCallback, useRef } from "react";
 import { doc, getDoc, updateDoc, arrayUnion } from "firebase/firestore";
-// ...
+import { db } from "@/lib/firebase";
+import { VoiceOrb } from "@/components/VoiceOrb";
+import { CampaignAnalysis } from "@/components/campaigns/CampaignAnalysis";
+import { Textarea } from "@/components/ui/textarea";
+import { Button } from "@/components/ui/button";
+import { Save, Check, Loader2, FileText, Mic, Brain, ChevronDown, ChevronUp, Cloud } from "lucide-react";
+import { AnalysisConfig, AnalysisField } from "@/types/campaign";
+
+interface TestingEnvironmentProps {
+    subworkspaceId: string;
+}
 
 export function TestingEnvironment({ subworkspaceId }: TestingEnvironmentProps) {
-    // ...
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+
+    const [prompt, setPrompt] = useState("");
+    const [activePrompt, setActivePrompt] = useState("");
+    const [retellAgentId, setRetellAgentId] = useState("");
+
+    // Status states
+    const [savingDraft, setSavingDraft] = useState(false);
+    const [draftSaved, setDraftSaved] = useState(false);
+    const [activating, setActivating] = useState(false);
+    const [activeSuccess, setActiveSuccess] = useState(false);
+
+    // Variable State
+    const [variables, setVariables] = useState<Record<string, string>>({});
+
+    // Analysis Config State
+    const [analysisConfig, setAnalysisConfig] = useState<AnalysisConfig | undefined>(undefined);
+    const [showAnalysis, setShowAnalysis] = useState(false);
+
     // Global Fields State
     const [globalFields, setGlobalFields] = useState<AnalysisField[]>([]);
 
-    // ...
+    // Ref to hold immediate value (for Activar button and avoiding stale closures)
+    const promptRef = useRef("");
+    // Ref for debounce timer
+    const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+    // Key to reset uncontrolled Textarea
+    const [initialLoadKey, setInitialLoadKey] = useState(0);
 
     // Load subworkspace data
     useEffect(() => {
@@ -51,8 +85,6 @@ export function TestingEnvironment({ subworkspaceId }: TestingEnvironmentProps) 
         loadData();
     }, [subworkspaceId]);
 
-    // ... handlePromptChange, etc ...
-
     const handleAddGlobalField = async (field: AnalysisField) => {
         setGlobalFields(prev => [...prev, field]); // Optimistic update
         try {
@@ -80,8 +112,6 @@ export function TestingEnvironment({ subworkspaceId }: TestingEnvironmentProps) 
             console.error("Error deleting global field:", error);
         }
     };
-
-    // ... existing helpers ...
 
     // Handle Text Change (Decoupled & Debounced)
     const handlePromptChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
