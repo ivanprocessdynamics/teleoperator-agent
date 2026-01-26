@@ -147,7 +147,7 @@ export function useCampaignExecutor({
             return;
         }
 
-        const normalizedPhone = phoneNumber.replace(/\s+/g, '');
+        const normalizedPhone = phoneNumber.replace(/[^0-9+]/g, '');
 
         try {
             await updateDoc(doc(db, "campaign_rows", row.id), {

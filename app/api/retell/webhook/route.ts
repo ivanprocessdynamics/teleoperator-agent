@@ -230,6 +230,7 @@ async function handleCallEnded(callId: string, data: any) {
         end_timestamp: data.end_timestamp,
         disconnection_reason: data.disconnection_reason,
         event_type: 'call_ended',
+        metadata: data.metadata || null,
         timestamp: serverTimestamp(), // Required for CallHistoryTable sorting
         updated_at: serverTimestamp(),
     };

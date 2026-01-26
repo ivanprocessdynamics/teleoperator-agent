@@ -21,7 +21,11 @@ import {
     Frown,
     MoreHorizontal,
     FileText,
-    RefreshCw
+    FileText,
+    RefreshCw,
+    Filter,
+    User,
+    LayoutGrid
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatDistanceToNow } from "date-fns";
@@ -46,10 +50,18 @@ interface CallHistoryTableProps {
     agentId?: string;
 }
 
-export function CallHistoryTable({ agentId }: CallHistoryTableProps) {
+export function CallHistoryTable({ agentId: initialAgentId }: CallHistoryTableProps) {
     const [calls, setCalls] = useState<CallRecord[]>([]);
+    const [filteredCalls, setFilteredCalls] = useState<CallRecord[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+
+    // Filters
+    const [selectedAgent, setSelectedAgent] = useState<string>(initialAgentId || "all");
+    const [sourceFilter, setSourceFilter] = useState<string>("all"); // all, campaign, testing
+
+    // Aggregated Filter Data
+    const [uniqueAgents, setUniqueAgents] = useState<string[]>([]);
 
     const [selectedCall, setSelectedCall] = useState<CallRecord | null>(null);
     const [refreshTrigger, setRefreshTrigger] = useState(0);
@@ -61,12 +73,11 @@ export function CallHistoryTable({ agentId }: CallHistoryTableProps) {
     useEffect(() => {
         setError(null);
 
-        // Base query setup
-        let constraints: any[] = [orderBy("timestamp", "desc"), limit(50)];
+        // Base query - fetch ALL calls derived from time first (better index usage usually)
+        // We filter by agent/source client-side to allow dynamic filtering without complex compound indexes for every combination
+        // OR we can minimal filter if agentId is fixed. 
 
-        if (agentId) {
-            constraints.unshift(where("agent_id", "==", agentId));
-        }
+        let constraints: any[] = [orderBy("timestamp", "desc"), limit(100)];
 
         // Calculate Date Range
         const now = new Date();
@@ -98,6 +109,11 @@ export function CallHistoryTable({ agentId }: CallHistoryTableProps) {
         const unsub = onSnapshot(q, (snapshot) => {
             const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as CallRecord));
             setCalls(data);
+
+            // Extract unique agents for filter
+            const agents = Array.from(new Set(data.map(c => c.agent_id).filter(Boolean)));
+            setUniqueAgents(agents);
+
             setLoading(false);
         }, (err) => {
             console.error("Error fetching calls:", err);
@@ -106,7 +122,28 @@ export function CallHistoryTable({ agentId }: CallHistoryTableProps) {
         });
 
         return () => unsub();
-    }, [agentId, interval, pickerStart, pickerEnd, refreshTrigger]);
+    }, [interval, pickerStart, pickerEnd, refreshTrigger]);
+
+    // Client-side Filtering
+    useEffect(() => {
+        let result = calls;
+
+        // Filter by Agent
+        if (selectedAgent !== "all") {
+            result = result.filter(c => c.agent_id === selectedAgent);
+        }
+
+        // Filter by Source (Campaign vs Testing)
+        if (sourceFilter === "campaign") {
+            // @ts-ignore - metadata might be missing in type definition but present in data
+            result = result.filter(c => c.metadata?.campaign_id);
+        } else if (sourceFilter === "testing") {
+            // @ts-ignore
+            result = result.filter(c => !c.metadata?.campaign_id);
+        }
+
+        setFilteredCalls(result);
+    }, [calls, selectedAgent, sourceFilter]);
 
     const [expandedSummaries, setExpandedSummaries] = useState<Set<string>>(new Set());
 
@@ -149,179 +186,212 @@ export function CallHistoryTable({ agentId }: CallHistoryTableProps) {
                                 Historial de Llamadas
                             </h2>
                             <p className="text-xs text-gray-500">
-                                {calls.length} resultados encontrados
+                                {filteredCalls.length} resultados encontrados
                             </p>
                         </div>
                     </div>
 
-                    <div className="flex flex-wrap items-center gap-3">
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                                setLoading(true);
-                                setRefreshTrigger(prev => prev + 1);
-                            }}
-                            className="bg-white dark:bg-gray-950 border-gray-200 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-900 text-gray-700 dark:text-gray-300"
-                        >
-                            <RefreshCw className={cn("h-4 w-4 mr-2", loading && "animate-spin")} />
-                            Actualizar
-                        </Button>
-
-                        <Select value={interval} onValueChange={setInterval}>
-                            <SelectTrigger className="w-[180px] h-9 bg-white dark:bg-gray-950 border-gray-200 dark:border-gray-800">
-                                <SelectValue placeholder="Selecciona periodo" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="1h">Última hora</SelectItem>
-                                <SelectItem value="24h">Últimas 24 horas</SelectItem>
-                                <SelectItem value="7d">Última semana</SelectItem>
-                                <SelectItem value="30d">Último mes</SelectItem>
-                                <SelectItem value="custom">Personalizado</SelectItem>
-                            </SelectContent>
-                        </Select>
-
-                        {interval === "custom" && (
-                            <div className="animate-in fade-in slide-in-from-right-4 duration-300">
-                                <DateRangePicker
-                                    startDate={pickerStart}
-                                    endDate={pickerEnd}
-                                    onChange={(s, e) => {
-                                        setPickerStart(s);
-                                        setPickerEnd(e);
-                                    }}
-                                />
-                            </div>
-                        )}
-                    </div>
                 </div>
 
-                {/* Content Area */}
-                {loading ? (
-                    <div className="flex justify-center p-12"><Loader2 className="h-8 w-8 animate-spin text-blue-500" /></div>
-                ) : error ? (
-                    <div className="flex flex-col items-center justify-center py-16 px-4 text-center border-2 border-dashed border-red-200 bg-red-50 rounded-xl text-red-600">
-                        <p>{error}</p>
-                    </div>
-                ) : calls.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center py-16 px-4 text-center border-2 border-dashed border-gray-200 dark:border-gray-800 rounded-xl bg-gray-50/50 dark:bg-gray-900/50">
-                        <div className="bg-white dark:bg-gray-800 p-4 rounded-full shadow-sm mb-4">
-                            <PhoneIncoming className="h-8 w-8 text-gray-400" />
+                <div className="flex flex-wrap items-center gap-3">
+                    {/* Source Filter */}
+                    <Select value={sourceFilter} onValueChange={setSourceFilter}>
+                        <SelectTrigger className="w-[140px] h-9 bg-white dark:bg-gray-950 border-gray-200 dark:border-gray-800">
+                            <LayoutGrid className="w-3.5 h-3.5 mr-2 text-gray-400" />
+                            <SelectValue placeholder="Origen" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all">Todos</SelectItem>
+                            <SelectItem value="campaign">Campañas</SelectItem>
+                            <SelectItem value="testing">Pruebas</SelectItem>
+                        </SelectContent>
+                    </Select>
+
+                    {/* Agent Filter */}
+                    <Select value={selectedAgent} onValueChange={setSelectedAgent}>
+                        <SelectTrigger className="w-[180px] h-9 bg-white dark:bg-gray-950 border-gray-200 dark:border-gray-800">
+                            <User className="w-3.5 h-3.5 mr-2 text-gray-400" />
+                            <SelectValue placeholder="Agente" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all">Todos los agentes</SelectItem>
+                            {uniqueAgents.map(aid => (
+                                <SelectItem key={aid} value={aid}>{aid}</SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+
+                    <div className="h-6 w-px bg-gray-200 dark:bg-gray-800 mx-1" />
+
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                            setLoading(true);
+                            setRefreshTrigger(prev => prev + 1);
+                        }}
+                        className="bg-white dark:bg-gray-950 border-gray-200 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-900 text-gray-700 dark:text-gray-300"
+                    >
+                        <RefreshCw className={cn("h-4 w-4 mr-2", loading && "animate-spin")} />
+                        Actualizar
+                    </Button>
+
+                    <Select value={interval} onValueChange={setInterval}>
+                        <SelectTrigger className="w-[180px] h-9 bg-white dark:bg-gray-950 border-gray-200 dark:border-gray-800">
+                            <Clock className="w-3.5 h-3.5 mr-2 text-gray-400" />
+                            <SelectValue placeholder="Selecciona periodo" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="1h">Última hora</SelectItem>
+                            <SelectItem value="24h">Últimas 24 horas</SelectItem>
+                            <SelectItem value="7d">Última semana</SelectItem>
+                            <SelectItem value="30d">Último mes</SelectItem>
+                            <SelectItem value="custom">Personalizado</SelectItem>
+                        </SelectContent>
+                    </Select>
+
+                    {interval === "custom" && (
+                        <div className="animate-in fade-in slide-in-from-right-4 duration-300">
+                            <DateRangePicker
+                                startDate={pickerStart}
+                                endDate={pickerEnd}
+                                onChange={(s, e) => {
+                                    setPickerStart(s);
+                                    setPickerEnd(e);
+                                }}
+                            />
                         </div>
-                        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Sin llamadas registradas</h3>
-                        <p className="text-sm text-gray-500 max-w-sm mt-1">
-                            No se han encontrado llamadas en este periodo. Prueba a cambiar el filtro de tiempo.
-                        </p>
+                    )}
+                </div>
+            </div>
+
+            {/* Content Area */}
+            {loading ? (
+                <div className="flex justify-center p-12"><Loader2 className="h-8 w-8 animate-spin text-blue-500" /></div>
+            ) : error ? (
+                <div className="flex flex-col items-center justify-center py-16 px-4 text-center border-2 border-dashed border-red-200 bg-red-50 rounded-xl text-red-600">
+                    <p>{error}</p>
+                </div>
+            ) : filteredCalls.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-16 px-4 text-center border-2 border-dashed border-gray-200 dark:border-gray-800 rounded-xl bg-gray-50/50 dark:bg-gray-900/50">
+                    <div className="bg-white dark:bg-gray-800 p-4 rounded-full shadow-sm mb-4">
+                        <PhoneIncoming className="h-8 w-8 text-gray-400" />
                     </div>
-                ) : (
-                    <div className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900/50 shadow-sm overflow-hidden">
-                        <Table>
-                            <TableHeader className="bg-gray-50/50 dark:bg-gray-900">
-                                <TableRow>
-                                    <TableHead className="w-[180px]">Fecha y Hora</TableHead>
-                                    <TableHead className="w-[100px]">Duración</TableHead>
-                                    <TableHead className="w-[140px]">Sentimiento</TableHead>
-                                    <TableHead>Resumen de la Conversación</TableHead>
-                                    <TableHead className="text-right w-[120px]">Acciones</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {calls.map((call) => {
-                                    const sentiment = getSentimentConfig(call.analysis?.user_sentiment);
-                                    const SentimentIcon = sentiment.icon;
-                                    const isExpanded = expandedSummaries.has(call.id);
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Sin llamadas registradas</h3>
+                    <p className="text-sm text-gray-500 max-w-sm mt-1">
+                        No hay llamadas que coincidan con los filtros seleccionados.
+                    </p>
+                </div>
+            ) : (
+                <div className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900/50 shadow-sm overflow-hidden">
+                    <Table>
+                        <TableHeader className="bg-gray-50/50 dark:bg-gray-900">
+                            <TableRow>
+                                <TableHead className="w-[180px]">Fecha y Hora</TableHead>
+                                <TableHead className="w-[100px]">Agente</TableHead>
+                                <TableHead className="w-[100px]">Duración</TableHead>
+                                <TableHead className="w-[140px]">Sentimiento</TableHead>
+                                <TableHead>Resumen de la Conversación</TableHead>
+                                <TableHead className="text-right w-[120px]">Acciones</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {filteredCalls.map((call) => {
+                                const sentiment = getSentimentConfig(call.analysis?.user_sentiment);
+                                const SentimentIcon = sentiment.icon;
+                                const isExpanded = expandedSummaries.has(call.id);
 
-                                    return (
-                                        <TableRow key={call.id} className="group hover:bg-blue-50/50 dark:hover:bg-blue-900/10 transition-colors">
-                                            <TableCell>
-                                                <div className="flex flex-col">
-                                                    <span className="font-medium text-gray-900 dark:text-white">
-                                                        {call.timestamp?.toDate ?
-                                                            (() => {
-                                                                const dist = formatDistanceToNow(call.timestamp.toDate(), { addSuffix: true, locale: es });
-                                                                return dist.charAt(0).toUpperCase() + dist.slice(1);
-                                                            })()
-                                                            : "Reciente"}
-                                                    </span>
-                                                    <span className="text-xs text-gray-500 flex items-center gap-1 mt-0.5">
-                                                        <Calendar className="h-3 w-3" />
-                                                        {call.timestamp?.toDate?.().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                                    </span>
-                                                </div>
-                                            </TableCell>
-                                            <TableCell>
-                                                <Badge variant="secondary" className="font-mono font-normal text-xs bg-gray-100 dark:bg-gray-800">
-                                                    {formatDuration(call.duration)}
-                                                </Badge>
-                                            </TableCell>
-                                            <TableCell>
-                                                <div className={cn("flex items-center gap-1.5 px-2.5 py-1 rounded-full w-fit text-xs font-medium border", sentiment.color)}>
-                                                    <SentimentIcon className="h-3.5 w-3.5" />
-                                                    {sentiment.label}
-                                                </div>
-                                            </TableCell>
-                                            <TableCell>
-                                                <div className="max-w-md">
-                                                    <div
-                                                        onClick={() => toggleSummary(call.id)}
-                                                        className={cn(
-                                                            "text-sm text-gray-600 dark:text-gray-300 cursor-pointer transition-all duration-300",
-                                                            isExpanded ? "" : "line-clamp-2"
-                                                        )}
-                                                        title={isExpanded ? "Click para reducir" : "Click para expandir"}
-                                                    >
-                                                        {(() => {
-                                                            const customData = call.analysis?.custom_analysis_data;
-                                                            const spanishSummary = Array.isArray(customData)
-                                                                ? customData.find(d => d.name === "resumen_espanol")?.value
-                                                                : null;
-
-                                                            return spanishSummary || call.analysis?.call_summary || (
-                                                                <span className="text-gray-400 italic flex items-center gap-1">
-                                                                    <Loader2 className="h-3 w-3 animate-spin" /> Procesando resumen...
-                                                                </span>
-                                                            );
-                                                        })()}
-                                                    </div>
+                                return (
+                                    <TableRow key={call.id} className="group hover:bg-blue-50/50 dark:hover:bg-blue-900/10 transition-colors">
+                                        <TableCell>
+                                            <div className="flex flex-col">
+                                                <span className="font-medium text-gray-900 dark:text-white">
+                                                    {call.timestamp?.toDate ?
+                                                        (() => {
+                                                            const dist = formatDistanceToNow(call.timestamp.toDate(), { addSuffix: true, locale: es });
+                                                            return dist.charAt(0).toUpperCase() + dist.slice(1);
+                                                        })()
+                                                        : "Reciente"}
+                                                </span>
+                                                <span className="text-xs text-gray-500 flex items-center gap-1 mt-0.5">
+                                                    <Calendar className="h-3 w-3" />
+                                                    {call.timestamp?.toDate?.().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                </span>
+                                            </div>
+                                        </TableCell>
+                                        <TableCell>
+                                            <Badge variant="secondary" className="font-mono font-normal text-xs bg-gray-100 dark:bg-gray-800">
+                                                {formatDuration(call.duration)}
+                                            </Badge>
+                                        </TableCell>
+                                        <TableCell>
+                                            <div className={cn("flex items-center gap-1.5 px-2.5 py-1 rounded-full w-fit text-xs font-medium border", sentiment.color)}>
+                                                <SentimentIcon className="h-3.5 w-3.5" />
+                                                {sentiment.label}
+                                            </div>
+                                        </TableCell>
+                                        <TableCell>
+                                            <div className="max-w-md">
+                                                <div
+                                                    onClick={() => toggleSummary(call.id)}
+                                                    className={cn(
+                                                        "text-sm text-gray-600 dark:text-gray-300 cursor-pointer transition-all duration-300",
+                                                        isExpanded ? "" : "line-clamp-2"
+                                                    )}
+                                                    title={isExpanded ? "Click para reducir" : "Click para expandir"}
+                                                >
                                                     {(() => {
                                                         const customData = call.analysis?.custom_analysis_data;
-                                                        if (Array.isArray(customData) && customData.length > 0) {
-                                                            return (
-                                                                <div className="flex gap-2 mt-2 flex-wrap">
-                                                                    {customData
-                                                                        .filter(d => d.name !== "resumen_espanol")
-                                                                        .map((d, i) => (
-                                                                            <span key={i} className="inline-flex items-center text-[11px] bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300 px-2 py-1 rounded-md border border-purple-100 dark:border-purple-800/50 font-medium shadow-sm">
-                                                                                <span className="opacity-70 mr-1 uppercase text-[9px] tracking-wider">{d.name}:</span>
-                                                                                <span>{String(d.value)}</span>
-                                                                            </span>
-                                                                        ))}
-                                                                </div>
-                                                            );
-                                                        }
-                                                        return null;
+                                                        const spanishSummary = Array.isArray(customData)
+                                                            ? customData.find(d => d.name === "resumen_espanol")?.value
+                                                            : null;
+
+                                                        return spanishSummary || call.analysis?.call_summary || (
+                                                            <span className="text-gray-400 italic flex items-center gap-1">
+                                                                <Loader2 className="h-3 w-3 animate-spin" /> Procesando resumen...
+                                                            </span>
+                                                        );
                                                     })()}
                                                 </div>
-                                            </TableCell>
-                                            <TableCell className="text-right">
-                                                <Button
-                                                    variant="outline"
-                                                    size="sm"
-                                                    onClick={() => setSelectedCall(call)}
-                                                    className="opacity-0 group-hover:opacity-100 transition-opacity hover:bg-blue-50 text-blue-600 border-blue-200"
-                                                >
-                                                    <MessageSquare className="h-4 w-4 mr-2" />
-                                                    Chat
-                                                </Button>
-                                            </TableCell>
-                                        </TableRow>
-                                    );
-                                })}
-                            </TableBody>
-                        </Table>
-                    </div>
-                )}
-            </div>
+                                                {(() => {
+                                                    const customData = call.analysis?.custom_analysis_data;
+                                                    if (Array.isArray(customData) && customData.length > 0) {
+                                                        return (
+                                                            <div className="flex gap-2 mt-2 flex-wrap">
+                                                                {customData
+                                                                    .filter(d => d.name !== "resumen_espanol")
+                                                                    .map((d, i) => (
+                                                                        <span key={i} className="inline-flex items-center text-[11px] bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300 px-2 py-1 rounded-md border border-purple-100 dark:border-purple-800/50 font-medium shadow-sm">
+                                                                            <span className="opacity-70 mr-1 uppercase text-[9px] tracking-wider">{d.name}:</span>
+                                                                            <span>{String(d.value)}</span>
+                                                                        </span>
+                                                                    ))}
+                                                            </div>
+                                                        );
+                                                    }
+                                                    return null;
+                                                })()}
+                                            </div>
+                                        </TableCell>
+                                        <TableCell className="text-right">
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={() => setSelectedCall(call)}
+                                                className="opacity-0 group-hover:opacity-100 transition-opacity hover:bg-blue-50 text-blue-600 border-blue-200"
+                                            >
+                                                <MessageSquare className="h-4 w-4 mr-2" />
+                                                Chat
+                                            </Button>
+                                        </TableCell>
+                                    </TableRow>
+                                );
+                            })}
+                        </TableBody>
+                    </Table>
+                </div>
+            )}
+        </div >
 
             <Dialog open={!!selectedCall} onOpenChange={(open) => !open && setSelectedCall(null)}>
                 <DialogContent className="max-w-2xl h-[85vh] flex flex-col p-0 gap-0 overflow-hidden rounded-2xl">

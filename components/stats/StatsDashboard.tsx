@@ -26,6 +26,10 @@ export function StatsDashboard(props: StatsDashboardProps) {
     // Config State
     const [hiddenStandard, setHiddenStandard] = useState<string[]>([]);
     const [period, setPeriod] = useState("7d");
+    const [selectedAgent, setSelectedAgent] = useState<string>(agentId || "all");
+    const [uniqueAgents, setUniqueAgents] = useState<string[]>([]); // Derived from calls
+
+    // Date Picker State
     const [pickerStart, setPickerStart] = useState<Date | null>(null);
     const [pickerEnd, setPickerEnd] = useState<Date | null>(null);
 
@@ -74,10 +78,13 @@ export function StatsDashboard(props: StatsDashboardProps) {
             }
 
             const constraints: any[] = [
-                where("agent_id", "==", agentId),
                 where("timestamp", ">=", Timestamp.fromDate(start)),
                 orderBy("timestamp", "desc")
             ];
+
+            if (agentId) { // If provided as prop, lock it. Otherwise allow all.
+                constraints.push(where("agent_id", "==", agentId));
+            }
 
             if (end) {
                 constraints.push(where("timestamp", "<=", Timestamp.fromDate(end)));
@@ -102,14 +109,25 @@ export function StatsDashboard(props: StatsDashboardProps) {
         fetchStats();
     }, [agentId, period, props.subworkspaceId, pickerStart, pickerEnd]);
 
+    // 2.5 Extract Agents
+    useEffect(() => {
+        const agents = Array.from(new Set(rawCalls.map(c => c.agent_id).filter(Boolean)));
+        setUniqueAgents(agents);
+    }, [rawCalls]);
+
     // 3. Calculate Stats when data or visibility changes
     useEffect(() => {
+        // Filter by Agent first
+        const filteredCalls = selectedAgent === 'all'
+            ? rawCalls
+            : rawCalls.filter(c => c.agent_id === selectedAgent);
+
         // Basic Stats
         let totalDuration = 0;
         let successfulCalls = 0;
         let sentimentCounts = { positive: 0, neutral: 0, negative: 0 };
 
-        rawCalls.forEach(data => {
+        filteredCalls.forEach(data => {
             if (typeof data.duration === 'number') totalDuration += data.duration;
             if (data.analysis?.call_successful) successfulCalls++;
 
@@ -119,7 +137,7 @@ export function StatsDashboard(props: StatsDashboardProps) {
             else sentimentCounts.neutral++;
         });
 
-        const total = rawCalls.length;
+        const total = filteredCalls.length;
         setStats({
             totalCalls: total,
             avgDuration: total > 0 ? totalDuration / total : 0,
@@ -127,53 +145,60 @@ export function StatsDashboard(props: StatsDashboardProps) {
             sentimentBreakdown: sentimentCounts
         });
 
-        // Custom Stats
-        const initialCustomStats: Record<string, any> = {};
-        const archivedList: any[] = [];
+        // Custom Stats - ROBUST DISCOVERY
+        const customAgg: Record<string, any> = {};
 
+        // 1. Initialize from Config
         allFields.forEach(field => {
-            if (field.isArchived) {
-                archivedList.push(field);
-                return;
-            }
-            initialCustomStats[field.name] = {
+            if (field.isArchived) return;
+            customAgg[field.name] = {
                 id: field.id,
                 type: field.type,
-                yes: 0,
-                no: 0,
-                count: 0,
-                totalSum: 0,
+                yes: 0, no: 0, count: 0, totalSum: 0,
                 description: field.description,
-                name: field.name
+                name: field.name,
+                isConfigured: true
             };
         });
-        setArchivedCustom(archivedList);
 
-        const customAgg = { ...initialCustomStats };
-
-        rawCalls.forEach(data => {
+        // 2. Aggregation & Discovery
+        filteredCalls.forEach(data => {
             const customs = data.analysis?.custom_analysis_data;
             if (Array.isArray(customs)) {
                 customs.forEach((c: any) => {
-                    if (customAgg[c.name]) {
-                        const entry = customAgg[c.name];
-                        entry.count++;
-                        if (typeof c.value === 'boolean') {
-                            entry.type = 'boolean';
-                            if (c.value) entry.yes++; else entry.no++;
-                        } else if (typeof c.value === 'number') {
-                            entry.type = 'number';
-                            entry.totalSum += c.value;
-                        } else {
-                            entry.type = 'string';
-                        }
+                    // Normalize Name
+                    const name = c.name;
+                    if (!customAgg[name]) {
+                        // Discovered a field not in active config (maybe deleted/archived or new)
+                        // We Check if it was in the archived config list to restore metadata? 
+                        // For now we just create a generic entry
+                        customAgg[name] = {
+                            id: `auto_${name}`,
+                            type: typeof c.value === 'boolean' ? 'boolean' : typeof c.value === 'number' ? 'number' : 'string',
+                            yes: 0, no: 0, count: 0, totalSum: 0,
+                            description: "Detectado automáticamente",
+                            name: name,
+                            isConfigured: false
+                        };
+                    }
+
+                    const entry = customAgg[name];
+                    entry.count++;
+                    if (typeof c.value === 'boolean') {
+                        entry.type = 'boolean';
+                        if (c.value) entry.yes++; else entry.no++;
+                    } else if (typeof c.value === 'number') {
+                        entry.type = 'number';
+                        entry.totalSum += c.value;
+                    } else {
+                        entry.type = 'string';
                     }
                 });
             }
         });
 
         setCustomStats(customAgg);
-    }, [rawCalls, allFields]);
+    }, [rawCalls, allFields, selectedAgent]);
 
 
     const handleHideStandard = async (metricId: string) => {
@@ -243,6 +268,18 @@ export function StatsDashboard(props: StatsDashboardProps) {
                         <RefreshCcw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
                         Actualizar
                     </Button>
+                    <Select value={selectedAgent} onValueChange={setSelectedAgent}>
+                        <SelectTrigger className="w-[180px] bg-white dark:bg-gray-800">
+                            <SelectValue placeholder="Agente" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all">Todos los agentes</SelectItem>
+                            {uniqueAgents.map(aid => (
+                                <SelectItem key={aid} value={aid}>{aid}</SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+
                     <Select value={period} onValueChange={setPeriod}>
                         <SelectTrigger className="w-[180px] bg-white dark:bg-gray-800">
                             <SelectValue placeholder="Periodo" />
