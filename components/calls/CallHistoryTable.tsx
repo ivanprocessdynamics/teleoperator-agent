@@ -21,7 +21,6 @@ import {
     Frown,
     MoreHorizontal,
     FileText,
-    FileText,
     RefreshCw,
     Filter,
     User,
@@ -190,7 +189,6 @@ export function CallHistoryTable({ agentId: initialAgentId }: CallHistoryTablePr
                             </p>
                         </div>
                     </div>
-
                 </div>
 
                 <div className="flex flex-wrap items-center gap-3">
@@ -320,6 +318,11 @@ export function CallHistoryTable({ agentId: initialAgentId }: CallHistoryTablePr
                                             </div>
                                         </TableCell>
                                         <TableCell>
+                                            <Badge variant="outline" className="font-mono text-[10px] text-gray-500 truncate max-w-[80px]" title={call.agent_id}>
+                                                {call.agent_id.substring(0, 8)}...
+                                            </Badge>
+                                        </TableCell>
+                                        <TableCell>
                                             <Badge variant="secondary" className="font-mono font-normal text-xs bg-gray-100 dark:bg-gray-800">
                                                 {formatDuration(call.duration)}
                                             </Badge>
@@ -391,7 +394,6 @@ export function CallHistoryTable({ agentId: initialAgentId }: CallHistoryTablePr
                     </Table>
                 </div>
             )}
-        </div >
 
             <Dialog open={!!selectedCall} onOpenChange={(open) => !open && setSelectedCall(null)}>
                 <DialogContent className="max-w-2xl h-[85vh] flex flex-col p-0 gap-0 overflow-hidden rounded-2xl">
@@ -411,7 +413,7 @@ export function CallHistoryTable({ agentId: initialAgentId }: CallHistoryTablePr
                     {selectedCall && (
                         <div className="flex-1 overflow-hidden bg-gray-50 dark:bg-gray-950">
                             <ChatTranscript
-                                messages={selectedCall.transcript_object}
+                                messages={selectedCall.transcript_object || []}
                                 audioUrl={selectedCall.recording_url}
                             />
                         </div>
