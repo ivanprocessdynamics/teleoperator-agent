@@ -26,9 +26,10 @@ export function CampaignPrompt({ prompt, columns, onChange, onSyncAgent, variabl
     // We store the history as an array of strings
     const [history, setHistory] = useState<string[]>([prompt]);
     const [historyIndex, setHistoryIndex] = useState(0);
+    const [hasUnsyncedChanges, setHasUnsyncedChanges] = useState(false);
 
     const textareaRef = useRef<HTMLTextAreaElement>(null);
-    const timeoutRef = useRef<NodeJS.Timeout>(null);
+    const timeoutRef = useRef<NodeJS.Timeout | null>(null);
     const lastSaveRef = useRef<string>(prompt);
 
     // Sync from props only if not focused (avoid overwriting user input)
@@ -38,6 +39,7 @@ export function CampaignPrompt({ prompt, columns, onChange, onSyncAgent, variabl
             setLocalPrompt(prompt);
             setHistory([prompt]);
             setHistoryIndex(0);
+            setHasUnsyncedChanges(false);
         }
     }, [prompt, isFocused]); // removed localPrompt to avoid loops, added logic check
 
@@ -60,8 +62,13 @@ export function CampaignPrompt({ prompt, columns, onChange, onSyncAgent, variabl
         });
     }, [historyIndex]);
 
+    const markAsUnsynced = () => {
+        setHasUnsyncedChanges(true);
+    };
+
     const handleChange = (newValue: string) => {
         setLocalPrompt(newValue);
+        markAsUnsynced();
 
         // Firestore Auto-Save Debounce
         if (timeoutRef.current) clearTimeout(timeoutRef.current);
@@ -71,9 +78,9 @@ export function CampaignPrompt({ prompt, columns, onChange, onSyncAgent, variabl
         }, 1000);
     };
 
-    // Snapshot history on pause (e.g. 500ms after typing stops) or space? 
+    // Snapshot history on pause (e.g. 500ms after typing stops) or space?
     // The user hated "letter by letter". Let's throttle history updates.
-    const historyTimeoutRef = useRef<NodeJS.Timeout>(null);
+    const historyTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
     const handleTextareaChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
         const val = e.target.value;
@@ -102,7 +109,7 @@ export function CampaignPrompt({ prompt, columns, onChange, onSyncAgent, variabl
                 // We need to calculate the new index based on the *result* of setHistory
                 // But since we can't know if setHistory actually added one without checking,
                 // we'll rely on the useEffect below or just simple logic:
-                return prev + 1; // This might drift if setHistory didn't add. 
+                return prev + 1; // This might drift if setHistory didn't add.
                 // Let's use a safer approach: direct state update
             });
             // Correction: Implementing safe atomic update
@@ -123,6 +130,7 @@ export function CampaignPrompt({ prompt, columns, onChange, onSyncAgent, variabl
     const safeHandleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
         const val = e.target.value;
         setLocalPrompt(val);
+        markAsUnsynced();
 
         // Firestore Save
         if (timeoutRef.current) clearTimeout(timeoutRef.current);
@@ -147,6 +155,7 @@ export function CampaignPrompt({ prompt, columns, onChange, onSyncAgent, variabl
             setLocalPrompt(newVal);
             onChange(newVal); // update firestore immediately on undo
             lastSaveRef.current = newVal;
+            markAsUnsynced();
         }
     };
 
@@ -158,11 +167,11 @@ export function CampaignPrompt({ prompt, columns, onChange, onSyncAgent, variabl
             setLocalPrompt(newVal);
             onChange(newVal);
             lastSaveRef.current = newVal;
+            markAsUnsynced();
         }
     };
 
     const insertVariable = (variable: string) => {
-        const toInsert = `{{${variable}}}`;
         const textarea = textareaRef.current;
 
         let newValue = localPrompt;
@@ -176,22 +185,19 @@ export function CampaignPrompt({ prompt, columns, onChange, onSyncAgent, variabl
             const prefix = (start > 0 && textBefore[start - 1] !== ' ' && textBefore[start - 1] !== '\n') ? ' ' : '';
             const suffix = (textAfter.length > 0 && textAfter[0] !== ' ' && textAfter[0] !== '\n' && textAfter[0] !== '.' && textAfter[0] !== ',') ? ' ' : '';
 
-            newValue = textBefore + prefix + toInsert + suffix + textAfter;
-
-            // Restore cursor? A bit tricky with state update re-render
-            // We can try to set it in a useEffect or use requestAnimationFrame
-            // For now, just setting the value is key.
+            newValue = textBefore + prefix + `{{${variable}}}` + suffix + textAfter;
 
             // Push to history immediately for variables
             pushToHistory(newValue);
         } else {
             // Fallback if ref missing
-            newValue = localPrompt + (localPrompt.slice(-1) === " " ? "" : " ") + toInsert;
+            newValue = localPrompt + (localPrompt.slice(-1) === " " ? "" : " ") + `{{${variable}}}`;
             pushToHistory(newValue);
         }
 
         setLocalPrompt(newValue);
         onChange(newValue);
+        markAsUnsynced();
     };
 
     const handleSync = async () => {
@@ -199,6 +205,7 @@ export function CampaignPrompt({ prompt, columns, onChange, onSyncAgent, variabl
         try {
             await onSyncAgent(localPrompt);
             setLastSynced(new Date());
+            setHasUnsyncedChanges(false);
         } catch (error) {
             console.error(error);
         } finally {
@@ -207,7 +214,7 @@ export function CampaignPrompt({ prompt, columns, onChange, onSyncAgent, variabl
     };
 
     return (
-        <div className="flex flex-col border border-gray-200 dark:border-blue-500/30 rounded-xl bg-white dark:bg-blue-500/10 shadow-sm overflow-hidden h-full">
+        <div className="flex flex-col border border-gray-200 dark:border-blue-500/30 rounded-xl bg-white dark:bg-blue-500/10 shadow-sm overflow-hidden h-auto min-h-[600px]">
             <div className="flex items-center justify-between px-4 py-2 border-b border-gray-100 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800/50">
                 <div className="flex items-center gap-2">
                     <MessageSquare className="h-4 w-4 text-gray-500 dark:text-gray-400" />
@@ -251,18 +258,25 @@ export function CampaignPrompt({ prompt, columns, onChange, onSyncAgent, variabl
                     <Button
                         size="sm"
                         onClick={handleSync}
-                        disabled={isSyncing}
+                        disabled={isSyncing || !hasUnsyncedChanges}
                         className={cn(
                             "h-8 text-xs font-medium transition-all shadow-sm",
                             isSyncing
                                 ? "bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300"
-                                : "bg-blue-600 text-white hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-500"
+                                : !hasUnsyncedChanges
+                                    ? "bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400 border border-gray-200 dark:border-gray-700"
+                                    : "bg-blue-600 text-white hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-500"
                         )}
                     >
                         {isSyncing ? (
                             <>
                                 <Loader2 className="mr-1.5 h-3 w-3 animate-spin" />
                                 Guardando...
+                            </>
+                        ) : !hasUnsyncedChanges ? (
+                            <>
+                                <Check className="mr-1.5 h-3 w-3" />
+                                Guardado
                             </>
                         ) : (
                             <>
@@ -274,7 +288,7 @@ export function CampaignPrompt({ prompt, columns, onChange, onSyncAgent, variabl
                 </div>
             </div>
 
-            <div className="flex flex-col flex-1 p-0 overflow-hidden relative">
+            <div className="flex flex-col flex-1 p-0 overflow-hidden relative min-h-[500px]">
                 <Textarea
                     ref={textareaRef}
                     value={localPrompt}
@@ -282,7 +296,7 @@ export function CampaignPrompt({ prompt, columns, onChange, onSyncAgent, variabl
                     onFocus={() => setIsFocused(true)}
                     onBlur={() => setIsFocused(false)}
                     placeholder="Escribe las instrucciones para el agente aquí. Usa las variables de abajo para personalizar el mensaje..."
-                    className="flex-1 w-full resize-none border-0 rounded-none focus-visible:ring-0 p-4 text-base leading-relaxed placeholder:text-gray-400 bg-transparent"
+                    className="flex-1 w-full resize-none border-0 rounded-none focus-visible:ring-0 p-4 text-base leading-relaxed placeholder:text-gray-400 bg-transparent font-mono"
                 />
 
                 {/* Last Save Indicator */}
