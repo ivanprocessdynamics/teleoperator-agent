@@ -52,9 +52,9 @@ export function StatsDashboard(props: StatsDashboardProps) {
             const map: Record<string, string> = {};
             snapshot.docs.forEach(doc => {
                 const data = doc.data();
-                map[doc.id] = data.title || "Campaña sin nombre";
+                map[doc.id] = data.name || "Campaña sin nombre";
                 if (data.vapi_agent_id) {
-                    map[data.vapi_agent_id] = data.title || "Campaña sin nombre";
+                    map[data.vapi_agent_id] = data.name || "Campaña sin nombre";
                 }
             });
             setCampaignMap(map);

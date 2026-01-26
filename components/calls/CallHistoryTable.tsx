@@ -84,12 +84,12 @@ export function CallHistoryTable({ agentId: initialAgentId }: CallHistoryTablePr
                 const data = doc.data();
                 // Map both the ID and the Vapi Agent ID if it exists? 
                 // For now map the document ID (which is likely the campaign_id) to the title.
-                map[doc.id] = data.title || "Campaña sin nombre";
+                map[doc.id] = data.name || "Campaña sin nombre";
 
                 // If the campaign has a specific 'agent_id' field, map that too? 
                 // Let's assume calls.agent_id might match campaign.id OR campaign.vapi_agent_id
                 if (data.vapi_agent_id) {
-                    map[data.vapi_agent_id] = data.title || "Campaña sin nombre";
+                    map[data.vapi_agent_id] = data.name || "Campaña sin nombre";
                 }
             });
             setCampaignMap(map);
