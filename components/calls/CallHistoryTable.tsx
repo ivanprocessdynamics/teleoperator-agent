@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { collection, query, where, orderBy, onSnapshot, limit, Timestamp } from "firebase/firestore";
+import { collection, query, where, orderBy, onSnapshot, limit, Timestamp, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -24,7 +24,8 @@ import {
     RefreshCw,
     Filter,
     User,
-    LayoutGrid
+    LayoutGrid,
+    Megaphone
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatDistanceToNow } from "date-fns";
@@ -33,6 +34,9 @@ import { es } from "date-fns/locale";
 interface CallRecord {
     id: string;
     agent_id: string;
+    metadata?: {
+        campaign_id?: string;
+    };
     analysis: {
         call_summary?: string;
         user_sentiment?: string;
@@ -55,12 +59,15 @@ export function CallHistoryTable({ agentId: initialAgentId }: CallHistoryTablePr
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
+    // Campaign Data
+    const [campaignMap, setCampaignMap] = useState<Record<string, string>>({});
+
     // Filters
-    const [selectedAgent, setSelectedAgent] = useState<string>(initialAgentId || "all");
+    const [selectedCampaignId, setSelectedCampaignId] = useState<string>("all");
     const [sourceFilter, setSourceFilter] = useState<string>("all"); // all, campaign, testing
 
     // Aggregated Filter Data
-    const [uniqueAgents, setUniqueAgents] = useState<string[]>([]);
+    const [uniqueCampaignIds, setUniqueCampaignIds] = useState<string[]>([]);
 
     const [selectedCall, setSelectedCall] = useState<CallRecord | null>(null);
     const [refreshTrigger, setRefreshTrigger] = useState(0);
@@ -69,13 +76,28 @@ export function CallHistoryTable({ agentId: initialAgentId }: CallHistoryTablePr
     const [pickerStart, setPickerStart] = useState<Date | null>(null);
     const [pickerEnd, setPickerEnd] = useState<Date | null>(null);
 
+    // 1. Fetch Campaigns for mapping names
+    useEffect(() => {
+        const fetchCampaigns = async () => {
+            try {
+                const snapshot = await getDocs(collection(db, "campaigns"));
+                const map: Record<string, string> = {};
+                snapshot.docs.forEach(doc => {
+                    const data = doc.data();
+                    map[doc.id] = data.title || "Campaña sin nombre";
+                });
+                setCampaignMap(map);
+            } catch (err) {
+                console.error("Error fetching campaigns:", err);
+            }
+        };
+        fetchCampaigns();
+    }, []);
+
     useEffect(() => {
         setError(null);
 
-        // Base query - fetch ALL calls derived from time first (better index usage usually)
-        // We filter by agent/source client-side to allow dynamic filtering without complex compound indexes for every combination
-        // OR we can minimal filter if agentId is fixed. 
-
+        // Base query
         let constraints: any[] = [orderBy("timestamp", "desc"), limit(100)];
 
         // Calculate Date Range
@@ -109,9 +131,9 @@ export function CallHistoryTable({ agentId: initialAgentId }: CallHistoryTablePr
             const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as CallRecord));
             setCalls(data);
 
-            // Extract unique agents for filter
-            const agents = Array.from(new Set(data.map(c => c.agent_id).filter(Boolean)));
-            setUniqueAgents(agents);
+            // Extract unique campaigns for filter
+            const cIds = Array.from(new Set(data.map(c => c.metadata?.campaign_id).filter(Boolean))) as string[];
+            setUniqueCampaignIds(cIds);
 
             setLoading(false);
         }, (err) => {
@@ -127,22 +149,20 @@ export function CallHistoryTable({ agentId: initialAgentId }: CallHistoryTablePr
     useEffect(() => {
         let result = calls;
 
-        // Filter by Agent
-        if (selectedAgent !== "all") {
-            result = result.filter(c => c.agent_id === selectedAgent);
+        // Filter by Campaign ID
+        if (selectedCampaignId !== "all") {
+            result = result.filter(c => c.metadata?.campaign_id === selectedCampaignId);
         }
 
         // Filter by Source (Campaign vs Testing)
         if (sourceFilter === "campaign") {
-            // @ts-ignore - metadata might be missing in type definition but present in data
             result = result.filter(c => c.metadata?.campaign_id);
         } else if (sourceFilter === "testing") {
-            // @ts-ignore
             result = result.filter(c => !c.metadata?.campaign_id);
         }
 
         setFilteredCalls(result);
-    }, [calls, selectedAgent, sourceFilter]);
+    }, [calls, selectedCampaignId, sourceFilter]);
 
     const [expandedSummaries, setExpandedSummaries] = useState<Set<string>>(new Set());
 
@@ -205,16 +225,18 @@ export function CallHistoryTable({ agentId: initialAgentId }: CallHistoryTablePr
                         </SelectContent>
                     </Select>
 
-                    {/* Agent Filter */}
-                    <Select value={selectedAgent} onValueChange={setSelectedAgent}>
-                        <SelectTrigger className="w-[180px] h-9 bg-white dark:bg-gray-950 border-gray-200 dark:border-gray-800">
-                            <User className="w-3.5 h-3.5 mr-2 text-gray-400" />
-                            <SelectValue placeholder="Agente" />
+                    {/* Campaign Filter */}
+                    <Select value={selectedCampaignId} onValueChange={setSelectedCampaignId}>
+                        <SelectTrigger className="w-[200px] h-9 bg-white dark:bg-gray-950 border-gray-200 dark:border-gray-800">
+                            <Megaphone className="w-3.5 h-3.5 mr-2 text-gray-400" />
+                            <SelectValue placeholder="Campaña" />
                         </SelectTrigger>
                         <SelectContent>
-                            <SelectItem value="all">Todos los agentes</SelectItem>
-                            {uniqueAgents.map(aid => (
-                                <SelectItem key={aid} value={aid}>{aid}</SelectItem>
+                            <SelectItem value="all">Todas las campañas</SelectItem>
+                            {uniqueCampaignIds.map(cid => (
+                                <SelectItem key={cid} value={cid}>
+                                    {campaignMap[cid] || "Campaña desconocida"}
+                                </SelectItem>
                             ))}
                         </SelectContent>
                     </Select>
@@ -286,7 +308,7 @@ export function CallHistoryTable({ agentId: initialAgentId }: CallHistoryTablePr
                         <TableHeader className="bg-gray-50/50 dark:bg-gray-900">
                             <TableRow>
                                 <TableHead className="w-[180px]">Fecha y Hora</TableHead>
-                                <TableHead className="w-[100px]">Agente</TableHead>
+                                <TableHead className="w-[140px]">Campaña</TableHead>
                                 <TableHead className="w-[100px]">Duración</TableHead>
                                 <TableHead className="w-[140px]">Sentimiento</TableHead>
                                 <TableHead>Resumen de la Conversación</TableHead>
@@ -298,6 +320,7 @@ export function CallHistoryTable({ agentId: initialAgentId }: CallHistoryTablePr
                                 const sentiment = getSentimentConfig(call.analysis?.user_sentiment);
                                 const SentimentIcon = sentiment.icon;
                                 const isExpanded = expandedSummaries.has(call.id);
+                                const campaignName = call.metadata?.campaign_id ? campaignMap[call.metadata.campaign_id] : null;
 
                                 return (
                                     <TableRow key={call.id} className="group hover:bg-blue-50/50 dark:hover:bg-blue-900/10 transition-colors">
@@ -318,9 +341,15 @@ export function CallHistoryTable({ agentId: initialAgentId }: CallHistoryTablePr
                                             </div>
                                         </TableCell>
                                         <TableCell>
-                                            <Badge variant="outline" className="font-mono text-[10px] text-gray-500 truncate max-w-[80px]" title={call.agent_id}>
-                                                {call.agent_id.substring(0, 8)}...
-                                            </Badge>
+                                            {campaignName ? (
+                                                <Badge variant="outline" className="font-medium text-xs border-blue-200 text-blue-700 bg-blue-50 dark:bg-blue-900/20 dark:text-blue-300 dark:border-blue-800">
+                                                    {campaignName}
+                                                </Badge>
+                                            ) : (
+                                                <Badge variant="outline" className="font-mono text-[10px] text-gray-400 border-dashed">
+                                                    Prueba / Manual
+                                                </Badge>
+                                            )}
                                         </TableCell>
                                         <TableCell>
                                             <Badge variant="secondary" className="font-mono font-normal text-xs bg-gray-100 dark:bg-gray-800">
