@@ -89,7 +89,24 @@ export default function SubworkspacePage() {
         }
     };
 
-    // ... existing fetchSub effect ...
+    // Fetch Subworkspace Data
+    useEffect(() => {
+        async function fetchSub() {
+            if (!subId) return;
+            try {
+                const docRef = doc(db, "subworkspaces", subId);
+                const snap = await getDoc(docRef);
+                if (snap.exists()) {
+                    const data = snap.data();
+                    setSubName(data.name || "Nuevo Agente");
+                    setAgentId(data.retell_agent_id || null);
+                }
+            } catch (error) {
+                console.error("Error fetching subworkspace:", error);
+            }
+        }
+        fetchSub();
+    }, [subId]);
 
     return (
         <div className="flex flex-col gap-6">
