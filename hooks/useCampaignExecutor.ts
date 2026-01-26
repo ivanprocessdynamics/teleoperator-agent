@@ -3,7 +3,7 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import { collection, query, where, onSnapshot, doc, updateDoc, Timestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { CampaignRow, CallingConfig } from "@/types/campaign";
+import { CampaignRow, CallingConfig, CampaignColumn } from "@/types/campaign";
 
 interface ExecutorState {
     isRunning: boolean;
@@ -29,8 +29,8 @@ export function useCampaignExecutor({
     callingConfig,
     phoneColumnId,
     campaignPrompt,
-    columns // New prop
-}: UseCampaignExecutorProps & { columns: any[] }) { // Quick fix for interface up top
+    columns
+}: UseCampaignExecutorProps & { columns: CampaignColumn[] }) {
     const [state, setState] = useState<ExecutorState>({
         isRunning: false,
         isPaused: false,
@@ -160,10 +160,8 @@ export function useCampaignExecutor({
             Object.entries(row.data).forEach(([key, value]) => {
                 // If we have column definitions, use the Name, otherwise ID
                 const colDef = columns?.find(c => c.id === key);
-                // Retell variables are case-sensitive usually? Use Name as is.
-                // Sanitize name to be safe? (remove spaces? Retell might handle spaces in {{Name}}?)
-                // Usually {{Name}} matches "Name".
-                const varName = colDef ? colDef.name : key;
+                // Use the column KEY (sanitized name) for the variable name
+                const varName = colDef ? colDef.key : key;
                 dynamicVariables[varName] = value;
             });
 
