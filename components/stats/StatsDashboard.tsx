@@ -3,9 +3,18 @@
 import { useEffect, useState } from "react";
 import { collection, query, where, getDocs, Timestamp, orderBy, doc, getDoc, updateDoc, onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Loader2, TrendingUp, Clock, Phone, ThumbsUp, Activity, RefreshCcw, EyeOff, Eye, Archive, Trash2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
+import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
-// ... (imports remain)
+interface StatsDashboardProps {
+    agentId?: string;
+    subworkspaceId?: string;
+}
 
 export function StatsDashboard(props: StatsDashboardProps) {
     const { agentId } = props;
@@ -25,12 +34,271 @@ export function StatsDashboard(props: StatsDashboardProps) {
     const [pickerStart, setPickerStart] = useState<Date | null>(null);
     const [pickerEnd, setPickerEnd] = useState<Date | null>(null);
 
+    // Derived UI State
+    const [stats, setStats] = useState({
+        totalCalls: 0,
+        avgDuration: 0,
+        successRate: 0,
+        sentimentBreakdown: { positive: 0, neutral: 0, negative: 0 }
+    });
+    const [customStats, setCustomStats] = useState<Record<string, any>>({});
+
     // Delete Confirmation State
     const [metricToDelete, setMetricToDelete] = useState<{ id: string, name: string } | null>(null);
 
-    // ... (rest of state)
+    // Campaign Data
+    const [campaignMap, setCampaignMap] = useState<Record<string, string>>({});
 
-    // ... (logic remains)
+    // 1. Fetch Campaigns for mapping names (Real-time)
+    useEffect(() => {
+        const unsub = onSnapshot(collection(db, "campaigns"), (snapshot) => {
+            const map: Record<string, string> = {};
+            snapshot.docs.forEach(doc => {
+                const data = doc.data();
+                map[doc.id] = data.name || "Campaña sin nombre";
+                if (data.vapi_agent_id) {
+                    map[data.vapi_agent_id] = data.name || "Campaña sin nombre";
+                }
+            });
+            setCampaignMap(map);
+        }, (err) => {
+            console.error("Error fetching campaigns:", err);
+        });
+
+        return () => unsub();
+    }, []);
+
+    // 1. Fetch Data (Calls + Config)
+    const fetchStats = async () => {
+        if (!agentId || !props.subworkspaceId) return;
+        setLoading(true);
+
+        try {
+            // Fetch Config
+            const subDoc = await getDoc(doc(db, "subworkspaces", props.subworkspaceId));
+            if (subDoc.exists()) {
+                const data = subDoc.data();
+                setHiddenStandard(data.analysis_config?.hidden_standard_fields || []);
+                setAllFields(data.analysis_config?.custom_fields || []);
+            }
+
+            // Fetch Calls
+            const now = new Date();
+            let start = new Date();
+            let end: Date | null = null;
+
+            if (period === "24h") {
+                start.setTime(now.getTime() - 24 * 60 * 60 * 1000);
+            } else if (period === "7d") {
+                start.setTime(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+            } else if (period === "30d") {
+                start.setTime(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+            } else if (period === "custom" && pickerStart && pickerEnd) {
+                start = pickerStart;
+                end = pickerEnd;
+            } else if (period === "custom") {
+                start = new Date(0);
+            } else {
+                start = new Date(0); // All time
+            }
+
+            const constraints: any[] = [
+                where("timestamp", ">=", Timestamp.fromDate(start)),
+                orderBy("timestamp", "desc")
+            ];
+
+            if (agentId) { // If provided as prop, lock it. Otherwise allow all.
+                constraints.push(where("agent_id", "==", agentId));
+            }
+
+            if (end) {
+                constraints.push(where("timestamp", "<=", Timestamp.fromDate(end)));
+            }
+
+            const q = query(collection(db, "calls"), ...constraints);
+
+            const snapshot = await getDocs(q);
+            const calls = snapshot.docs.map(doc => doc.data());
+            setRawCalls(calls);
+
+        } catch (error) {
+            console.error("Error fetching data:", error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // 2. Refresh data when context changes
+    useEffect(() => {
+        if (period === "custom" && (!pickerStart || !pickerEnd)) return;
+        fetchStats();
+    }, [agentId, period, props.subworkspaceId, pickerStart, pickerEnd]);
+
+    // 2.5 Extract Agents
+    useEffect(() => {
+        const agents = Array.from(new Set(rawCalls.map(c => c.agent_id).filter(Boolean)));
+        setUniqueAgents(agents);
+    }, [rawCalls]);
+
+    // 3. Calculate Stats when data or visibility changes
+    useEffect(() => {
+        // Filter by Agent first
+        const filteredCalls = selectedAgent === 'all'
+            ? rawCalls
+            : rawCalls.filter(c => c.agent_id === selectedAgent);
+
+        // Basic Stats
+        let totalDuration = 0;
+        let successfulCalls = 0;
+        let sentimentCounts = { positive: 0, neutral: 0, negative: 0 };
+
+        filteredCalls.forEach(data => {
+            if (typeof data.duration === 'number') totalDuration += data.duration;
+            if (data.analysis?.call_successful) successfulCalls++;
+
+            const sentiment = (data.analysis?.user_sentiment || "Neutral").toLowerCase();
+            if (sentiment.includes('positive')) sentimentCounts.positive++;
+            else if (sentiment.includes('negative')) sentimentCounts.negative++;
+            else sentimentCounts.neutral++;
+        });
+
+        const total = filteredCalls.length;
+        setStats({
+            totalCalls: total,
+            avgDuration: total > 0 ? totalDuration / total : 0,
+            successRate: total > 0 ? (successfulCalls / total) * 100 : 0,
+            sentimentBreakdown: sentimentCounts
+        });
+
+        // Custom Stats - ROBUST DISCOVERY
+        const customAgg: Record<string, any> = {};
+
+        // 1. Initialize from Config
+        allFields.forEach(field => {
+            if (field.isArchived) return; // Skip archived fields (don't show them)
+            customAgg[field.name] = {
+                id: field.id,
+                type: field.type,
+                yes: 0, no: 0, count: 0, totalSum: 0,
+                description: field.description,
+                name: field.name,
+                isConfigured: true
+            };
+        });
+
+        // 2. Aggregation & Discovery
+        filteredCalls.forEach(data => {
+            const customs = data.analysis?.custom_analysis_data;
+            if (Array.isArray(customs)) {
+                customs.forEach((c: any) => {
+                    // Normalize Name
+                    const name = c.name;
+
+                    // CRITICAL FIX: If this field is KNOWN to be archived, ignore it entirely.
+                    // Do not "rediscover" it.
+                    const isArchived = allFields.some(f => f.name === name && f.isArchived);
+                    if (isArchived) return;
+
+                    if (!customAgg[name]) {
+                        // Discovered a field not in active config (maybe new)
+                        customAgg[name] = {
+                            id: `auto_${name}`,
+                            type: typeof c.value === 'boolean' ? 'boolean' : typeof c.value === 'number' ? 'number' : 'string',
+                            yes: 0, no: 0, count: 0, totalSum: 0,
+                            description: "Detectado automáticamente",
+                            name: name,
+                            isConfigured: false
+                        };
+                    }
+
+                    const entry = customAgg[name];
+                    entry.count++;
+                    if (typeof c.value === 'boolean') {
+                        entry.type = 'boolean';
+                        if (c.value) entry.yes++; else entry.no++;
+                    } else if (typeof c.value === 'number') {
+                        entry.type = 'number';
+                        entry.totalSum += c.value;
+                    } else {
+                        entry.type = 'string';
+                    }
+                });
+            }
+        });
+
+        setCustomStats(customAgg);
+    }, [rawCalls, allFields, selectedAgent]);
+
+
+    const handleHideStandard = async (metricId: string) => {
+        if (!props.subworkspaceId) return;
+        const newHidden = [...hiddenStandard, metricId];
+        setHiddenStandard(newHidden); // Instant update
+
+        try {
+            await updateDoc(doc(db, "subworkspaces", props.subworkspaceId), {
+                "analysis_config.hidden_standard_fields": newHidden
+            });
+        } catch (e) {
+            console.error("Error hiding metric", e);
+        }
+    };
+
+    const handleRestoreStandard = async (metricId: string) => {
+        if (!props.subworkspaceId) return;
+        const newHidden = hiddenStandard.filter(id => id !== metricId);
+        setHiddenStandard(newHidden); // Instant update
+
+        try {
+            await updateDoc(doc(db, "subworkspaces", props.subworkspaceId), {
+                "analysis_config.hidden_standard_fields": newHidden
+            });
+        } catch (e) {
+            console.error("Error restoring metric", e);
+        }
+    };
+
+    const handleToggleCustomArchive = async (fieldId: string, archive: boolean) => {
+        if (!props.subworkspaceId) return;
+
+        // Find if this is an auto-discovered field (starts with 'auto_')
+        // OR an existing config field.
+        // If it's auto-discovered, we must ADD it to the 'custom_fields' array as archived.
+
+        let newFields = [...allFields];
+        const existingIndex = newFields.findIndex(f => f.id === fieldId);
+
+        if (existingIndex >= 0) {
+            // Update existing
+            newFields[existingIndex] = { ...newFields[existingIndex], isArchived: archive };
+        } else if (fieldId.startsWith('auto_')) {
+            // It's a transient field we want to archive. We must persist it.
+            // Retrieve the temp object from customStats to get details?
+            // Actually, we can just look at customStats[name] but we need the name.
+            // The 'id' in handleToggle is what we have.
+            // We search customStats values for this ID.
+            const statEntry = Object.values(customStats).find(s => s.id === fieldId);
+            if (statEntry) {
+                newFields.push({
+                    id: fieldId, // or generate new ID? 'auto_' ID is fine for now or valid UUID
+                    name: statEntry.name,
+                    description: statEntry.description,
+                    type: statEntry.type,
+                    isArchived: true // Start archived
+                });
+            }
+        }
+
+        setAllFields(newFields);
+
+        try {
+            await updateDoc(doc(db, "subworkspaces", props.subworkspaceId), {
+                "analysis_config.custom_fields": newFields
+            });
+        } catch (e) {
+            console.error("Error toggling archive", e);
+        }
+    };
 
     const handleDeleteCustomMetric = async () => {
         if (!props.subworkspaceId || !metricToDelete) return;
