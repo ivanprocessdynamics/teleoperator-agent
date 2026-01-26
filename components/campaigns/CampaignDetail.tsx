@@ -105,35 +105,36 @@ export function CampaignDetail({ campaignId, subworkspaceId, onBack }: CampaignD
 
     const handleUpdateColumns = (columns: CampaignColumn[]) => debouncedSave({ columns });
 
-    const handleUpdatePrompt = useCallback(async (prompt_template: string) => {
-        console.log('🔄 handleUpdatePrompt called with:', prompt_template.substring(0, 50) + '...');
-        console.log('🔑 Retell Agent ID:', retellAgentId);
+    // Save to Firestore (Auto-save)
+    const handlePromptChange = useCallback((prompt_template: string) => {
+        debouncedSave({ prompt_template });
+    }, [debouncedSave]);
 
-        // 1. Save to Firestore
-        await debouncedSave({ prompt_template });
-        console.log('💾 Saved to Firestore');
-
-        // 2. Sync to Retell Agent (if agent exists)
-        if (retellAgentId) {
-            try {
-                console.log('📡 Calling /api/retell/update-agent...');
-                const response = await fetch('/api/retell/update-agent', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        agent_id: retellAgentId,
-                        prompt: prompt_template
-                    })
-                });
-                const result = await response.json();
-                console.log('✅ Prompt synced to Retell agent:', result);
-            } catch (error) {
-                console.error('❌ Failed to sync prompt to Retell:', error);
-            }
-        } else {
+    // Sync to Retell (Manual trigger)
+    const handleSyncPrompt = useCallback(async (prompt_template: string) => {
+        if (!retellAgentId) {
             console.warn('⚠️ No Retell Agent ID found - skipping sync');
+            return;
         }
-    }, [campaignId, retellAgentId, debouncedSave]);
+
+        console.log('📡 Calling /api/retell/update-agent...');
+        try {
+            const response = await fetch('/api/retell/update-agent', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    agent_id: retellAgentId,
+                    prompt: prompt_template
+                })
+            });
+            const result = await response.json();
+            console.log('✅ Prompt synced to Retell agent:', result);
+            return result;
+        } catch (error) {
+            console.error('❌ Failed to sync prompt to Retell:', error);
+            throw error;
+        }
+    }, [retellAgentId]);
 
     const handleUpdateAnalysis = (analysis_config: AnalysisConfig) => debouncedSave({ analysis_config });
 
@@ -416,7 +417,8 @@ export function CampaignDetail({ campaignId, subworkspaceId, onBack }: CampaignD
                             <CampaignPrompt
                                 prompt={campaign?.prompt_template || ""}
                                 columns={campaign?.columns || []}
-                                onChange={handleUpdatePrompt}
+                                onChange={handlePromptChange}
+                                onSyncAgent={handleSyncPrompt}
                                 variableClass={styles.variable}
                             />
                         </TabsContent>
