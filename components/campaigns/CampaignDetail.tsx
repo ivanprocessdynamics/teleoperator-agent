@@ -170,6 +170,18 @@ export function CampaignDetail({ campaignId, subworkspaceId, onBack }: CampaignD
 
     return (
         <div className="h-full flex flex-col bg-gray-50 dark:bg-gray-950 p-6">
+            {/* Back Button */}
+            <div className="mb-4">
+                <Button
+                    variant="ghost"
+                    onClick={onBack}
+                    className="text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white pl-0 hover:bg-transparent"
+                >
+                    <ArrowLeft className="mr-2 h-4 w-4" />
+                    Volver a la lista
+                </Button>
+            </div>
+
             {/* Active Campaign Dashboard */}
             {
                 (executor.state.isRunning || executor.state.isPaused || executor.state.activeCalls > 0) && (

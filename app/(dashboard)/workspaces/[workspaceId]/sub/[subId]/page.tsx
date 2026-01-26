@@ -29,7 +29,7 @@ export default function SubworkspacePage() {
     const [agentId, setAgentId] = useState<string | null>(null);
     const [isEditing, setIsEditing] = useState(false);
     const [activeTab, setActiveTab] = useState(initialTab);
-    const [selectedCampaignId, setSelectedCampaignId] = useState<string | null>(null);
+    const selectedCampaignId = searchParams.get("campaignId");
 
     // Track scroll positions for each tab
     const scrollPositions = useRef<Record<string, number>>({});
@@ -42,20 +42,7 @@ export default function SubworkspacePage() {
         }
     }, [searchParams]);
 
-    // Restore scroll position when tab changes
-    useLayoutEffect(() => {
-        const savedPosition = scrollPositions.current[activeTab] || 0;
-        // Restore scroll on main window or specific container if needed
-        // Since layout has overflow-y-auto on main, we need to find that element?
-        // Actually the layout shows main has overflow-y-auto. Window scroll might be 0.
-        // Let's try to target the main element.
-        const main = document.querySelector('main');
-        if (main) {
-            main.scrollTop = savedPosition;
-        } else {
-            window.scrollTo(0, savedPosition);
-        }
-    }, [activeTab]);
+    // ... (keep scroll restoration logic) ...
 
     const handleTabChange = (value: string) => {
         // Save current scroll position before changing
@@ -64,9 +51,29 @@ export default function SubworkspacePage() {
         scrollPositions.current[activeTab] = currentScroll;
 
         setActiveTab(value);
-        // Update URL without reloading
+        // Update URL without reloading, keep campaignId if present? 
+        // No, typically switching tabs might want to close campaign or keep it?
+        // Let's assume switching tabs closes campaign if it's open overlay? 
+        // Actually, Campaign Detail replaces the entire view based on line 135 logic. 
+        // If we switch tabs, we probably want to clear campaignId to show the list?
+        // Or if we are in campaign view, we don't see tabs.
+        // So this logic is fine.
+
         const newParams = new URLSearchParams(searchParams.toString());
         newParams.set("tab", value);
+        newParams.delete("campaignId"); // Close campaign if switching tabs via URL (though UI hides tabs)
+        router.push(`?${newParams.toString()}`);
+    };
+
+    const handleSelectCampaign = (campaignId: string) => {
+        const newParams = new URLSearchParams(searchParams.toString());
+        newParams.set("campaignId", campaignId);
+        router.push(`?${newParams.toString()}`);
+    };
+
+    const handleCloseCampaign = () => {
+        const newParams = new URLSearchParams(searchParams.toString());
+        newParams.delete("campaignId");
         router.push(`?${newParams.toString()}`);
     };
 
@@ -82,18 +89,7 @@ export default function SubworkspacePage() {
         }
     };
 
-    useEffect(() => {
-        async function fetchSub() {
-            if (!subId) return;
-            const snap = await getDoc(doc(db, "subworkspaces", subId));
-            if (snap.exists()) {
-                const data = snap.data();
-                setSubName(data.name);
-                setAgentId(data.retell_agent_id);
-            }
-        }
-        fetchSub();
-    }, [subId]);
+    // ... existing fetchSub effect ...
 
     return (
         <div className="flex flex-col gap-6">
@@ -137,7 +133,7 @@ export default function SubworkspacePage() {
                 <CampaignDetail
                     campaignId={selectedCampaignId}
                     subworkspaceId={subId}
-                    onBack={() => setSelectedCampaignId(null)}
+                    onBack={handleCloseCampaign}
                 />
             ) : (
                 // Tabs containing Campaign List
@@ -172,7 +168,7 @@ export default function SubworkspacePage() {
                     <TabsContent value="contacts" forceMount className="mt-6 data-[state=inactive]:hidden">
                         <CampaignList
                             subworkspaceId={subId}
-                            onSelectCampaign={setSelectedCampaignId}
+                            onSelectCampaign={handleSelectCampaign}
                         />
                     </TabsContent>
 

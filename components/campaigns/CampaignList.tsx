@@ -214,6 +214,8 @@ export function CampaignList({ subworkspaceId, onSelectCampaign }: CampaignListP
     const [isDeleteOpen, setIsDeleteOpen] = useState(false);
     const [campaignToDelete, setCampaignToDelete] = useState<Campaign | null>(null);
     const [deleting, setDeleting] = useState(false);
+    // Optimistic Deletion State
+    const [optimisticDeletedIds, setOptimisticDeletedIds] = useState<Set<string>>(new Set());
 
     // Inline Editing State
     const [editingCampaignId, setEditingCampaignId] = useState<string | null>(null);
@@ -282,28 +284,65 @@ export function CampaignList({ subworkspaceId, onSelectCampaign }: CampaignListP
 
     const handleDeleteCampaign = async () => {
         if (!campaignToDelete) return;
-        setDeleting(true);
 
+        const idToDelete = campaignToDelete.id;
+
+        // 1. Optimistic Update: Hide immediately
+        setOptimisticDeletedIds(prev => {
+            const next = new Set(prev);
+            next.add(idToDelete);
+            return next;
+        });
+        setIsDeleteOpen(false);
+        setCampaignToDelete(null);
+
+        // 2. Perform deletion in background
         try {
-            // 1. Delete rows (batch)
-            const rowsQ = query(collection(db, "campaign_rows"), where("campaign_id", "==", campaignToDelete.id));
+            // Fetch all rows
+            const rowsQ = query(collection(db, "campaign_rows"), where("campaign_id", "==", idToDelete));
             const rowsSnap = await getDocs(rowsQ);
 
-            const batch = writeBatch(db);
-            rowsSnap.docs.forEach((docSnap) => {
-                batch.delete(docSnap.ref);
+            // Chunk formatting for batches (Firestore limit 500)
+            const BATCH_SIZE = 450;
+            const chunks = [];
+
+            // Create batches for rows
+            for (let i = 0; i < rowsSnap.size; i += BATCH_SIZE) {
+                const batch = writeBatch(db);
+                rowsSnap.docs.slice(i, i + BATCH_SIZE).forEach(doc => {
+                    batch.delete(doc.ref);
+                });
+                chunks.push(batch.commit());
+            }
+
+            // Await all row deletions
+            await Promise.all(chunks);
+
+            // Delete the campaign document itself
+            await deleteDoc(doc(db, "campaigns", idToDelete));
+
+            // Success: Remove from optimistic set (since it's now gone for real, onSnapshot will handle it)
+            // Actually, we can leave it or remove it. onSnapshot updates will likely come in.
+            // If we remove it from optimistic set but onSnapshot hasn't fired yet, it might flash back?
+            // Usually local writes fire snapshots immediately. 
+            // `deleteDoc` triggers local snapshot update almost instantly.
+            // So we can clear the optimistic ID to keep the set clean.
+            setOptimisticDeletedIds(prev => {
+                const next = new Set(prev);
+                next.delete(idToDelete);
+                return next;
             });
 
-            // 2. Delete campaign
-            batch.delete(doc(db, "campaigns", campaignToDelete.id));
-
-            await batch.commit();
-            setIsDeleteOpen(false);
-            setCampaignToDelete(null);
         } catch (error) {
             console.error("Error deleting campaign:", error);
-        } finally {
-            setDeleting(false);
+            alert("Error al eliminar la campaña. Por favor recarga la página.");
+
+            // Revert optimistic update on critical failure
+            setOptimisticDeletedIds(prev => {
+                const next = new Set(prev);
+                next.delete(idToDelete);
+                return next;
+            });
         }
     };
 
@@ -455,7 +494,7 @@ export function CampaignList({ subworkspaceId, onSelectCampaign }: CampaignListP
                     </div>
                 ) : (
                     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                        {campaigns.map((camp) => (
+                        {campaigns.filter(c => !optimisticDeletedIds.has(c.id)).map((camp) => (
                             <div
                                 key={camp.id}
                                 onClick={() => onSelectCampaign(camp.id)}
