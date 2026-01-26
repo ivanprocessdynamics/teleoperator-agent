@@ -169,6 +169,38 @@ export function CampaignDetail({ campaignId, subworkspaceId, onBack }: CampaignD
 
     const handleUpdateAnalysis = (analysis_config: AnalysisConfig) => debouncedSave({ analysis_config });
 
+    // Auto-Promote Local Fields to Global (Ensures "Archived" logic works for legacy fields)
+    useEffect(() => {
+        if (!campaign || !globalFields || !subworkspaceId) return;
+
+        const localFields = campaign.analysis_config?.custom_fields || [];
+        const missingInGlobal = localFields.filter(lf =>
+            !globalFields.some(gf => gf.id === lf.id || gf.name === lf.name)
+        );
+
+        if (missingInGlobal.length > 0) {
+            console.log("Creating/Promoting local fields to global inventory:", missingInGlobal);
+
+            // 1. Update Local State immediately to prevent "Disappearing" UI glitch
+            setGlobalFields(prev => [...prev, ...missingInGlobal]);
+
+            // 2. Persist to Firestore
+            const promoteFields = async () => {
+                try {
+                    const docRef = doc(db, "subworkspaces", subworkspaceId);
+                    // We use arrayUnion for each field. 
+                    // To do it in one go is tricky if they are objects, but arrayUnion(...items) works.
+                    await updateDoc(docRef, {
+                        global_analysis_definitions: arrayUnion(...missingInGlobal)
+                    });
+                } catch (err) {
+                    console.error("Failed to promote fields:", err);
+                }
+            };
+            promoteFields();
+        }
+    }, [campaign?.analysis_config?.custom_fields, subworkspaceId]); // Intentionally not including globalFields to avoid loops, we trust the strict check inside.
+
     const phoneColumnId = campaign?.phone_column_id || campaign?.columns?.find(c => c.isPhoneColumn)?.id || "col_phone";
 
     // Campaign Executor
