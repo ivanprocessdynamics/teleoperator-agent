@@ -1,51 +1,16 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { doc, getDoc, updateDoc } from "firebase/firestore";
-import { db } from "@/lib/firebase";
-import { VoiceOrb } from "@/components/VoiceOrb";
-import { CampaignAnalysis } from "@/components/campaigns/CampaignAnalysis";
-import { Textarea } from "@/components/ui/textarea";
-import { Button } from "@/components/ui/button";
-import { Save, Check, Loader2, FileText, Mic, Brain, ChevronDown, ChevronUp, Cloud } from "lucide-react";
-import { AnalysisConfig } from "@/types/campaign";
-
-import { useRef, useCallback } from "react";
-
-
-interface TestingEnvironmentProps {
-    subworkspaceId: string;
-}
-
+// ... imports
+import { doc, getDoc, updateDoc, arrayUnion } from "firebase/firestore";
+// ...
 
 export function TestingEnvironment({ subworkspaceId }: TestingEnvironmentProps) {
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
+    // ...
+    // Global Fields State
+    const [globalFields, setGlobalFields] = useState<AnalysisField[]>([]);
 
-    const [prompt, setPrompt] = useState("");
-    const [activePrompt, setActivePrompt] = useState("");
-    const [retellAgentId, setRetellAgentId] = useState("");
-
-    // Status states
-    const [savingDraft, setSavingDraft] = useState(false);
-    const [draftSaved, setDraftSaved] = useState(false);
-    const [activating, setActivating] = useState(false);
-    const [activeSuccess, setActiveSuccess] = useState(false);
-
-    // Variable State
-    const [variables, setVariables] = useState<Record<string, string>>({});
-
-    // Analysis Config State
-    const [analysisConfig, setAnalysisConfig] = useState<AnalysisConfig | undefined>(undefined);
-    const [showAnalysis, setShowAnalysis] = useState(false);
-
-    // Ref to hold immediate value (for Activar button and avoiding stale closures)
-    const promptRef = useRef("");
-    // Ref for debounce timer
-    const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
-
-    // Key to reset uncontrolled Textarea
-    const [initialLoadKey, setInitialLoadKey] = useState(0);
+    // ...
 
     // Load subworkspace data
     useEffect(() => {
@@ -70,6 +35,7 @@ export function TestingEnvironment({ subworkspaceId }: TestingEnvironmentProps) 
 
                     setRetellAgentId(data.retell_agent_id || "");
                     setAnalysisConfig(data.analysis_config);
+                    setGlobalFields(data.global_analysis_definitions || []); // Load Global Definitions
                     setInitialLoadKey(prev => prev + 1);
                 } else {
                     setError("No se encontró la configuración del workspace.");
@@ -84,6 +50,38 @@ export function TestingEnvironment({ subworkspaceId }: TestingEnvironmentProps) 
 
         loadData();
     }, [subworkspaceId]);
+
+    // ... handlePromptChange, etc ...
+
+    const handleAddGlobalField = async (field: AnalysisField) => {
+        setGlobalFields(prev => [...prev, field]); // Optimistic update
+        try {
+            await updateDoc(doc(db, "subworkspaces", subworkspaceId), {
+                global_analysis_definitions: arrayUnion(field)
+            });
+        } catch (error) {
+            console.error("Error adding global field:", error);
+        }
+    };
+
+    const handleDeleteGlobalField = async (fieldId: string) => {
+        const fieldToDelete = globalFields.find(f => f.id === fieldId);
+        if (!fieldToDelete) return;
+
+        setGlobalFields(prev => prev.filter(f => f.id !== fieldId)); // Optimistic
+        try {
+            // Firestore arrayRemove requires exact object match or we replace the whole array.
+            // Replacing whole array is safer here.
+            const newFields = globalFields.filter(f => f.id !== fieldId);
+            await updateDoc(doc(db, "subworkspaces", subworkspaceId), {
+                global_analysis_definitions: newFields
+            });
+        } catch (error) {
+            console.error("Error deleting global field:", error);
+        }
+    };
+
+    // ... existing helpers ...
 
     // Handle Text Change (Decoupled & Debounced)
     const handlePromptChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -390,6 +388,9 @@ export function TestingEnvironment({ subworkspaceId }: TestingEnvironmentProps) 
                                     custom_fields: []
                                 }}
                                 onChange={handleUpdateAnalysis}
+                                globalFields={globalFields}
+                                onAddGlobalField={handleAddGlobalField}
+                                onDeleteGlobalField={handleDeleteGlobalField}
                             />
                         </div>
                     )}

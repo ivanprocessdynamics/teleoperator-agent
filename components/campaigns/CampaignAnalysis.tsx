@@ -14,6 +14,11 @@ import { Badge } from "@/components/ui/badge";
 interface CampaignAnalysisProps {
     config: AnalysisConfig;
     onChange: (newConfig: AnalysisConfig) => void;
+
+    // Global support
+    globalFields?: AnalysisField[];
+    onAddGlobalField?: (field: AnalysisField) => void;
+    onDeleteGlobalField?: (fieldId: string) => void;
 }
 
 const DEFAULT_CONFIG: AnalysisConfig = {
@@ -29,7 +34,13 @@ const DEFAULT_CONFIG: AnalysisConfig = {
     hidden_standard_fields: []
 };
 
-export function CampaignAnalysis({ config = DEFAULT_CONFIG, onChange }: CampaignAnalysisProps) {
+export function CampaignAnalysis({
+    config = DEFAULT_CONFIG,
+    onChange,
+    globalFields,
+    onAddGlobalField,
+    onDeleteGlobalField
+}: CampaignAnalysisProps) {
     const [newField, setNewField] = useState<Partial<AnalysisField>>({
         type: 'string',
         name: '',
@@ -37,6 +48,19 @@ export function CampaignAnalysis({ config = DEFAULT_CONFIG, onChange }: Campaign
     });
 
     const [isAddingField, setIsAddingField] = useState(false);
+
+    // Determine Active vs Archived
+    // Mode A: Global Mode (if globalFields provided)
+    // Mode B: Local Mode (fallback)
+    const isGlobalMode = Array.isArray(globalFields);
+
+    const activeFields = isGlobalMode
+        ? config.custom_fields
+        : config.custom_fields.filter(f => !f.isArchived);
+
+    const archivedFields = isGlobalMode
+        ? (globalFields || []).filter(gf => !config.custom_fields.some(af => af.id === gf.id || af.name === gf.name))
+        : config.custom_fields.filter(f => f.isArchived);
 
     const addCustomField = () => {
         if (!newField.name || !newField.description || !newField.type) return;
@@ -49,33 +73,70 @@ export function CampaignAnalysis({ config = DEFAULT_CONFIG, onChange }: Campaign
             isArchived: false
         };
 
-        onChange({
-            ...config,
-            custom_fields: [...config.custom_fields, field]
-        });
+        // 1. Add to Global (if mode on)
+        if (isGlobalMode && onAddGlobalField) {
+            onAddGlobalField(field);
+        }
+
+        // 2. Add to Local Active
+        // Check for duplicates in local first?
+        if (!config.custom_fields.some(f => f.name === field.name)) {
+            onChange({
+                ...config,
+                custom_fields: [...config.custom_fields, field]
+            });
+        }
 
         setNewField({ type: 'string', name: '', description: '' });
         setIsAddingField(false);
     };
 
-    const removeCustomField = (id: string) => {
-        onChange({
-            ...config,
-            custom_fields: config.custom_fields.filter(f => f.id !== id)
-        });
+    // "Archivar": Remove from Active List (Global Mode) OR Set isArchived=true (Local Mode)
+    const archiveField = (id: string) => {
+        if (isGlobalMode) {
+            onChange({
+                ...config,
+                custom_fields: config.custom_fields.filter(f => f.id !== id)
+            });
+        } else {
+            onChange({
+                ...config,
+                custom_fields: config.custom_fields.map(f => f.id === id ? { ...f, isArchived: true } : f)
+            });
+        }
     };
 
-    const toggleArchiveField = (id: string) => {
-        onChange({
-            ...config,
-            custom_fields: config.custom_fields.map(f =>
-                f.id === id ? { ...f, isArchived: !f.isArchived } : f
-            )
-        });
+    // "Restaurar": Add from Global to Active (Global Mode) OR Set isArchived=false (Local Mode)
+    const restoreField = (field: AnalysisField) => {
+        if (isGlobalMode) {
+            onChange({
+                ...config,
+                custom_fields: [...config.custom_fields, field]
+            });
+        } else {
+            onChange({
+                ...config,
+                custom_fields: config.custom_fields.map(f => f.id === field.id ? { ...f, isArchived: false } : f)
+            });
+        }
     };
 
-    const activeFields = config.custom_fields.filter(f => !f.isArchived);
-    const archivedFields = config.custom_fields.filter(f => f.isArchived);
+    // "Eliminar": Delete from Global (Global Mode) OR Delete from Local (Local Mode)
+    const deletePermanent = (id: string) => {
+        if (isGlobalMode && onDeleteGlobalField) {
+            onDeleteGlobalField(id);
+            // Also ensure it's removed from local if present
+            onChange({
+                ...config,
+                custom_fields: config.custom_fields.filter(f => f.id !== id)
+            });
+        } else {
+            onChange({
+                ...config,
+                custom_fields: config.custom_fields.filter(f => f.id !== id)
+            });
+        }
+    };
 
     return (
         <div className="space-y-6 max-w-5xl mx-auto">
@@ -192,7 +253,7 @@ export function CampaignAnalysis({ config = DEFAULT_CONFIG, onChange }: Campaign
                                     </div>
 
                                     <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                        <Button variant="ghost" size="sm" onClick={() => toggleArchiveField(field.id)} className="text-gray-400 hover:text-orange-500 hover:bg-orange-50 dark:hover:bg-orange-900/10">
+                                        <Button variant="ghost" size="sm" onClick={() => archiveField(field.id)} className="text-gray-400 hover:text-orange-500 hover:bg-orange-50 dark:hover:bg-orange-900/10">
                                             <Archive className="h-4 w-4 mr-2" />
                                             Archivar
                                         </Button>
@@ -205,8 +266,12 @@ export function CampaignAnalysis({ config = DEFAULT_CONFIG, onChange }: Campaign
                                     <div className="h-12 w-12 rounded-full bg-gray-50 dark:bg-gray-800 flex items-center justify-center mb-3">
                                         <Brain className="h-6 w-6 text-gray-300 dark:text-gray-600" />
                                     </div>
-                                    <h5 className="text-gray-900 dark:text-white font-medium">Sin métricas personalizadas</h5>
-                                    <p className="text-sm text-gray-500 max-w-xs mt-1">Añade campos específicos que quieras que la IA detecte en cada llamada.</p>
+                                    <h5 className="text-gray-900 dark:text-white font-medium">Sin métricas activas</h5>
+                                    <p className="text-sm text-gray-500 max-w-xs mt-1">
+                                        {archivedFields.length > 0
+                                            ? "Hay métricas disponibles abajo. Restáuralas para usarlas."
+                                            : "Añade campos específicos que quieras que la IA detecte en cada llamada."}
+                                    </p>
                                 </div>
                             )
                         )}
@@ -217,7 +282,7 @@ export function CampaignAnalysis({ config = DEFAULT_CONFIG, onChange }: Campaign
                         <div className="bg-gray-50/50 dark:bg-gray-900/50 border-t border-gray-100 dark:border-gray-800">
                             <div className="px-4 py-3 bg-gray-100/50 dark:bg-gray-800/50 border-b border-gray-100 dark:border-gray-800 flex items-center gap-2">
                                 <Archive className="h-4 w-4 text-gray-400" />
-                                <span className="text-xs font-semibold uppercase text-gray-500 tracking-wider">Métricas Archivadas (Ocultas)</span>
+                                <span className="text-xs font-semibold uppercase text-gray-500 tracking-wider">Métricas Disponibles (Archivadas)</span>
                             </div>
                             <div className="divide-y divide-gray-100 dark:divide-gray-800 opacity-60 hover:opacity-100 transition-opacity p-2">
                                 {archivedFields.map((field) => (
@@ -227,10 +292,10 @@ export function CampaignAnalysis({ config = DEFAULT_CONFIG, onChange }: Campaign
                                             <span className="text-sm font-medium text-gray-600 dark:text-gray-400 line-through decoration-gray-300">{field.name}</span>
                                         </div>
                                         <div className="flex items-center gap-1">
-                                            <Button variant="ghost" size="icon" onClick={() => toggleArchiveField(field.id)} className="h-7 w-7 text-gray-400 hover:text-green-600 hover:bg-green-50" title="Restaurar Visibilidad">
+                                            <Button variant="ghost" size="icon" onClick={() => restoreField(field)} className="h-7 w-7 text-gray-400 hover:text-green-600 hover:bg-green-50" title="Restaurar Visibilidad">
                                                 <RefreshCcw className="h-3.5 w-3.5" />
                                             </Button>
-                                            <Button variant="ghost" size="icon" onClick={() => removeCustomField(field.id)} className="h-7 w-7 text-gray-400 hover:text-red-600 hover:bg-red-50" title="Eliminar definitivamente">
+                                            <Button variant="ghost" size="icon" onClick={() => deletePermanent(field.id)} className="h-7 w-7 text-gray-400 hover:text-red-600 hover:bg-red-50" title="Eliminar definitivamente">
                                                 <Trash2 className="h-3.5 w-3.5" />
                                             </Button>
                                         </div>

@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useState, useRef, useCallback } from "react";
-import { doc, onSnapshot, updateDoc, getDoc } from "firebase/firestore";
+import { doc, onSnapshot, updateDoc, getDoc, arrayUnion } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { Campaign, CampaignColumn, AnalysisConfig, CallingConfig } from "@/types/campaign";
+import { Campaign, CampaignColumn, AnalysisConfig, AnalysisField, CallingConfig } from "@/types/campaign";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Play, Save, Check, Loader2, FileText, Phone, Users, Target, Zap, Star, MessageCircle, Mail, Pause, Square, Settings, Activity } from "lucide-react";
 import { CampaignTable } from "./CampaignTable";
@@ -64,6 +64,7 @@ export function CampaignDetail({ campaignId, subworkspaceId, onBack }: CampaignD
     const [campaign, setCampaign] = useState<Campaign | null>(null);
     const [retellAgentId, setRetellAgentId] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(true);
+    const [globalFields, setGlobalFields] = useState<AnalysisField[]>([]);
 
     const [showRelaunchDialog, setShowRelaunchDialog] = useState(false);
     const [relaunchStartLine, setRelaunchStartLine] = useState("1");
@@ -81,7 +82,7 @@ export function CampaignDetail({ campaignId, subworkspaceId, onBack }: CampaignD
         return () => unsub();
     }, [campaignId]);
 
-    // Fetch Subworkspace (for Retell Agent ID)
+    // Fetch Subworkspace (for Retell Agent ID AND Global Fields)
     useEffect(() => {
         async function fetchSubworkspace() {
             if (!subworkspaceId) return;
@@ -89,7 +90,9 @@ export function CampaignDetail({ campaignId, subworkspaceId, onBack }: CampaignD
                 const docRef = doc(db, "subworkspaces", subworkspaceId);
                 const snap = await getDoc(docRef);
                 if (snap.exists()) {
-                    setRetellAgentId(snap.data().retell_agent_id);
+                    const data = snap.data();
+                    setRetellAgentId(data.retell_agent_id);
+                    setGlobalFields(data.global_analysis_definitions || []);
                 }
             } catch (err) {
                 console.error("Error fetching subworkspace:", err);
@@ -97,6 +100,34 @@ export function CampaignDetail({ campaignId, subworkspaceId, onBack }: CampaignD
         }
         fetchSubworkspace();
     }, [subworkspaceId]);
+
+    const handleAddGlobalField = async (field: AnalysisField) => {
+        if (!subworkspaceId) return;
+        setGlobalFields(prev => [...prev, field]); // Optimistic
+        try {
+            await updateDoc(doc(db, "subworkspaces", subworkspaceId), {
+                global_analysis_definitions: arrayUnion(field)
+            });
+        } catch (error) {
+            console.error("Error adding global field:", error);
+        }
+    };
+
+    const handleDeleteGlobalField = async (fieldId: string) => {
+        if (!subworkspaceId) return;
+        const fieldToDelete = globalFields.find(f => f.id === fieldId);
+        if (!fieldToDelete) return;
+
+        setGlobalFields(prev => prev.filter(f => f.id !== fieldId));
+        try {
+            const newFields = globalFields.filter(f => f.id !== fieldId);
+            await updateDoc(doc(db, "subworkspaces", subworkspaceId), {
+                global_analysis_definitions: newFields
+            });
+        } catch (error) {
+            console.error("Error deleting global field:", error);
+        }
+    };
 
     const debouncedSave = useCallback(async (updates: Partial<Campaign>) => {
         if (!campaignId) return;
@@ -140,7 +171,7 @@ export function CampaignDetail({ campaignId, subworkspaceId, onBack }: CampaignD
 
     const phoneColumnId = campaign?.phone_column_id || campaign?.columns?.find(c => c.isPhoneColumn)?.id || "col_phone";
 
-    // Campaign Executor - Moved up to avoid conditional hook call
+    // Campaign Executor
     const executor = useCampaignExecutor({
         campaignId: campaignId,
         agentId: retellAgentId || '',
@@ -420,7 +451,7 @@ export function CampaignDetail({ campaignId, subworkspaceId, onBack }: CampaignD
                 <div className="col-span-12 lg:col-span-5 h-full overflow-y-auto pr-2">
                     <Tabs defaultValue="prompt" className="w-full">
                         <TabsList className="grid w-full grid-cols-3 mb-4 bg-gray-100 dark:bg-gray-800">
-                            <TabsTrigger value="prompt">Prompt (Guion)</TabsTrigger>
+                            <TabsTrigger value="prompt">Prompt</TabsTrigger>
                             <TabsTrigger value="analysis">Análisis & IA</TabsTrigger>
                             <TabsTrigger value="calling"><Phone className="h-3.5 w-3.5 mr-1.5" />Llamadas</TabsTrigger>
                         </TabsList>
@@ -449,6 +480,9 @@ export function CampaignDetail({ campaignId, subworkspaceId, onBack }: CampaignD
                                     custom_fields: []
                                 }}
                                 onChange={handleUpdateAnalysis}
+                                globalFields={globalFields}
+                                onAddGlobalField={handleAddGlobalField}
+                                onDeleteGlobalField={handleDeleteGlobalField}
                             />
                         </TabsContent>
 
