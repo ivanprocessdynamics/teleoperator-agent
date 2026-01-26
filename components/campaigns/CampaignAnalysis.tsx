@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Plus, Trash2, Brain, FileText, BarChart3, Archive, RefreshCcw, Eye, EyeOff, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 interface CampaignAnalysisProps {
     config: AnalysisConfig;
@@ -48,6 +49,7 @@ export function CampaignAnalysis({
     });
 
     const [isAddingField, setIsAddingField] = useState(false);
+    const [fieldToDelete, setFieldToDelete] = useState<AnalysisField | null>(null);
 
     // Determine Active vs Archived
     // Mode A: Global Mode (if globalFields provided)
@@ -135,6 +137,13 @@ export function CampaignAnalysis({
                 ...config,
                 custom_fields: config.custom_fields.filter(f => f.id !== id)
             });
+        }
+    };
+
+    const confirmDelete = () => {
+        if (fieldToDelete) {
+            deletePermanent(fieldToDelete.id);
+            setFieldToDelete(null);
         }
     };
 
@@ -295,7 +304,7 @@ export function CampaignAnalysis({
                                             <Button variant="ghost" size="icon" onClick={() => restoreField(field)} className="h-7 w-7 text-gray-400 hover:text-green-600 hover:bg-green-50" title="Restaurar Visibilidad">
                                                 <RefreshCcw className="h-3.5 w-3.5" />
                                             </Button>
-                                            <Button variant="ghost" size="icon" onClick={() => deletePermanent(field.id)} className="h-7 w-7 text-gray-400 hover:text-red-600 hover:bg-red-50" title="Eliminar definitivamente">
+                                            <Button variant="ghost" size="icon" onClick={() => setFieldToDelete(field)} className="h-7 w-7 text-gray-400 hover:text-red-600 hover:bg-red-50" title="Eliminar definitivamente">
                                                 <Trash2 className="h-3.5 w-3.5" />
                                             </Button>
                                         </div>
@@ -306,6 +315,21 @@ export function CampaignAnalysis({
                     )}
                 </CardContent>
             </Card>
+
+            <Dialog open={!!fieldToDelete} onOpenChange={(open) => !open && setFieldToDelete(null)}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>¿Eliminar métrica "{fieldToDelete?.name}"?</DialogTitle>
+                        <DialogDescription>
+                            Estás a punto de eliminar definitivamente esta configuración de métrica. La IA dejará de buscar este dato en futuras llamadas.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setFieldToDelete(null)}>Cancelar</Button>
+                        <Button variant="destructive" onClick={confirmDelete}>Eliminar</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }
