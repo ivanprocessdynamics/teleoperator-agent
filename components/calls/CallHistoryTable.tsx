@@ -76,22 +76,28 @@ export function CallHistoryTable({ agentId: initialAgentId }: CallHistoryTablePr
     const [pickerStart, setPickerStart] = useState<Date | null>(null);
     const [pickerEnd, setPickerEnd] = useState<Date | null>(null);
 
-    // 1. Fetch Campaigns for mapping names
+    // 1. Fetch Campaigns for mapping names (Real-time)
     useEffect(() => {
-        const fetchCampaigns = async () => {
-            try {
-                const snapshot = await getDocs(collection(db, "campaigns"));
-                const map: Record<string, string> = {};
-                snapshot.docs.forEach(doc => {
-                    const data = doc.data();
-                    map[doc.id] = data.title || "Campaña sin nombre";
-                });
-                setCampaignMap(map);
-            } catch (err) {
-                console.error("Error fetching campaigns:", err);
-            }
-        };
-        fetchCampaigns();
+        const unsub = onSnapshot(collection(db, "campaigns"), (snapshot) => {
+            const map: Record<string, string> = {};
+            snapshot.docs.forEach(doc => {
+                const data = doc.data();
+                // Map both the ID and the Vapi Agent ID if it exists? 
+                // For now map the document ID (which is likely the campaign_id) to the title.
+                map[doc.id] = data.title || "Campaña sin nombre";
+
+                // If the campaign has a specific 'agent_id' field, map that too? 
+                // Let's assume calls.agent_id might match campaign.id OR campaign.vapi_agent_id
+                if (data.vapi_agent_id) {
+                    map[data.vapi_agent_id] = data.title || "Campaña sin nombre";
+                }
+            });
+            setCampaignMap(map);
+        }, (err) => {
+            console.error("Error fetching campaigns:", err);
+        });
+
+        return () => unsub();
     }, []);
 
     useEffect(() => {
@@ -132,7 +138,12 @@ export function CallHistoryTable({ agentId: initialAgentId }: CallHistoryTablePr
             setCalls(data);
 
             // Extract unique campaigns for filter
-            const cIds = Array.from(new Set(data.map(c => c.metadata?.campaign_id).filter(Boolean))) as string[];
+            // Check both agent_id and metadata.campaign_id
+            const cIds = Array.from(new Set(data.map(c => {
+                // If we have a mapped title for the agent_id, use that ID (or the agent_id itself)
+                // We prefer metadata.campaign_id, then agent_id
+                return c.metadata?.campaign_id || c.agent_id;
+            }).filter(Boolean))) as string[];
             setUniqueCampaignIds(cIds);
 
             setLoading(false);
@@ -149,20 +160,24 @@ export function CallHistoryTable({ agentId: initialAgentId }: CallHistoryTablePr
     useEffect(() => {
         let result = calls;
 
-        // Filter by Campaign ID
+        // Filter by Campaign ID (matches agent_id or campaign_id)
         if (selectedCampaignId !== "all") {
-            result = result.filter(c => c.metadata?.campaign_id === selectedCampaignId);
+            result = result.filter(c =>
+                c.metadata?.campaign_id === selectedCampaignId ||
+                c.agent_id === selectedCampaignId
+            );
         }
 
         // Filter by Source (Campaign vs Testing)
         if (sourceFilter === "campaign") {
-            result = result.filter(c => c.metadata?.campaign_id);
+            // Assume it's a campaign if we can find a title for it or it has explicit metadata
+            result = result.filter(c => c.metadata?.campaign_id || campaignMap[c.agent_id]);
         } else if (sourceFilter === "testing") {
-            result = result.filter(c => !c.metadata?.campaign_id);
+            result = result.filter(c => !c.metadata?.campaign_id && !campaignMap[c.agent_id]);
         }
 
         setFilteredCalls(result);
-    }, [calls, selectedCampaignId, sourceFilter]);
+    }, [calls, selectedCampaignId, sourceFilter, campaignMap]);
 
     const [expandedSummaries, setExpandedSummaries] = useState<Set<string>>(new Set());
 
@@ -320,7 +335,10 @@ export function CallHistoryTable({ agentId: initialAgentId }: CallHistoryTablePr
                                 const sentiment = getSentimentConfig(call.analysis?.user_sentiment);
                                 const SentimentIcon = sentiment.icon;
                                 const isExpanded = expandedSummaries.has(call.id);
-                                const campaignName = call.metadata?.campaign_id ? campaignMap[call.metadata.campaign_id] : null;
+
+                                // Try lookup by campaign_id (metadata) OR agent_id (direct map)
+                                const campaignName = (call.metadata?.campaign_id ? campaignMap[call.metadata.campaign_id] : null)
+                                    || campaignMap[call.agent_id];
 
                                 return (
                                     <TableRow key={call.id} className="group hover:bg-blue-50/50 dark:hover:bg-blue-900/10 transition-colors">

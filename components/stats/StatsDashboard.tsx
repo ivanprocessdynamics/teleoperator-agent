@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { collection, query, where, getDocs, Timestamp, orderBy, doc, getDoc, updateDoc } from "firebase/firestore";
+import { collection, query, where, getDocs, Timestamp, orderBy, doc, getDoc, updateDoc, onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Loader2, TrendingUp, Clock, Phone, ThumbsUp, Activity, RefreshCcw, EyeOff, Eye, Archive, Trash2 } from "lucide-react";
@@ -41,7 +41,29 @@ export function StatsDashboard(props: StatsDashboardProps) {
         sentimentBreakdown: { positive: 0, neutral: 0, negative: 0 }
     });
     const [customStats, setCustomStats] = useState<Record<string, any>>({});
-    const [archivedCustom, setArchivedCustom] = useState<any[]>([]);
+    // Removed archivedCustom state as we now filter allFields directly, but for compatibility lets keep it or just rely on derived
+
+    // Campaign Data
+    const [campaignMap, setCampaignMap] = useState<Record<string, string>>({});
+
+    // 1. Fetch Campaigns for mapping names (Real-time)
+    useEffect(() => {
+        const unsub = onSnapshot(collection(db, "campaigns"), (snapshot) => {
+            const map: Record<string, string> = {};
+            snapshot.docs.forEach(doc => {
+                const data = doc.data();
+                map[doc.id] = data.title || "Campaña sin nombre";
+                if (data.vapi_agent_id) {
+                    map[data.vapi_agent_id] = data.title || "Campaña sin nombre";
+                }
+            });
+            setCampaignMap(map);
+        }, (err) => {
+            console.error("Error fetching campaigns:", err);
+        });
+
+        return () => unsub();
+    }, []);
 
     // 1. Fetch Data (Calls + Config)
     const fetchStats = async () => {
@@ -150,7 +172,7 @@ export function StatsDashboard(props: StatsDashboardProps) {
 
         // 1. Initialize from Config
         allFields.forEach(field => {
-            if (field.isArchived) return;
+            if (field.isArchived) return; // Skip archived fields (don't show them)
             customAgg[field.name] = {
                 id: field.id,
                 type: field.type,
@@ -168,10 +190,14 @@ export function StatsDashboard(props: StatsDashboardProps) {
                 customs.forEach((c: any) => {
                     // Normalize Name
                     const name = c.name;
+
+                    // CRITICAL FIX: If this field is KNOWN to be archived, ignore it entirely.
+                    // Do not "rediscover" it.
+                    const isArchived = allFields.some(f => f.name === name && f.isArchived);
+                    if (isArchived) return;
+
                     if (!customAgg[name]) {
-                        // Discovered a field not in active config (maybe deleted/archived or new)
-                        // We Check if it was in the archived config list to restore metadata? 
-                        // For now we just create a generic entry
+                        // Discovered a field not in active config (maybe new)
                         customAgg[name] = {
                             id: `auto_${name}`,
                             type: typeof c.value === 'boolean' ? 'boolean' : typeof c.value === 'number' ? 'number' : 'string',
@@ -232,15 +258,39 @@ export function StatsDashboard(props: StatsDashboardProps) {
     const handleToggleCustomArchive = async (fieldId: string, archive: boolean) => {
         if (!props.subworkspaceId) return;
 
-        // Optimistic local update
-        const updatedFields = allFields.map(f =>
-            f.id === fieldId ? { ...f, isArchived: archive } : f
-        );
-        setAllFields(updatedFields);
+        // Find if this is an auto-discovered field (starts with 'auto_')
+        // OR an existing config field.
+        // If it's auto-discovered, we must ADD it to the 'custom_fields' array as archived.
+
+        let newFields = [...allFields];
+        const existingIndex = newFields.findIndex(f => f.id === fieldId);
+
+        if (existingIndex >= 0) {
+            // Update existing
+            newFields[existingIndex] = { ...newFields[existingIndex], isArchived: archive };
+        } else if (fieldId.startsWith('auto_')) {
+            // It's a transient field we want to archive. We must persist it.
+            // Retrieve the temp object from customStats to get details?
+            // Actually, we can just look at customStats[name] but we need the name.
+            // The 'id' in handleToggle is what we have.
+            // We search customStats values for this ID.
+            const statEntry = Object.values(customStats).find(s => s.id === fieldId);
+            if (statEntry) {
+                newFields.push({
+                    id: fieldId, // or generate new ID? 'auto_' ID is fine for now or valid UUID
+                    name: statEntry.name,
+                    description: statEntry.description,
+                    type: statEntry.type,
+                    isArchived: true // Start archived
+                });
+            }
+        }
+
+        setAllFields(newFields);
 
         try {
             await updateDoc(doc(db, "subworkspaces", props.subworkspaceId), {
-                "analysis_config.custom_fields": updatedFields
+                "analysis_config.custom_fields": newFields
             });
         } catch (e) {
             console.error("Error toggling archive", e);
@@ -257,7 +307,8 @@ export function StatsDashboard(props: StatsDashboardProps) {
         return <div className="flex justify-center p-12"><Loader2 className="h-8 w-8 animate-spin text-blue-500" /></div>;
     }
 
-    const hasHiddenMetrics = hiddenStandard.length > 0 || archivedCustom.length > 0;
+    const hasHiddenMetrics = hiddenStandard.length > 0 || allFields.filter(f => f.isArchived).length > 0;
+    const archivedCustomList = allFields.filter(f => f.isArchived);
 
     return (
         <div className="space-y-6 animate-fade-in pb-10">
@@ -270,12 +321,14 @@ export function StatsDashboard(props: StatsDashboardProps) {
                     </Button>
                     <Select value={selectedAgent} onValueChange={setSelectedAgent}>
                         <SelectTrigger className="w-[180px] bg-white dark:bg-gray-800">
-                            <SelectValue placeholder="Agente" />
+                            <SelectValue placeholder="Campaña" />
                         </SelectTrigger>
                         <SelectContent>
-                            <SelectItem value="all">Todos los agentes</SelectItem>
+                            <SelectItem value="all">Todas las campañas</SelectItem>
                             {uniqueAgents.map(aid => (
-                                <SelectItem key={aid} value={aid}>{aid}</SelectItem>
+                                <SelectItem key={aid} value={aid}>
+                                    {campaignMap[aid] || "Campaña desconocida"}
+                                </SelectItem>
                             ))}
                         </SelectContent>
                     </Select>
@@ -512,7 +565,7 @@ export function StatsDashboard(props: StatsDashboardProps) {
                         })}
 
                         {/* Custom Archived */}
-                        {archivedCustom.map(field => (
+                        {archivedCustomList.map(field => (
                             <div key={field.id} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-100 dark:border-gray-800">
                                 <div className="flex items-center gap-2">
                                     <Badge variant="outline" className="bg-purple-50 dark:bg-purple-900/10 text-purple-600 border-purple-100 text-xs">Personalizada</Badge>
