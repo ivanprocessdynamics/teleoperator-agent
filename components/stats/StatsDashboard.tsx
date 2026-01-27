@@ -69,20 +69,48 @@ export function StatsDashboard(props: StatsDashboardProps) {
         return () => unsub();
     }, []);
 
-    // 1. Fetch Data (Calls + Config)
+    // 2. Fetch Data (Calls + Config)
     const fetchStats = async () => {
         if (!agentId || !props.subworkspaceId) return;
         setLoading(true);
 
         try {
-            // Fetch Config
+            // Fetch Subworkspace Config (Base)
+            let currentFields: any[] = [];
+            let currentHidden: string[] = [];
+            let currentIgnored: string[] = [];
+
             const subDoc = await getDoc(doc(db, "subworkspaces", props.subworkspaceId));
             if (subDoc.exists()) {
                 const data = subDoc.data();
-                setHiddenStandard(data.analysis_config?.hidden_standard_fields || []);
-                setAllFields(data.analysis_config?.custom_fields || []);
-                setIgnoredFields(data.analysis_config?.ignored_custom_fields || []);
+                currentHidden = data.analysis_config?.hidden_standard_fields || [];
+                currentFields = data.analysis_config?.custom_fields || [];
+                currentIgnored = data.analysis_config?.ignored_custom_fields || [];
             }
+
+            // If a specific Campaign is selected, try to load its config to overlay/add fields
+            if (selectedCampaign !== 'all') {
+                try {
+                    const campDoc = await getDoc(doc(db, "campaigns", selectedCampaign));
+                    if (campDoc.exists()) {
+                        const cData = campDoc.data();
+                        const cFields = cData.analysis_config?.custom_fields || [];
+                        // Merge strategies? For now, we'll append unique fields from Campaign
+                        // or should we replace? The user expects to see Campaign fields.
+                        // Let's just create a map by name to unified them.
+                        const fieldMap = new Map();
+                        currentFields.forEach(f => fieldMap.set(f.name, f));
+                        cFields.forEach((f: any) => fieldMap.set(f.name, f)); // Campaign overrides/adds
+                        currentFields = Array.from(fieldMap.values());
+                    }
+                } catch (err) {
+                    console.error("Error loading campaign config:", err);
+                }
+            }
+
+            setHiddenStandard(currentHidden);
+            setAllFields(currentFields);
+            setIgnoredFields(currentIgnored);
 
             // Fetch Calls
             const now = new Date();
@@ -134,7 +162,7 @@ export function StatsDashboard(props: StatsDashboardProps) {
     useEffect(() => {
         if (period === "custom" && (!pickerStart || !pickerEnd)) return;
         fetchStats();
-    }, [agentId, period, props.subworkspaceId, pickerStart, pickerEnd]);
+    }, [agentId, period, props.subworkspaceId, pickerStart, pickerEnd, selectedCampaign]);
 
     // 2.5 Extract Campaigns
     useEffect(() => {

@@ -11,6 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Plus, Trash2, Brain, FileText, BarChart3, Archive, RefreshCcw, Eye, EyeOff, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { cn } from "@/lib/utils";
 
 interface CampaignAnalysisProps {
     config: AnalysisConfig;
@@ -20,6 +21,7 @@ interface CampaignAnalysisProps {
     globalFields?: AnalysisField[];
     onAddGlobalField?: (field: AnalysisField) => void;
     onDeleteGlobalField?: (fieldId: string) => void;
+    isCampaignMode?: boolean; // If true, disables creation/deletion and only allows toggling active state
 }
 
 const DEFAULT_CONFIG: AnalysisConfig = {
@@ -41,7 +43,8 @@ export function CampaignAnalysis({
     onChange,
     globalFields,
     onAddGlobalField,
-    onDeleteGlobalField
+    onDeleteGlobalField,
+    isCampaignMode = false
 }: CampaignAnalysisProps) {
     const [newField, setNewField] = useState<Partial<AnalysisField>>({
         type: 'string',
@@ -179,9 +182,26 @@ export function CampaignAnalysis({
                 </CardHeader>
 
                 <CardContent className="p-0">
+                    {/* Campaign Mode Info Banner */}
+                    {isCampaignMode && (
+                        <div className="bg-blue-50/50 dark:bg-blue-900/10 border-b border-blue-100 dark:border-blue-900/20 px-6 py-4 flex items-start gap-4">
+                            <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg text-blue-600 dark:text-blue-400">
+                                <RefreshCcw className="h-5 w-5" />
+                            </div>
+                            <div>
+                                <h4 className="text-sm font-semibold text-gray-900 dark:text-white">Gestión Centralizada</h4>
+                                <p className="text-sm text-gray-600 dark:text-gray-400 mt-1 max-w-2xl">
+                                    Estas variables se sincronizan automáticamente con el Entorno de Pruebas.
+                                    Puedes activar o desactivar cuáles usar en esta campaña, pero para crear nuevas o eliminarlas debes ir al Entorno de Pruebas.
+                                </p>
+                            </div>
+                        </div>
+                    )}
+
                     {/* Add Form (Collapsible/Inline) */}
-                    {isAddingField && (
+                    {isAddingField && !isCampaignMode && (
                         <div className="p-6 bg-gray-50/80 dark:bg-gray-900/80 border-b border-gray-100 dark:border-gray-800 animate-in slide-in-from-top-2 duration-200">
+                            {/* ... (Keep existing form content) ... */}
                             <div className="flex items-center justify-between mb-4">
                                 <h4 className="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-2">
                                     <div className="h-2 w-2 rounded-full bg-purple-500" />
@@ -224,7 +244,7 @@ export function CampaignAnalysis({
                                 <div className="space-y-2">
                                     <Label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Instrucción para la IA</Label>
                                     <Input
-                                        placeholder="ej: ¿Cuál fue la razón exacta por la que el cliente dijo que no?"
+                                        placeholder="ej: ¿Cuál fue la razón exacta por la que el cliente dijo no?"
                                         value={newField.description}
                                         onChange={(e) => setNewField({ ...newField, description: e.target.value })}
                                         className="bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 h-10"
@@ -270,8 +290,19 @@ export function CampaignAnalysis({
                                     <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                         <Button variant="ghost" size="sm" onClick={() => archiveField(field.id)} className="text-gray-400 hover:text-orange-500 hover:bg-orange-50 dark:hover:bg-orange-900/10">
                                             <Archive className="h-4 w-4 mr-2" />
-                                            Archivar
+                                            {isCampaignMode ? "Desactivar" : "Archivar"}
                                         </Button>
+                                        {!isCampaignMode && (
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                onClick={() => setFieldToDelete(field)}
+                                                className="text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/10"
+                                                title="Eliminar definitivamente"
+                                            >
+                                                <Trash2 className="h-4 w-4" />
+                                            </Button>
+                                        )}
                                     </div>
                                 </div>
                             ))
@@ -283,9 +314,10 @@ export function CampaignAnalysis({
                                     </div>
                                     <h5 className="text-gray-900 dark:text-white font-medium">Sin métricas activas</h5>
                                     <p className="text-sm text-gray-500 max-w-xs mt-1">
-                                        {archivedFields.length > 0
-                                            ? "Hay métricas disponibles abajo. Restáuralas para usarlas."
-                                            : "Añade campos específicos que quieras que la IA detecte en cada llamada."}
+                                        {isCampaignMode
+                                            ? "No hay métricas activas. Activa las disponibles abajo."
+                                            : (archivedFields.length > 0 ? "Hay métricas disponibles abajo. Restáuralas para usarlas." : "Añade campos específicos que quieras que la IA detecte en cada llamada.")
+                                        }
                                     </p>
                                 </div>
                             )
@@ -297,22 +329,31 @@ export function CampaignAnalysis({
                         <div className="bg-gray-50/50 dark:bg-gray-900/50 border-t border-gray-100 dark:border-gray-800">
                             <div className="px-4 py-3 bg-gray-100/50 dark:bg-gray-800/50 border-b border-gray-100 dark:border-gray-800 flex items-center gap-2">
                                 <Archive className="h-4 w-4 text-gray-400" />
-                                <span className="text-xs font-semibold uppercase text-gray-500 tracking-wider">Métricas Disponibles (Archivadas)</span>
+                                <span className="text-xs font-semibold uppercase text-gray-500 tracking-wider">
+                                    {isCampaignMode ? "Métricas Disponibles (Inactivas)" : "Métricas Disponibles (Archivadas)"}
+                                </span>
                             </div>
-                            <div className="divide-y divide-gray-100 dark:divide-gray-800 opacity-60 hover:opacity-100 transition-opacity p-2">
+                            <div className="divide-y divide-gray-100 dark:divide-gray-800 opacity-80 hover:opacity-100 transition-opacity p-2">
                                 {archivedFields.map((field) => (
                                     <div key={field.id} className="flex items-center justify-between p-3 rounded hover:bg-white dark:hover:bg-gray-800 transition-colors">
                                         <div className="flex items-center gap-3">
                                             <div className="h-1.5 w-1.5 rounded-full bg-gray-400" />
-                                            <span className="text-sm font-medium text-gray-600 dark:text-gray-400 line-through decoration-gray-300">{field.name}</span>
+                                            <span className={cn(
+                                                "text-sm font-medium text-gray-600 dark:text-gray-400",
+                                                !isCampaignMode && "line-through decoration-gray-300"
+                                            )}>
+                                                {field.name}
+                                            </span>
                                         </div>
                                         <div className="flex items-center gap-1">
-                                            <Button variant="ghost" size="icon" onClick={() => restoreField(field)} className="h-7 w-7 text-gray-400 hover:text-green-600 hover:bg-green-50" title="Restaurar Visibilidad">
+                                            <Button variant="ghost" size="icon" onClick={() => restoreField(field)} className="h-7 w-7 text-gray-400 hover:text-green-600 hover:bg-green-50" title="Activar">
                                                 <RefreshCcw className="h-3.5 w-3.5" />
                                             </Button>
-                                            <Button variant="ghost" size="icon" onClick={() => setFieldToDelete(field)} className="h-7 w-7 text-gray-400 hover:text-red-600 hover:bg-red-50" title="Eliminar definitivamente">
-                                                <Trash2 className="h-3.5 w-3.5" />
-                                            </Button>
+                                            {!isCampaignMode && (
+                                                <Button variant="ghost" size="icon" onClick={() => setFieldToDelete(field)} className="h-7 w-7 text-gray-400 hover:text-red-600 hover:bg-red-50" title="Eliminar definitivamente">
+                                                    <Trash2 className="h-3.5 w-3.5" />
+                                                </Button>
+                                            )}
                                         </div>
                                     </div>
                                 ))}

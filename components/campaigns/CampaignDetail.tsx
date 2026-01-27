@@ -101,7 +101,9 @@ export function CampaignDetail({ campaignId, subworkspaceId, onBack }: CampaignD
                 if (snap.exists()) {
                     const data = snap.data();
                     setRetellAgentId(data.retell_agent_id);
-                    setGlobalFields(data.global_analysis_definitions || []);
+                    // USE Subworkspace's active config as the "Global/Shared" source of truth
+                    const sharedFields = data.analysis_config?.custom_fields || [];
+                    setGlobalFields(sharedFields);
                 }
             } catch (err) {
                 console.error("Error fetching subworkspace:", err);
@@ -110,33 +112,12 @@ export function CampaignDetail({ campaignId, subworkspaceId, onBack }: CampaignD
         fetchSubworkspace();
     }, [subworkspaceId]);
 
-    const handleAddGlobalField = async (field: AnalysisField) => {
-        if (!subworkspaceId) return;
-        setGlobalFields(prev => [...prev, field]); // Optimistic
-        try {
-            await updateDoc(doc(db, "subworkspaces", subworkspaceId), {
-                global_analysis_definitions: arrayUnion(field)
-            });
-        } catch (error) {
-            console.error("Error adding global field:", error);
-        }
-    };
-
-    const handleDeleteGlobalField = async (fieldId: string) => {
-        if (!subworkspaceId) return;
-        const fieldToDelete = globalFields.find(f => f.id === fieldId);
-        if (!fieldToDelete) return;
-
-        setGlobalFields(prev => prev.filter(f => f.id !== fieldId));
-        try {
-            const newFields = globalFields.filter(f => f.id !== fieldId);
-            await updateDoc(doc(db, "subworkspaces", subworkspaceId), {
-                global_analysis_definitions: newFields
-            });
-        } catch (error) {
-            console.error("Error deleting global field:", error);
-        }
-    };
+    /* 
+       Legacy/Unused handlers (handleAddGlobalField, handleDeleteGlobalField) 
+       can be kept empty or removed since Campaign Mode disables them.
+    */
+    const handleAddGlobalField = async (field: AnalysisField) => { console.log("Managed centrally"); };
+    const handleDeleteGlobalField = async (fieldId: string) => { console.log("Managed centrally"); };
 
     const debouncedSave = useCallback(async (updates: Partial<Campaign>) => {
         if (!campaignId) return;
@@ -178,37 +159,61 @@ export function CampaignDetail({ campaignId, subworkspaceId, onBack }: CampaignD
 
     const handleUpdateAnalysis = (analysis_config: AnalysisConfig) => debouncedSave({ analysis_config });
 
-    // Auto-Promote Local Fields to Global (Ensures "Archived" logic works for legacy fields)
+    // Active Sync: Global (Subworkspace) -> Campaign
+    // Ensures Campaign always reflects the Global Definitions, only allowing local "Archive/Disable" overrides.
     useEffect(() => {
-        if (!campaign || !globalFields || !subworkspaceId) return;
+        if (!campaign || !globalFields || globalFields.length === 0) return;
 
-        const localFields = campaign.analysis_config?.custom_fields || [];
-        const missingInGlobal = localFields.filter(lf =>
-            !globalFields.some(gf => gf.id === lf.id || gf.name === lf.name)
-        );
+        const currentLocal = campaign.analysis_config?.custom_fields || [];
+        let hasChanges = false;
 
-        if (missingInGlobal.length > 0) {
-            console.log("Creating/Promoting local fields to global inventory:", missingInGlobal);
+        // 1. Map current local state for preservation of isArchived
+        const localMap = new Map(currentLocal.map(f => [f.name, f]));
 
-            // 1. Update Local State immediately to prevent "Disappearing" UI glitch
-            setGlobalFields(prev => [...prev, ...missingInGlobal]);
+        // 2. Build new Local List from Global Source
+        const newLocalFields = globalFields.map(gf => {
+            const existing = localMap.get(gf.name);
 
-            // 2. Persist to Firestore
-            const promoteFields = async () => {
-                try {
-                    const docRef = doc(db, "subworkspaces", subworkspaceId);
-                    // We use arrayUnion for each field. 
-                    // To do it in one go is tricky if they are objects, but arrayUnion(...items) works.
-                    await updateDoc(docRef, {
-                        global_analysis_definitions: arrayUnion(...missingInGlobal)
-                    });
-                } catch (err) {
-                    console.error("Failed to promote fields:", err);
+            if (existing) {
+                // If definition changed (desc/type), we update it.
+                // If isArchived changed locally, we keep local.
+                if (existing.description !== gf.description || existing.type !== gf.type) {
+                    hasChanges = true;
+                    return { ...gf, isArchived: existing.isArchived };
                 }
-            };
-            promoteFields();
+                return { ...gf, isArchived: existing.isArchived };
+            } else {
+                // New Global Field -> Add to Campaign (Active by default)
+                hasChanges = true;
+                return { ...gf, isArchived: false }; // "Importen activamente"
+            }
+        });
+
+        // 3. Check for deletions (Fields in Local but not in Global)
+        if (currentLocal.length !== newLocalFields.length) {
+            hasChanges = true;
+        } else {
+            // Deep check if not caught above (e.g. reordering)
+            const newNames = new Set(newLocalFields.map(f => f.name));
+            const oldNames = new Set(currentLocal.map(f => f.name));
+            if (newNames.size !== oldNames.size) hasChanges = true;
         }
-    }, [campaign?.analysis_config?.custom_fields, subworkspaceId]); // Intentionally not including globalFields to avoid loops, we trust the strict check inside.
+
+        if (hasChanges) {
+            console.log("🔄 Syncing Campaign with Global Metrics...");
+            const newConfig = {
+                ...(campaign.analysis_config || {
+                    enable_transcription: true,
+                    standard_fields: {
+                        satisfaction_score: true, sentiment: true, summary: true, user_sentiment: true, call_successful: true
+                    },
+                    custom_fields: []
+                }),
+                custom_fields: newLocalFields
+            };
+            handleUpdateAnalysis(newConfig);
+        }
+    }, [globalFields, campaign?.analysis_config?.custom_fields]); // depend on the custom_fields array specifically
 
     const phoneColumnId = campaign?.phone_column_id || campaign?.columns?.find(c => c.isPhoneColumn)?.id || "col_phone";
 
@@ -489,12 +494,21 @@ export function CampaignDetail({ campaignId, subworkspaceId, onBack }: CampaignD
                                             <SelectItem value="+34">🇪🇸 ES (+34)</SelectItem>
                                             <SelectItem value="+44">🇬🇧 UK (+44)</SelectItem>
                                             <SelectItem value="+33">🇫🇷 FR (+33)</SelectItem>
+                                            <SelectItem value="+39">🇮🇹 IT (+39)</SelectItem>
+                                            <SelectItem value="+49">🇩🇪 DE (+49)</SelectItem>
+                                            <SelectItem value="+351">🇵🇹 PT (+351)</SelectItem>
                                         </SelectGroup>
                                         <SelectGroup>
                                             <SelectLabel>América</SelectLabel>
                                             <SelectItem value="+1">🇺🇸 US (+1)</SelectItem>
                                             <SelectItem value="+52">🇲🇽 MX (+52)</SelectItem>
                                             <SelectItem value="+57">🇨🇴 CO (+57)</SelectItem>
+                                            <SelectItem value="+54">🇦🇷 AR (+54)</SelectItem>
+                                            <SelectItem value="+56">🇨🇱 CL (+56)</SelectItem>
+                                            <SelectItem value="+591">🇧🇴 BO (+591)</SelectItem>
+                                            <SelectItem value="+593">🇪🇨 EC (+593)</SelectItem>
+                                            <SelectItem value="+595">🇵🇾 PY (+595)</SelectItem>
+                                            <SelectItem value="+598">🇺🇾 UY (+598)</SelectItem>
                                         </SelectGroup>
                                     </SelectContent>
                                 </Select>
@@ -626,6 +640,7 @@ export function CampaignDetail({ campaignId, subworkspaceId, onBack }: CampaignD
                                 globalFields={globalFields}
                                 onAddGlobalField={handleAddGlobalField}
                                 onDeleteGlobalField={handleDeleteGlobalField}
+                                isCampaignMode={true}
                             />
                         </TabsContent>
 

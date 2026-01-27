@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { collection, query, where, orderBy, onSnapshot, addDoc, serverTimestamp, deleteDoc, doc, getDocs, writeBatch, updateDoc } from "firebase/firestore";
+import { collection, query, where, orderBy, onSnapshot, addDoc, serverTimestamp, deleteDoc, doc, getDocs, writeBatch, updateDoc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { Campaign, CampaignRow } from "@/types/campaign";
 import { Button } from "@/components/ui/button";
@@ -142,6 +142,17 @@ function CreateCampaignDialog({
                 label: `Columna ${i + 1}`
             }));
 
+            // Sync: Fetch Subworkspace config to inherit Analysis Settings
+            let inheritedConfig = null;
+            try {
+                const subDoc = await getDoc(doc(db, "subworkspaces", subworkspaceId));
+                if (subDoc.exists()) {
+                    inheritedConfig = subDoc.data().analysis_config;
+                }
+            } catch (err) {
+                console.error("Error fetching subworkspace config for inheritance:", err);
+            }
+
             const docRef = await addDoc(collection(db, "campaigns"), {
                 subworkspace_id: subworkspaceId,
                 name: name,
@@ -150,6 +161,18 @@ function CreateCampaignDialog({
                 status: 'draft',
                 columns: defaultColumns,
                 prompt_template: "",
+                // Inherit Analysis Config or default
+                analysis_config: inheritedConfig || {
+                    enable_transcription: true,
+                    standard_fields: {
+                        satisfaction_score: true,
+                        sentiment: true,
+                        summary: true,
+                        user_sentiment: true,
+                        call_successful: true
+                    },
+                    custom_fields: []
+                },
                 created_at: serverTimestamp(),
                 updated_at: serverTimestamp()
             });
