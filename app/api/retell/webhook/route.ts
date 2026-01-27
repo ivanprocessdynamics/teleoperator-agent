@@ -265,59 +265,82 @@ async function handleCallAnalyzed(callId: string, data: any) {
     }
 
     // AI Extraction (Primary for Custom Fields)
-    // We prioritize our own OpenAI extraction for custom fields if any are configured.
+    // Campaign-First approach: If call has campaign_id, use that Campaign's config.
+    // Otherwise, fall back to Subworkspace config (for Testing Environment calls).
     if (data.agent_id) {
         try {
             console.log(`[AI Extraction] Checking for custom field config for agent ${data.agent_id}`);
 
-            // 1. Find Subworkspace config for this agent
-            const q = query(collection(db, "subworkspaces"), where("retell_agent_id", "==", data.agent_id));
-            const snapshot = await getDocs(q);
+            let customFields: any[] = [];
+            let configSource = 'none';
 
-            if (!snapshot.empty) {
-                const subSettings = snapshot.docs[0].data();
-                const customFields = subSettings.analysis_config?.custom_fields || [];
-
-                // Filter out archived fields
-                const activeFields = customFields.filter((f: any) => !f.isArchived);
-
-                if (activeFields.length > 0 && transcriptText) {
-                    console.log(`[AI Extraction] Generating analysis for ${activeFields.length} active custom fields using OpenAI...`);
-
-                    const OpenAI = require("openai");
-                    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-
-                    const prompt = `
-                        Analyze the following call transcript and extract the requested variables. 
-                        Return ONLY a valid JSON object with a key "custom_analysis_data" containing an array of objects.
-                        Each object must have: "name" (string), "value" (string, number, or boolean), and "rationale" (string).
-                        
-                        Variables to extract:
-                        ${activeFields.map((f: any) => `- Name: ${f.name}, Type: ${f.type}, Description: ${f.description}`).join('\n')}
-                        
-                        Transcript:
-                        ${transcriptText}
-                    `;
-
-                    const completion = await openai.chat.completions.create({
-                        messages: [{ role: "system", content: "You are a precise data extraction assistant." }, { role: "user", content: prompt }],
-                        model: "gpt-4o-mini",
-                        response_format: { type: "json_object" }
-                    });
-
-                    const result = JSON.parse(completion.choices[0].message.content || "{}");
-
-                    if (result.custom_analysis_data) {
-                        // Merge or Overwrite? User said "OpenAI principal", so we overwrite custom_analysis_data
-                        // but we preserve other analysis fields (sentiment, summary) that came from Retell if not configured otherwise.
-                        analysis.custom_analysis_data = result.custom_analysis_data;
-                        console.log(`[AI Extraction] Successfully generated ${result.custom_analysis_data.length} data points.`);
-                    }
+            // 1. Check if this call is from a Campaign (via metadata)
+            const campaignId = data.metadata?.campaign_id;
+            if (campaignId) {
+                console.log(`[AI Extraction] Call has campaign_id: ${campaignId}, fetching Campaign config...`);
+                const campaignDoc = await getDoc(doc(db, "campaigns", campaignId));
+                if (campaignDoc.exists()) {
+                    const campaignData = campaignDoc.data();
+                    customFields = campaignData.analysis_config?.custom_fields || [];
+                    configSource = `campaign:${campaignId}`;
+                    console.log(`[AI Extraction] Loaded ${customFields.length} custom fields from Campaign.`);
                 } else {
-                    console.log(`[AI Extraction] No active custom fields found or empty transcript.`);
+                    console.log(`[AI Extraction] Campaign ${campaignId} not found, falling back to Subworkspace.`);
+                }
+            }
+
+            // 2. Fallback: Use Subworkspace config (Testing Environment or Campaign without config)
+            if (customFields.length === 0) {
+                const q = query(collection(db, "subworkspaces"), where("retell_agent_id", "==", data.agent_id));
+                const snapshot = await getDocs(q);
+
+                if (!snapshot.empty) {
+                    const subSettings = snapshot.docs[0].data();
+                    customFields = subSettings.analysis_config?.custom_fields || [];
+                    configSource = `subworkspace:${snapshot.docs[0].id}`;
+                    console.log(`[AI Extraction] Loaded ${customFields.length} custom fields from Subworkspace.`);
+                } else {
+                    console.log(`[AI Extraction] No subworkspace found for agent ${data.agent_id}`);
+                }
+            }
+
+            // Filter out archived fields
+            const activeFields = customFields.filter((f: any) => !f.isArchived);
+
+            if (activeFields.length > 0 && transcriptText) {
+                console.log(`[AI Extraction] Generating analysis for ${activeFields.length} active custom fields using OpenAI (source: ${configSource})...`);
+
+                const OpenAI = require("openai");
+                const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+                const prompt = `
+                    Analyze the following call transcript and extract the requested variables. 
+                    Return ONLY a valid JSON object with a key "custom_analysis_data" containing an array of objects.
+                    Each object must have: "name" (string), "value" (string, number, or boolean), and "rationale" (string).
+                    
+                    Variables to extract:
+                    ${activeFields.map((f: any) => `- Name: ${f.name}, Type: ${f.type}, Description: ${f.description}`).join('\n')}
+                    
+                    Transcript:
+                    ${transcriptText}
+                `;
+
+                const completion = await openai.chat.completions.create({
+                    messages: [{ role: "system", content: "You are a precise data extraction assistant." }, { role: "user", content: prompt }],
+                    model: "gpt-4o-mini",
+                    response_format: { type: "json_object" }
+                });
+
+                const result = JSON.parse(completion.choices[0].message.content || "{}");
+
+                if (result.custom_analysis_data) {
+                    // Merge or Overwrite? User said "OpenAI principal", so we overwrite custom_analysis_data
+                    // but we preserve other analysis fields (sentiment, summary) that came from Retell if not configured otherwise.
+                    analysis.custom_analysis_data = result.custom_analysis_data;
+                    console.log(`[AI Extraction] Successfully generated ${result.custom_analysis_data.length} data points.`);
                 }
             } else {
-                console.log(`[AI Extraction] No subworkspace found for agent ${data.agent_id}`);
+                console.log(`[AI Extraction] No active custom fields found or empty transcript.`);
             }
         } catch (err) {
             console.error("[AI Extraction] Error generating analysis:", err);
