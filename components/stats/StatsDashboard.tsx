@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { collection, query, where, getDocs, Timestamp, orderBy, doc, getDoc, updateDoc, onSnapshot } from "firebase/firestore";
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, Legend } from "recharts";
 import { db } from "@/lib/firebase";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { ChatTranscript } from "@/components/calls/ChatTranscript";
@@ -13,12 +14,102 @@ import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { formatDistanceToNow } from "date-fns";
+import { cn } from "@/lib/utils";
 import { es } from "date-fns/locale";
+
+// Helper Component for Enum Pie Chart
+function EnumPieChart({ data, name }: { data: any, name: string }) {
+    const [isHovered, setIsHovered] = useState(false);
+    const [isPinned, setIsPinned] = useState(false);
+
+    // Transform value counts to array
+    const chartData = Object.entries(data.values || {}).map(([key, value]: [string, any]) => ({
+        name: key,
+        value: value
+    })).sort((a, b) => b.value - a.value);
+
+    const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#6366f1', '#14b8a6'];
+
+    const showLegend = isHovered || isPinned;
+
+    return (
+        <div
+            className="h-64 relative flex flex-col items-center justify-center p-2"
+            onMouseEnter={() => setIsHovered(true)}
+            onMouseLeave={() => setIsHovered(false)}
+            onClick={() => setIsPinned(!isPinned)}
+        >
+            {chartData.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                        <Pie
+                            data={chartData}
+                            cx="50%"
+                            cy="50%"
+                            innerRadius={60}
+                            outerRadius={80}
+                            paddingAngle={5}
+                            dataKey="value"
+                        >
+                            {chartData.map((entry, index) => (
+                                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                            ))}
+                        </Pie>
+                        <RechartsTooltip
+                            formatter={(value: number) => [value, 'Respuestas']}
+                            contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                        />
+                    </PieChart>
+                </ResponsiveContainer>
+            ) : (
+                <div className="text-gray-400 text-sm">Sin datos</div>
+            )}
+
+            {/* Center Count */}
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                <div className="text-center">
+                    <span className="text-2xl font-bold text-gray-900 dark:text-white">{data.count}</span>
+                    <div className="text-[10px] text-gray-500 uppercase tracking-wider">Total</div>
+                </div>
+            </div>
+
+            {/* Interactive Legend Overlay */}
+            <div className={cn(
+                "absolute top-0 right-0 max-w-[200px] bg-white/95 dark:bg-gray-800/95 backdrop-blur-sm border border-gray-100 dark:border-gray-700 rounded-lg shadow-lg transition-all duration-300 overflow-hidden z-10",
+                showLegend ? "opacity-100 visible max-h-64 overflow-y-auto p-2" : "opacity-0 invisible max-h-0"
+            )}>
+                <div className="text-[10px] font-bold text-gray-500 uppercase mb-2 px-1 flex justify-between">
+                    <span>Leyenda</span>
+                    {isPinned && <span className="text-blue-500">Fijado</span>}
+                </div>
+                <div className="space-y-1">
+                    {chartData.map((entry, index) => (
+                        <div key={index} className="flex items-center justify-between text-xs gap-3 p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700">
+                            <div className="flex items-center gap-1.5 truncate">
+                                <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: COLORS[index % COLORS.length] }} />
+                                <span className="truncate text-gray-700 dark:text-gray-300" title={entry.name}>{entry.name}</span>
+                            </div>
+                            <span className="font-medium text-gray-900 dark:text-white">{entry.value}</span>
+                        </div>
+                    ))}
+                </div>
+            </div>
+
+            {/* Hint for interaction */}
+            {!isPinned && (
+                <div className="absolute bottom-2 text-[10px] text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
+                    <Eye className="h-3 w-3" /> Click para fijar leyenda
+                </div>
+            )}
+        </div>
+    );
+}
 
 interface StatsDashboardProps {
     agentId?: string;
     subworkspaceId?: string;
 }
+
 
 export function StatsDashboard(props: StatsDashboardProps) {
     const { agentId } = props;
@@ -288,6 +379,7 @@ export function StatsDashboard(props: StatsDashboardProps) {
                             id: `auto_${name}`,
                             type: typeof c.value === 'boolean' ? 'boolean' : typeof c.value === 'number' ? 'number' : 'string',
                             yes: 0, no: 0, count: 0, totalSum: 0,
+                            values: {}, // Track distinct values
                             description: "Detectado automáticamente",
                             name: name,
                             isConfigured: false
@@ -296,6 +388,12 @@ export function StatsDashboard(props: StatsDashboardProps) {
 
                     const entry = customAgg[name];
                     entry.count++;
+
+                    // Track Values for Enum/String
+                    const valStr = String(c.value);
+                    if (!entry.values) entry.values = {};
+                    entry.values[valStr] = (entry.values[valStr] || 0) + 1;
+
                     if (typeof c.value === 'boolean') {
                         entry.type = 'boolean';
                         if (c.value) entry.yes++; else entry.no++;
@@ -303,7 +401,8 @@ export function StatsDashboard(props: StatsDashboardProps) {
                         entry.type = 'number';
                         entry.totalSum += c.value;
                     } else {
-                        entry.type = 'string';
+                        // Default to string/enum - check config if it's an enum
+                        entry.type = (allFields.find(f => f.name === name)?.type === 'enum') ? 'enum' : 'string';
                     }
                 });
             }
@@ -657,9 +756,11 @@ export function StatsDashboard(props: StatsDashboardProps) {
                                                 </div>
                                                 <span className="text-sm text-gray-500 font-medium uppercase tracking-wide">Promedio</span>
                                             </div>
+                                        ) : data.type === 'enum' ? (
+                                            <EnumPieChart data={data} name={name} />
                                         ) : (
                                             <div className="text-sm text-gray-600 dark:text-gray-400 italic bg-gray-50 dark:bg-gray-800/50 p-3 rounded-lg border border-gray-100 dark:border-gray-700 flex items-center justify-between">
-                                                <span className="truncate">Ver lista de respuestas</span>
+                                                <span className="truncate">Ver lista de respuestas ({Object.keys(data.values || {}).length} variantes)</span>
                                                 <ArrowRight className="h-4 w-4 text-gray-400" />
                                             </div>
                                         )}

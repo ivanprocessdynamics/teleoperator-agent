@@ -529,8 +529,8 @@ export function CampaignTable({ campaign, onColumnsChange }: CampaignTableProps)
             const isInTableContainer = tableContainerRef.current?.contains(activeElement as Node);
 
             // Only handle table shortcuts if focus is within the table or on a table cell input
-            if (isInTextarea || isContentEditable) {
-                return; // Let native behavior handle it
+            if (isInTextarea || isContentEditable || !isInTableContainer) {
+                return; // Let native behavior handle it or ignore if outside table
             }
 
             // Track Ctrl press timestamp

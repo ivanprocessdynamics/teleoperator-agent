@@ -533,7 +533,7 @@ export function CampaignDetail({ campaignId, subworkspaceId, onBack }: CampaignD
             {/* Relaunch Card - Premium Redesign */}
             {
                 executor.hasBeenRun && !executor.state.isRunning && (
-                    <div className="group relative overflow-hidden bg-white dark:bg-gray-900 border border-amber-200/50 dark:border-amber-800/50 rounded-xl p-6 shadow-sm hover:shadow-md transition-all duration-300 animate-in fade-in slide-in-from-top-2">
+                    <div className="mb-6 group relative overflow-hidden bg-white dark:bg-gray-900 border border-amber-200/50 dark:border-amber-800/50 rounded-xl p-6 shadow-sm hover:shadow-md transition-all duration-300 animate-in fade-in slide-in-from-top-2">
                         {/* Background Gradient Decoration */}
                         <div className="absolute top-0 right-0 w-64 h-64 bg-amber-500/5 rounded-full blur-3xl -mr-32 -mt-32 pointer-events-none" />
 
