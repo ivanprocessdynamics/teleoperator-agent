@@ -142,8 +142,10 @@ export function CallHistoryTable({ agentId: initialAgentId }: CallHistoryTablePr
             const cIds = Array.from(new Set(data.map(c => {
                 // If we have a mapped title for the agent_id, use that ID (or the agent_id itself)
                 // We prefer metadata.campaign_id, then agent_id
-                return c.metadata?.campaign_id || c.agent_id;
-            }).filter(Boolean))) as string[];
+                const candidateId = c.metadata?.campaign_id || c.agent_id;
+                // Filter out if it's not a valid ID or if it maps to "Unknown" (optional, but requested)
+                return candidateId;
+            }).filter(id => id && id !== "undefined" && id !== "null"))) as string[];
             setUniqueCampaignIds(cIds);
 
             setLoading(false);
@@ -248,11 +250,13 @@ export function CallHistoryTable({ agentId: initialAgentId }: CallHistoryTablePr
                         </SelectTrigger>
                         <SelectContent>
                             <SelectItem value="all">Todas las campañas</SelectItem>
-                            {uniqueCampaignIds.map(cid => (
-                                <SelectItem key={cid} value={cid}>
-                                    {campaignMap[cid] || "Campaña desconocida"}
-                                </SelectItem>
-                            ))}
+                            {uniqueCampaignIds
+                                .filter(cid => (campaignMap[cid] || "Campaña desconocida") !== "Campaña desconocida")
+                                .map(cid => (
+                                    <SelectItem key={cid} value={cid}>
+                                        {campaignMap[cid]}
+                                    </SelectItem>
+                                ))}
                         </SelectContent>
                     </Select>
 

@@ -28,7 +28,7 @@ export function StatsDashboard(props: StatsDashboardProps) {
     const [hiddenStandard, setHiddenStandard] = useState<string[]>([]);
     const [ignoredFields, setIgnoredFields] = useState<string[]>([]);
     const [period, setPeriod] = useState("7d");
-    const [selectedCampaign, setSelectedCampaign] = useState<string>(agentId || "all");
+    const [selectedCampaign, setSelectedCampaign] = useState<string>("all");
     const [uniqueCampaigns, setUniqueCampaigns] = useState<string[]>([]); // Derived from calls
 
     // Date Picker State
