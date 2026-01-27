@@ -135,16 +135,30 @@ export function CampaignDetail({ campaignId, subworkspaceId, onBack }: CampaignD
 
     const handleDeleteGlobalField = async (fieldId: string) => {
         if (!activeSubworkspaceId || !globalFields) return;
-        const fieldToDelete = globalFields.find(f => f.id === fieldId);
-        if (!fieldToDelete) return;
 
+        console.log(`[Global Delete] Attempting to delete field ${fieldId} from subworkspace ${activeSubworkspaceId}`);
+
+        // Optimistic Update
         setGlobalFields(prev => (prev ? prev.filter(f => f.id !== fieldId) : null));
 
         try {
             const docRef = doc(db, "subworkspaces", activeSubworkspaceId);
-            await updateDoc(docRef, {
-                global_analysis_definitions: arrayRemove(fieldToDelete)
-            });
+            const snap = await getDoc(docRef);
+
+            if (snap.exists()) {
+                const data = snap.data();
+                const currentDefinitions = data.global_analysis_definitions || [];
+                const newDefinitions = currentDefinitions.filter((f: AnalysisField) => f.id !== fieldId);
+
+                if (currentDefinitions.length !== newDefinitions.length) {
+                    await updateDoc(docRef, {
+                        global_analysis_definitions: newDefinitions
+                    });
+                    console.log(`[Global Delete] Successfully removed field ${fieldId} from Firestore.`);
+                } else {
+                    console.warn(`[Global Delete] Field ${fieldId} not found in Firestore definitions.`);
+                }
+            }
         } catch (error) {
             console.error("Error deleting global field:", error);
         }
