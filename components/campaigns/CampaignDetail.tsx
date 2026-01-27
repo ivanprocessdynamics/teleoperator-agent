@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef, useCallback } from "react";
-import { doc, onSnapshot, updateDoc, getDoc, arrayUnion } from "firebase/firestore";
+import { doc, onSnapshot, updateDoc, getDoc, arrayUnion, arrayRemove } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { Campaign, CampaignColumn, AnalysisConfig, AnalysisField, CallingConfig } from "@/types/campaign";
 import { Button } from "@/components/ui/button";
@@ -112,12 +112,42 @@ export function CampaignDetail({ campaignId, subworkspaceId, onBack }: CampaignD
         fetchSubworkspace();
     }, [subworkspaceId]);
 
-    /* 
-       Legacy/Unused handlers (handleAddGlobalField, handleDeleteGlobalField) 
-       can be kept empty or removed since Campaign Mode disables them.
-    */
-    const handleAddGlobalField = async (field: AnalysisField) => { console.log("Managed centrally"); };
-    const handleDeleteGlobalField = async (fieldId: string) => { console.log("Managed centrally"); };
+    const handleAddGlobalField = async (field: AnalysisField) => {
+        if (!subworkspaceId) return;
+        // Optimistic update of Global Fields (Source of Truth)
+        setGlobalFields(prev => [...prev, field]);
+
+        try {
+            const docRef = doc(db, "subworkspaces", subworkspaceId);
+            // We need to update analysis_config.custom_fields in Subworkspace
+            // We cannot easily use arrayUnion on a nested field path map cleanly without potential race if we don't have full object.
+            // But let's try reading and writing for safety, or dot notation if possible.
+            // Firestore supports "analysis_config.custom_fields": arrayUnion(...)
+            await updateDoc(docRef, {
+                "analysis_config.custom_fields": arrayUnion(field)
+            });
+        } catch (error) {
+            console.error("Error adding global field:", error);
+            // Revert optimistic?
+        }
+    };
+
+    const handleDeleteGlobalField = async (fieldId: string) => {
+        if (!subworkspaceId) return;
+        const fieldToDelete = globalFields.find(f => f.id === fieldId);
+        if (!fieldToDelete) return;
+
+        setGlobalFields(prev => prev.filter(f => f.id !== fieldId));
+
+        try {
+            const docRef = doc(db, "subworkspaces", subworkspaceId);
+            await updateDoc(docRef, {
+                "analysis_config.custom_fields": arrayRemove(fieldToDelete)
+            });
+        } catch (error) {
+            console.error("Error deleting global field:", error);
+        }
+    };
 
     const debouncedSave = useCallback(async (updates: Partial<Campaign>) => {
         if (!campaignId) return;
@@ -160,47 +190,47 @@ export function CampaignDetail({ campaignId, subworkspaceId, onBack }: CampaignD
     const handleUpdateAnalysis = (analysis_config: AnalysisConfig) => debouncedSave({ analysis_config });
 
     // Active Sync: Global (Subworkspace) -> Campaign
-    // Ensures Campaign always reflects the Global Definitions, only allowing local "Archive/Disable" overrides.
+    // FIX: Do NOT auto-add new global fields to local active list.
+    // They should be available as "Archived" (Inactive) options.
+    // Only Sync updates to ALREADY ACTIVE fields, and remove DELETED fields.
     useEffect(() => {
-        if (!campaign || !globalFields || globalFields.length === 0) return;
+        if (!campaign || !globalFields) return;
 
         const currentLocal = campaign.analysis_config?.custom_fields || [];
         let hasChanges = false;
 
-        // 1. Map current local state for preservation of isArchived
-        const localMap = new Map(currentLocal.map(f => [f.name, f]));
+        // 1. Map Global Fields for quick lookup
+        const globalMap = new Map(globalFields.map(f => [f.name, f]));
 
-        // 2. Build new Local List from Global Source
-        const newLocalFields = globalFields.map(gf => {
-            const existing = localMap.get(gf.name);
+        // 2. Filter Local Fields: Keep only those that still exist in Global
+        // AND update their definitions (Description/Type) if changed Globaly.
+        const newLocalFields = currentLocal.reduce((acc: AnalysisField[], localField) => {
+            const globalMatch = globalMap.get(localField.name);
 
-            if (existing) {
-                // If definition changed (desc/type), we update it.
-                // If isArchived changed locally, we keep local.
-                if (existing.description !== gf.description || existing.type !== gf.type) {
+            if (globalMatch) {
+                // Field exists globally. Check if definition needs update.
+                if (localField.description !== globalMatch.description || localField.type !== globalMatch.type) {
                     hasChanges = true;
-                    return { ...gf, isArchived: existing.isArchived };
+                    // Preserve local ID? No, use Global ID for consistency usually, but persistence implies local state.
+                    // Important: The UI uses ID to distinguish. Let's sync to Global ID if possible or keep local?
+                    // "Reflected in all sites" -> standardize on Global ID.
+                    acc.push({ ...globalMatch, isArchived: localField.isArchived });
+                } else {
+                    // No change
+                    acc.push(localField);
                 }
-                return { ...gf, isArchived: existing.isArchived };
             } else {
-                // New Global Field -> Add to Campaign (Active by default)
+                // Field deleted globally -> Remove from local
                 hasChanges = true;
-                return { ...gf, isArchived: false }; // "Importen activamente"
             }
-        });
+            return acc;
+        }, []);
 
-        // 3. Check for deletions (Fields in Local but not in Global)
-        if (currentLocal.length !== newLocalFields.length) {
-            hasChanges = true;
-        } else {
-            // Deep check if not caught above (e.g. reordering)
-            const newNames = new Set(newLocalFields.map(f => f.name));
-            const oldNames = new Set(currentLocal.map(f => f.name));
-            if (newNames.size !== oldNames.size) hasChanges = true;
-        }
+        // 3. Detect if meaningful changes happened (Deletions or Updates)
+        if (currentLocal.length !== newLocalFields.length) hasChanges = true;
 
         if (hasChanges) {
-            console.log("🔄 Syncing Campaign with Global Metrics...");
+            console.log("🔄 Syncing Campaign with Global Metrics (Updates/Deletions only)...");
             const newConfig = {
                 ...(campaign.analysis_config || {
                     enable_transcription: true,
@@ -213,7 +243,7 @@ export function CampaignDetail({ campaignId, subworkspaceId, onBack }: CampaignD
             };
             handleUpdateAnalysis(newConfig);
         }
-    }, [globalFields, campaign?.analysis_config?.custom_fields]); // depend on the custom_fields array specifically
+    }, [globalFields, campaign?.analysis_config?.custom_fields]);
 
     const phoneColumnId = campaign?.phone_column_id || campaign?.columns?.find(c => c.isPhoneColumn)?.id || "col_phone";
 
@@ -640,7 +670,6 @@ export function CampaignDetail({ campaignId, subworkspaceId, onBack }: CampaignD
                                 globalFields={globalFields}
                                 onAddGlobalField={handleAddGlobalField}
                                 onDeleteGlobalField={handleDeleteGlobalField}
-                                isCampaignMode={true}
                             />
                         </TabsContent>
 
