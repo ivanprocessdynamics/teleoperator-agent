@@ -745,7 +745,8 @@ export function StatsDashboard(props: StatsDashboardProps) {
                                     if (selectedCampaign === 'testing' && !isTesting && (c.metadata?.campaign_id || campaignMap[c.agent_id])) return false; // Strict testing check
 
                                     // Check if metric exists
-                                    return c.analysis?.custom_analysis_data?.some((d: any) => d.name === viewingMetric);
+                                    const customData = c.analysis?.custom_analysis_data;
+                                    return Array.isArray(customData) && customData.some((d: any) => d.name === viewingMetric);
                                 }).sort((a, b) => (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0));
 
                                 if (callsWithMetric.length === 0) return (
@@ -753,7 +754,8 @@ export function StatsDashboard(props: StatsDashboardProps) {
                                 );
 
                                 return callsWithMetric.map(call => {
-                                    const metricData = call.analysis?.custom_analysis_data?.find((d: any) => d.name === viewingMetric);
+                                    const customData = call.analysis?.custom_analysis_data;
+                                    const metricData = Array.isArray(customData) ? customData.find((d: any) => d.name === viewingMetric) : undefined;
                                     const campaignName = (call.metadata?.campaign_id ? campaignMap[call.metadata.campaign_id] : null) || campaignMap[call.agent_id];
 
                                     return (

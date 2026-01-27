@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef, useCallback } from "react";
 import { useParams } from "next/navigation";
-import { doc, onSnapshot, updateDoc, getDoc, arrayUnion, arrayRemove } from "firebase/firestore";
+import { doc, onSnapshot, updateDoc, getDoc, arrayUnion, arrayRemove, collection, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { Campaign, CampaignColumn, AnalysisConfig, AnalysisField, CallingConfig } from "@/types/campaign";
 import { Button } from "@/components/ui/button";
@@ -79,6 +79,8 @@ export function CampaignDetail({ campaignId, subworkspaceId, onBack }: CampaignD
     const [isLoading, setIsLoading] = useState(true);
     const [globalFields, setGlobalFields] = useState<AnalysisField[] | null>(null);
 
+    const [importableAgents, setImportableAgents] = useState<{ id: string; name: string; fields: AnalysisField[] }[]>([]);
+
     const [showRelaunchDialog, setShowRelaunchDialog] = useState(false);
     const [relaunchStartLine, setRelaunchStartLine] = useState("1");
     const [showRelaunchLineDialog, setShowRelaunchLineDialog] = useState(false);
@@ -115,6 +117,31 @@ export function CampaignDetail({ campaignId, subworkspaceId, onBack }: CampaignD
             }
         }
         fetchSubworkspace();
+    }, [activeSubworkspaceId]);
+
+    // Fetch ALL Subworkspaces for Import
+    useEffect(() => {
+        async function fetchAllAgents() {
+            try {
+                // Assuming all subworkspaces are in the same parent workspace collection path structure or accessible
+                // For this demo, we fetch the top-level 'subworkspaces' collection if that's how it's structured,
+                // or we need to know the workspaceId.
+                // Based on `app/(dashboard)/workspaces/[workspaceId]/sub/[subId]/page.tsx`, subworkspaces seem to be a root collection or subcollection?
+                // The retrieval above uses `doc(db, "subworkspaces", activeSubworkspaceId)`, so "subworkspaces" is a root collection.
+
+                const snap = await getDocs(collection(db, "subworkspaces"));
+                const agents = snap.docs.map(doc => ({
+                    id: doc.id,
+                    name: doc.data().name || "Sin nombre",
+                    fields: doc.data().global_analysis_definitions || []
+                })).filter(a => a.fields.length > 0 && a.id !== activeSubworkspaceId); // Exclude current agent and empty ones
+
+                setImportableAgents(agents);
+            } catch (error) {
+                console.error("Error fetching importable agents:", error);
+            }
+        }
+        fetchAllAgents();
     }, [activeSubworkspaceId]);
 
     const handleAddGlobalField = async (field: AnalysisField) => {
@@ -705,6 +732,7 @@ export function CampaignDetail({ campaignId, subworkspaceId, onBack }: CampaignD
                                 globalFields={globalFields}
                                 onAddGlobalField={handleAddGlobalField}
                                 onDeleteGlobalField={handleDeleteGlobalField}
+                                importableAgents={importableAgents}
                             />
                         </TabsContent>
 
