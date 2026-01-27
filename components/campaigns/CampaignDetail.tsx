@@ -278,14 +278,49 @@ export function CampaignDetail({ campaignId, subworkspaceId, onBack }: CampaignD
                                 </div>
                             </div>
 
-                            <Button
-                                onClick={executor.start}
-                                disabled={executor.state.totalRows === 0}
-                                className="w-full sm:w-auto bg-green-600 hover:bg-green-700 text-white shadow-lg shadow-green-500/20 px-8 py-6 text-lg font-semibold transition-all hover:scale-105 active:scale-95 disabled:opacity-50 disabled:hover:scale-100"
-                            >
-                                <Play className="mr-2 h-5 w-5 fill-current" />
-                                Iniciar Campaña
-                            </Button>
+                            <div className="flex items-center gap-3">
+                                <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+                                    <Globe className="h-4 w-4 text-gray-500" />
+                                    <Select
+                                        value={campaign.calling_config?.target_country_code || "+34"}
+                                        onValueChange={(value) => {
+                                            const newConfig: CallingConfig = {
+                                                ...campaign.calling_config!,
+                                                target_country_code: value
+                                            };
+                                            debouncedSave({ calling_config: newConfig });
+                                        }}
+                                    >
+                                        <SelectTrigger className="h-7 w-[140px] border-0 bg-transparent text-xs focus:ring-0 px-0">
+                                            <SelectValue placeholder="País" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectGroup>
+                                                <SelectLabel>Europa</SelectLabel>
+                                                <SelectItem value="+34">🇪🇸 España (+34)</SelectItem>
+                                                <SelectItem value="+44">🇬🇧 Reino Unido (+44)</SelectItem>
+                                                <SelectItem value="+33">🇫🇷 Francia (+33)</SelectItem>
+                                            </SelectGroup>
+                                            <SelectGroup>
+                                                <SelectLabel>América</SelectLabel>
+                                                <SelectItem value="+1">🇺🇸 EEUU (+1)</SelectItem>
+                                                <SelectItem value="+52">🇲🇽 México (+52)</SelectItem>
+                                                <SelectItem value="+57">🇨🇴 Colombia (+57)</SelectItem>
+                                                <SelectItem value="+54">🇦🇷 Argentina (+54)</SelectItem>
+                                            </SelectGroup>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+
+                                <Button
+                                    onClick={executor.start}
+                                    disabled={executor.state.totalRows === 0}
+                                    className="w-full sm:w-auto bg-green-600 hover:bg-green-700 text-white shadow-lg shadow-green-500/20 px-8 py-6 text-lg font-semibold transition-all hover:scale-105 active:scale-95 disabled:opacity-50 disabled:hover:scale-100"
+                                >
+                                    <Play className="mr-2 h-5 w-5 fill-current" />
+                                    Iniciar Campaña
+                                </Button>
+                            </div>
                         </div>
                     </div>
                 )
@@ -430,22 +465,53 @@ export function CampaignDetail({ campaignId, subworkspaceId, onBack }: CampaignD
                                     </div>
                                 </div>
                             </div>
+                        </div>
 
-                            <div className="flex items-center gap-3 w-full sm:w-auto">
-                                <Button
-                                    variant="outline"
-                                    onClick={() => setShowRelaunchLineDialog(true)}
-                                    className="flex-1 sm:flex-none border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300 transition-colors"
+                        <div className="flex flex-col sm:flex-row items-end sm:items-center gap-3 w-full sm:w-auto">
+                            <div className="flex items-center gap-2 px-3 py-1.5 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 mb-2 sm:mb-0">
+                                <Globe className="h-4 w-4 text-gray-500" />
+                                <Select
+                                    value={campaign.calling_config?.target_country_code || "+34"}
+                                    onValueChange={(value) => {
+                                        const newConfig: CallingConfig = {
+                                            ...campaign.calling_config!,
+                                            target_country_code: value
+                                        };
+                                        debouncedSave({ calling_config: newConfig });
+                                    }}
                                 >
-                                    <span className="mr-2 text-amber-600">↳</span> Desde fila...
-                                </Button>
-                                <Button
-                                    onClick={() => setShowRelaunchDialog(true)}
-                                    className="flex-1 sm:flex-none bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 text-white shadow-lg shadow-amber-500/20 border-0 transition-all hover:scale-105 active:scale-95"
-                                >
-                                    <Play className="mr-2 h-4 w-4 fill-current" /> Relanzar Todo
-                                </Button>
+                                    <SelectTrigger className="h-7 w-[90px] border-0 bg-transparent text-xs focus:ring-0 px-0">
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectGroup>
+                                            <SelectLabel>Europa</SelectLabel>
+                                            <SelectItem value="+34">🇪🇸 ES (+34)</SelectItem>
+                                            <SelectItem value="+44">🇬🇧 UK (+44)</SelectItem>
+                                            <SelectItem value="+33">🇫🇷 FR (+33)</SelectItem>
+                                        </SelectGroup>
+                                        <SelectGroup>
+                                            <SelectLabel>América</SelectLabel>
+                                            <SelectItem value="+1">🇺🇸 US (+1)</SelectItem>
+                                            <SelectItem value="+52">🇲🇽 MX (+52)</SelectItem>
+                                            <SelectItem value="+57">🇨🇴 CO (+57)</SelectItem>
+                                        </SelectGroup>
+                                    </SelectContent>
+                                </Select>
                             </div>
+                            <Button
+                                variant="outline"
+                                onClick={() => setShowRelaunchLineDialog(true)}
+                                className="flex-1 sm:flex-none border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300 transition-colors"
+                            >
+                                <span className="mr-2 text-amber-600">↳</span> Desde fila...
+                            </Button>
+                            <Button
+                                onClick={() => setShowRelaunchDialog(true)}
+                                className="flex-1 sm:flex-none bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 text-white shadow-lg shadow-amber-500/20 border-0 transition-all hover:scale-105 active:scale-95"
+                            >
+                                <Play className="mr-2 h-4 w-4 fill-current" /> Relanzar Todo
+                            </Button>
                         </div>
                     </div>
                 )
@@ -704,6 +770,6 @@ export function CampaignDetail({ campaignId, subworkspaceId, onBack }: CampaignD
                     </Tabs>
                 </div>
             </div>
-        </div>
+        </div >
     );
 }

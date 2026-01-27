@@ -28,8 +28,8 @@ export function StatsDashboard(props: StatsDashboardProps) {
     const [hiddenStandard, setHiddenStandard] = useState<string[]>([]);
     const [ignoredFields, setIgnoredFields] = useState<string[]>([]);
     const [period, setPeriod] = useState("7d");
-    const [selectedAgent, setSelectedAgent] = useState<string>(agentId || "all");
-    const [uniqueAgents, setUniqueAgents] = useState<string[]>([]); // Derived from calls
+    const [selectedCampaign, setSelectedCampaign] = useState<string>(agentId || "all");
+    const [uniqueCampaigns, setUniqueCampaigns] = useState<string[]>([]); // Derived from calls
 
     // Date Picker State
     const [pickerStart, setPickerStart] = useState<Date | null>(null);
@@ -136,18 +136,18 @@ export function StatsDashboard(props: StatsDashboardProps) {
         fetchStats();
     }, [agentId, period, props.subworkspaceId, pickerStart, pickerEnd]);
 
-    // 2.5 Extract Agents
+    // 2.5 Extract Campaigns
     useEffect(() => {
-        const agents = Array.from(new Set(rawCalls.map(c => c.agent_id).filter(Boolean)));
-        setUniqueAgents(agents);
+        const campaigns = Array.from(new Set(rawCalls.map(c => c.metadata?.campaign_id).filter(Boolean)));
+        setUniqueCampaigns(campaigns);
     }, [rawCalls]);
 
     // 3. Calculate Stats when data or visibility changes
     useEffect(() => {
-        // Filter by Agent first
-        const filteredCalls = selectedAgent === 'all'
+        // Filter by Campaign first
+        const filteredCalls = selectedCampaign === 'all'
             ? rawCalls
-            : rawCalls.filter(c => c.agent_id === selectedAgent);
+            : rawCalls.filter(c => c.metadata?.campaign_id === selectedCampaign);
 
         // Basic Stats
         let totalDuration = 0;
@@ -233,7 +233,7 @@ export function StatsDashboard(props: StatsDashboardProps) {
         });
 
         setCustomStats(customAgg);
-    }, [rawCalls, allFields, ignoredFields, selectedAgent]);
+    }, [rawCalls, allFields, ignoredFields, selectedCampaign]);
 
 
     const handleHideStandard = async (metricId: string) => {
@@ -348,15 +348,15 @@ export function StatsDashboard(props: StatsDashboardProps) {
                         <RefreshCcw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
                         Actualizar
                     </Button>
-                    <Select value={selectedAgent} onValueChange={setSelectedAgent}>
+                    <Select value={selectedCampaign} onValueChange={setSelectedCampaign}>
                         <SelectTrigger className="w-[180px] bg-white dark:bg-gray-800">
                             <SelectValue placeholder="Campaña" />
                         </SelectTrigger>
                         <SelectContent>
                             <SelectItem value="all">Todas las campañas</SelectItem>
-                            {uniqueAgents.map(aid => (
-                                <SelectItem key={aid} value={aid}>
-                                    {campaignMap[aid] || "Campaña desconocida"}
+                            {uniqueCampaigns.map(cid => (
+                                <SelectItem key={cid} value={cid}>
+                                    {campaignMap[cid] || "Campaña desconocida"}
                                 </SelectItem>
                             ))}
                         </SelectContent>
