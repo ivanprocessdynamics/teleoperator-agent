@@ -21,6 +21,7 @@ export interface CallingConfig {
     from_number: string;         // Your Retell number (E.164)
     concurrency_limit: number;   // Max parallel calls (default: 1)
     retry_failed: boolean;       // Auto-retry failed calls?
+    target_country_code?: string; // Optional: default country code (e.g., "+34")
 }
 
 export interface Campaign {

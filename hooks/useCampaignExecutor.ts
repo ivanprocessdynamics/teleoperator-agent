@@ -147,7 +147,22 @@ export function useCampaignExecutor({
             return;
         }
 
-        const normalizedPhone = phoneNumber.replace(/[^0-9+]/g, '');
+        let normalizedPhone = phoneNumber.replace(/[^0-9+]/g, '');
+
+        // Smart Normalization using Target Country Code
+        const countryCode = callingConfig.target_country_code;
+        if (countryCode && !normalizedPhone.startsWith('+')) {
+            // Remove + from country code for comparison
+            const codeDigits = countryCode.replace('+', '');
+
+            // If it starts with the country code digits (e.g. 346...), just add +
+            if (normalizedPhone.startsWith(codeDigits)) {
+                normalizedPhone = '+' + normalizedPhone;
+            } else {
+                // Otherwise prepend the whole code
+                normalizedPhone = countryCode + normalizedPhone;
+            }
+        }
 
         try {
             await updateDoc(doc(db, "campaign_rows", row.id), {
@@ -220,7 +235,7 @@ export function useCampaignExecutor({
                 last_error: error.message || 'Unknown error',
             });
         }
-    }, [campaignId, agentId, callingConfig.from_number, phoneColumnId, columns, campaignPrompt]);
+    }, [campaignId, agentId, callingConfig.from_number, callingConfig.target_country_code, phoneColumnId, columns, campaignPrompt]);
 
     const start = useCallback(() => {
         isRunningRef.current = true;

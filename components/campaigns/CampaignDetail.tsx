@@ -5,7 +5,7 @@ import { doc, onSnapshot, updateDoc, getDoc, arrayUnion } from "firebase/firesto
 import { db } from "@/lib/firebase";
 import { Campaign, CampaignColumn, AnalysisConfig, AnalysisField, CallingConfig } from "@/types/campaign";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Play, Save, Check, Loader2, FileText, Phone, Users, Target, Zap, Star, MessageCircle, Mail, Pause, Square, Settings, Activity } from "lucide-react";
+import { ArrowLeft, Play, Save, Check, Loader2, FileText, Phone, Users, Target, Zap, Star, MessageCircle, Mail, Pause, Square, Settings, Activity, Globe } from "lucide-react";
 import { CampaignTable } from "./CampaignTable";
 import { CampaignPrompt } from "./CampaignPrompt";
 import { CampaignAnalysis } from "./CampaignAnalysis";
@@ -16,6 +16,15 @@ import {
     DropdownMenuContent,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+    Select,
+    SelectContent,
+    SelectGroup,
+    SelectItem,
+    SelectLabel,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useCampaignExecutor } from "@/hooks/useCampaignExecutor";
 import { Progress } from "@/components/ui/progress";
@@ -246,6 +255,42 @@ export function CampaignDetail({ campaignId, subworkspaceId, onBack }: CampaignD
             </div>
 
             {/* Active Campaign Dashboard */}
+            {
+                !executor.hasBeenRun && !executor.state.isRunning && campaign.status === 'draft' && (
+                    <div className="mb-6 bg-white dark:bg-gray-900 border border-green-200 dark:border-green-800 rounded-xl p-6 shadow-md animate-in fade-in slide-in-from-top-2 relative overflow-hidden">
+                        <div className="absolute top-0 right-0 w-64 h-64 bg-green-500/5 rounded-full blur-3xl -mr-32 -mt-32 pointer-events-none" />
+
+                        <div className="relative flex flex-col sm:flex-row items-center justify-between gap-6">
+                            <div className="flex items-center gap-5">
+                                <div className="h-12 w-12 rounded-2xl bg-gradient-to-br from-green-100 to-green-200 dark:from-green-900 dark:to-green-800 flex items-center justify-center shadow-inner">
+                                    <Play className="h-6 w-6 text-green-700 dark:text-green-300 ml-1" />
+                                </div>
+                                <div>
+                                    <h4 className="text-lg font-bold text-gray-900 dark:text-gray-100 flex items-center gap-2">
+                                        Campaña Lista
+                                        <span className="text-xs font-medium px-2.5 py-0.5 rounded-full bg-green-50 text-green-700 border border-green-200 dark:bg-green-900/20 dark:text-green-400 dark:border-green-800">
+                                            Borrador
+                                        </span>
+                                    </h4>
+                                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
+                                        {executor.state.totalRows} contactos listos para llamar
+                                    </p>
+                                </div>
+                            </div>
+
+                            <Button
+                                onClick={executor.start}
+                                disabled={executor.state.totalRows === 0}
+                                className="w-full sm:w-auto bg-green-600 hover:bg-green-700 text-white shadow-lg shadow-green-500/20 px-8 py-6 text-lg font-semibold transition-all hover:scale-105 active:scale-95 disabled:opacity-50 disabled:hover:scale-100"
+                            >
+                                <Play className="mr-2 h-5 w-5 fill-current" />
+                                Iniciar Campaña
+                            </Button>
+                        </div>
+                    </div>
+                )
+            }
+
             {
                 (executor.state.isRunning || executor.state.isPaused || executor.state.activeCalls > 0) && (
                     <div className="mb-6 bg-white dark:bg-gray-900 border border-blue-200 dark:border-blue-800 rounded-xl p-6 shadow-md animate-in fade-in slide-in-from-top-2 relative overflow-hidden">
@@ -591,31 +636,77 @@ export function CampaignDetail({ campaignId, subworkspaceId, onBack }: CampaignD
                                                     checked={campaign.calling_config?.retry_failed || false}
                                                     onChange={(e) => {
                                                         const newConfig: CallingConfig = {
-                                                            from_number: campaign.calling_config?.from_number || "+34877450708",
-                                                            concurrency_limit: campaign.calling_config?.concurrency_limit || 1,
+                                                            ...campaign.calling_config!,
                                                             retry_failed: e.target.checked
                                                         };
                                                         debouncedSave({ calling_config: newConfig });
                                                     }}
                                                     className="sr-only peer"
                                                 />
-                                                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
+                                                <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
                                             </label>
                                         </div>
-                                    </div>
-                                </div>
 
-                                {/* Info Box */}
-                                <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-100 dark:border-blue-800">
-                                    <p className="text-sm text-blue-700 dark:text-blue-300">
-                                        <strong>Nota:</strong> Al pulsar "Lanzar Campaña", el sistema comenzará a llamar secuencialmente a cada número de la tabla, respetando el límite de concurrencia configurado.
-                                    </p>
+                                        {/* Country Selector */}
+                                        <div className="pt-2 border-t border-gray-100 dark:border-gray-800">
+                                            <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1.5">
+                                                País de los teléfonos
+                                            </label>
+                                            <Select
+                                                value={campaign.calling_config?.target_country_code || ""}
+                                                onValueChange={(value) => {
+                                                    const newConfig: CallingConfig = {
+                                                        ...campaign.calling_config!,
+                                                        target_country_code: value
+                                                    };
+                                                    debouncedSave({ calling_config: newConfig });
+                                                }}
+                                            >
+                                                <SelectTrigger className="w-full">
+                                                    <SelectValue placeholder="Seleccionar país..." />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectGroup>
+                                                        <SelectLabel>Europa</SelectLabel>
+                                                        <SelectItem value="+34">🇪🇸 España (+34)</SelectItem>
+                                                        <SelectItem value="+44">🇬🇧 Reino Unido (+44)</SelectItem>
+                                                        <SelectItem value="+33">🇫🇷 Francia (+33)</SelectItem>
+                                                        <SelectItem value="+49">🇩🇪 Alemania (+49)</SelectItem>
+                                                        <SelectItem value="+39">🇮🇹 Italia (+39)</SelectItem>
+                                                    </SelectGroup>
+                                                    <SelectGroup>
+                                                        <SelectLabel>América</SelectLabel>
+                                                        <SelectItem value="+1">🇺🇸 Estados Unidos (+1)</SelectItem>
+                                                        <SelectItem value="+52">🇲🇽 México (+52)</SelectItem>
+                                                        <SelectItem value="+57">🇨🇴 Colombia (+57)</SelectItem>
+                                                        <SelectItem value="+54">🇦🇷 Argentina (+54)</SelectItem>
+                                                        <SelectItem value="+56">🇨🇱 Chile (+56)</SelectItem>
+                                                        <SelectItem value="+51">🇵🇪 Perú (+51)</SelectItem>
+                                                    </SelectGroup>
+                                                </SelectContent>
+                                            </Select>
+                                            <p className="text-[10px] text-gray-400 mt-1">
+                                                <Globe className="inline h-3 w-3 mr-1" />
+                                                Se usará para normalizar números sin prefijo (ej: 600... → +34600...)
+                                            </p>
+                                        </div>
+                                        <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
+                                    </label>
                                 </div>
                             </div>
-                        </TabsContent>
-                    </Tabs>
+                        </div>
+
+                        {/* Info Box */}
+                        <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-100 dark:border-blue-800">
+                            <p className="text-sm text-blue-700 dark:text-blue-300">
+                                <strong>Nota:</strong> Al pulsar "Lanzar Campaña", el sistema comenzará a llamar secuencialmente a cada número de la tabla, respetando el límite de concurrencia configurado.
+                            </p>
+                        </div>
                 </div>
-            </div>
+            </TabsContent>
+        </Tabs>
+                </div >
+            </div >
         </div >
     );
 }
