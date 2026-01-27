@@ -45,6 +45,9 @@ export function useCampaignExecutor({
     const isRunningRef = useRef(false);
     const isPausedRef = useRef(false);
 
+    // Track rows that are being initiated but not yet marked 'calling' in DB to prevent race conditions
+    const initiatingRowsRef = useRef<Set<string>>(new Set());
+
     // Listen to campaign rows in real-time
     useEffect(() => {
         if (!campaignId) return;
@@ -106,9 +109,13 @@ export function useCampaignExecutor({
 
 
 
-        // Filter pending rows that HAVE a valid phone number
+        // Filter pending rows that HAVE a valid phone number AND are not currently initiating
         const pendingRows = rows.filter(r => {
             if (r.status !== 'pending') return false;
+
+            // Critical: check local lock
+            if (initiatingRowsRef.current.has(r.id)) return false;
+
             const phone = r.data[phoneColumnId]?.trim();
             const isValid = phone && phone.length >= 7;
             if (!isValid && r.status === 'pending') {
@@ -131,41 +138,50 @@ export function useCampaignExecutor({
 
 
         nextBatch.forEach(row => {
-            initiateCall(row);
+            initiatingRowsRef.current.add(row.id); // Lock directly
+            initiateCall(row).catch(err => {
+                console.error("Critical error in initiateCall wrapper:", err);
+                initiatingRowsRef.current.delete(row.id); // Release lock on error
+            });
         });
     }, [rows, callingConfig.concurrency_limit, phoneColumnId]);
 
     const initiateCall = useCallback(async (row: CampaignRow) => {
-        const phoneNumber = row.data[phoneColumnId];
-        console.log(`[Executor] Initiating call for row ${row.id}. PhoneCol: ${phoneColumnId}, Val: ${phoneNumber}`);
-
-        if (!phoneNumber) {
-            await updateDoc(doc(db, "campaign_rows", row.id), {
-                status: 'failed',
-                last_error: 'No phone number provided'
-            });
-            return;
-        }
-
-        let normalizedPhone = phoneNumber.replace(/[^0-9+]/g, '');
-
-        // Smart Normalization using Target Country Code (Default to +34 Spain if not set)
-        const countryCode = callingConfig.target_country_code || '+34';
-
-        if (!normalizedPhone.startsWith('+')) {
-            // Remove + from country code for comparison
-            const codeDigits = countryCode.replace('+', '');
-
-            // If it starts with the country code digits (e.g. 346...), just add +
-            if (normalizedPhone.startsWith(codeDigits)) {
-                normalizedPhone = '+' + normalizedPhone;
-            } else {
-                // Otherwise prepend the whole code
-                normalizedPhone = countryCode + normalizedPhone;
-            }
-        }
+        // Lock verified in caller, but safety check:
+        // initiatingRowsRef.current.add(row.id); 
 
         try {
+            const phoneNumber = row.data[phoneColumnId];
+            console.log(`[Executor] Initiating call for row ${row.id}. PhoneCol: ${phoneColumnId}`);
+
+            if (!phoneNumber) {
+                await updateDoc(doc(db, "campaign_rows", row.id), {
+                    status: 'failed',
+                    last_error: 'No phone number provided'
+                });
+                return;
+            }
+
+            let normalizedPhone = phoneNumber.replace(/[^0-9+]/g, '');
+
+            // Smart Normalization using Target Country Code (Default to +34 Spain if not set)
+            const countryCode = callingConfig.target_country_code || '+34';
+
+            if (!normalizedPhone.startsWith('+')) {
+                // Remove + from country code for comparison
+                const codeDigits = countryCode.replace('+', '');
+
+                // If it starts with the country code digits (e.g. 346...), just add +
+                if (normalizedPhone.startsWith(codeDigits)) {
+                    normalizedPhone = '+' + normalizedPhone;
+                } else {
+                    // Otherwise prepend the whole code
+                    normalizedPhone = countryCode + normalizedPhone;
+                }
+            }
+
+
+            // Begin main logic (Try merged)
             await updateDoc(doc(db, "campaign_rows", row.id), {
                 status: 'calling',
                 called_at: Timestamp.now(),
@@ -235,6 +251,12 @@ export function useCampaignExecutor({
                 status: 'failed',
                 last_error: error.message || 'Unknown error',
             });
+        } finally {
+            // Always release lock when done (success or fail)
+            // Note: If success, status is 'calling', so main filter will skip it anyway.
+            // If fail, status is 'failed', main filter skips.
+            // This is just to cleanup the Set.
+            initiatingRowsRef.current.delete(row.id);
         }
     }, [campaignId, agentId, callingConfig.from_number, callingConfig.target_country_code, phoneColumnId, columns, campaignPrompt]);
 
