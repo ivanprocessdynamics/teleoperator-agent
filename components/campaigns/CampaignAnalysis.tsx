@@ -79,6 +79,7 @@ export function CampaignAnalysis({
             name: newField.name,
             description: newField.description,
             type: newField.type as any,
+            options: newField.options,
             isArchived: false
         };
 
@@ -239,15 +240,32 @@ export function CampaignAnalysis({
                                                 <SelectItem value="string">Texto Libre</SelectItem>
                                                 <SelectItem value="boolean">Sí / No</SelectItem>
                                                 <SelectItem value="number">Numérico</SelectItem>
+                                                <SelectItem value="enum">Lista de Opciones</SelectItem>
                                             </SelectContent>
                                         </Select>
                                     </div>
                                 </div>
 
+                                {newField.type === 'enum' && (
+                                    <div className="space-y-2">
+                                        <Label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Opciones Disponibles (separadas por comas)</Label>
+                                        <Input
+                                            placeholder="ej: Interesado, No Interesado, Llamar más tarde"
+                                            value={newField.options?.join(", ") || ""}
+                                            onChange={(e) => {
+                                                const opts = e.target.value.split(",").map(s => s.trim()).filter(Boolean);
+                                                setNewField({ ...newField, options: opts });
+                                            }}
+                                            className="bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 h-10"
+                                        />
+                                        <p className="text-[10px] text-gray-400">La IA se verá obligada a elegir una de estas opciones.</p>
+                                    </div>
+                                )}
+
                                 <div className="space-y-2">
                                     <Label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Instrucción para la IA</Label>
                                     <Input
-                                        placeholder="ej: ¿Cuál fue la razón exacta por la que el cliente dijo no?"
+                                        placeholder="ej: Clasifica la respuesta del cliente"
                                         value={newField.description}
                                         onChange={(e) => setNewField({ ...newField, description: e.target.value })}
                                         className="bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 h-10"
@@ -257,7 +275,7 @@ export function CampaignAnalysis({
                                 <div className="pt-2 flex justify-end">
                                     <Button
                                         onClick={addCustomField}
-                                        disabled={!newField.name || !newField.description}
+                                        disabled={!newField.name || !newField.description || (newField.type === 'enum' && (!newField.options || newField.options.length === 0))}
                                         className="bg-purple-600 hover:bg-purple-700 text-white w-full md:w-auto min-w-[120px]"
                                     >
                                         <Plus className="h-4 w-4 mr-2" />
@@ -278,12 +296,13 @@ export function CampaignAnalysis({
                                             {field.type === 'boolean' && <div className="h-2 w-2 rounded-full bg-green-400 mt-2" title="Sí/No" />}
                                             {field.type === 'number' && <div className="h-2 w-2 rounded-full bg-blue-400 mt-2" title="Número" />}
                                             {field.type === 'string' && <div className="h-2 w-2 rounded-full bg-orange-400 mt-2" title="Texto" />}
+                                            {field.type === 'enum' && <div className="h-2 w-2 rounded-full bg-purple-400 mt-2" title="Lista" />}
                                         </div>
                                         <div>
                                             <div className="flex items-center gap-2">
                                                 <h4 className="font-semibold text-sm text-gray-900 dark:text-gray-100">{field.name}</h4>
                                                 <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-5 font-normal bg-gray-100 text-gray-500 border-0">
-                                                    {field.type === 'boolean' ? 'Sí/No' : field.type === 'number' ? 'Número' : 'Texto'}
+                                                    {field.type === 'boolean' ? 'Sí/No' : field.type === 'number' ? 'Número' : field.type === 'enum' ? 'Lista' : 'Texto'}
                                                 </Badge>
                                             </div>
                                             <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">{field.description}</p>

@@ -413,7 +413,13 @@ async function handleCallAnalyzed(callId: string, data: any) {
                         Each object must have: "name" (string), "value" (string, number, or boolean), and "rationale" (string).
                         
                         Variables to extract:
-                        ${activeFields.map((f: any) => `- Name: ${f.name}, Type: ${f.type}, Description: ${f.description}`).join('\n')}
+                        ${activeFields.map((f: any) => {
+                        let desc = `- Name: ${f.name}, Type: ${f.type}, Description: ${f.description}`;
+                        if (f.type === 'enum' && f.options && f.options.length > 0) {
+                            desc += ` \n  IMPORTANT: Value MUST be one of: [${f.options.map((o: string) => `"${o}"`).join(', ')}]`;
+                        }
+                        return desc;
+                    }).join('\n')}
                         
                         Transcript:
                         ${transcriptText}

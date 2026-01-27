@@ -4,12 +4,16 @@ import { useEffect, useState } from "react";
 import { collection, query, where, getDocs, Timestamp, orderBy, doc, getDoc, updateDoc, onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Loader2, TrendingUp, Clock, Phone, ThumbsUp, Activity, RefreshCcw, EyeOff, Eye, Archive, Trash2 } from "lucide-react";
+import { ChatTranscript } from "@/components/calls/ChatTranscript";
+import { Loader2, TrendingUp, Clock, Phone, ThumbsUp, Activity, RefreshCcw, EyeOff, Eye, Archive, Trash2, ArrowRight, MessageSquare, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { formatDistanceToNow } from "date-fns";
+import { es } from "date-fns/locale";
 
 interface StatsDashboardProps {
     agentId?: string;
@@ -46,6 +50,10 @@ export function StatsDashboard(props: StatsDashboardProps) {
 
     // Delete Confirmation State
     const [metricToDelete, setMetricToDelete] = useState<{ id: string, name: string } | null>(null);
+
+    // Interactive Details State
+    const [viewingMetric, setViewingMetric] = useState<string | null>(null); // Name of the metric to view details
+    const [selectedCall, setSelectedCall] = useState<any | null>(null); // For Chat Transcript
 
     // Campaign Data
     const [campaignMap, setCampaignMap] = useState<Record<string, string>>({});
@@ -576,19 +584,36 @@ export function StatsDashboard(props: StatsDashboardProps) {
                             const noPct = data.count > 0 ? (data.no / data.count) * 100 : 0;
 
                             return (
-                                <Card key={name} className="group relative overflow-hidden border-gray-100 dark:border-gray-800 shadow-sm hover:shadow-md transition-shadow bg-white dark:bg-gray-800">
+                                <Card
+                                    key={name}
+                                    className="group relative overflow-hidden border-gray-100 dark:border-gray-800 shadow-sm hover:shadow-md transition-shadow bg-white dark:bg-gray-800 cursor-pointer"
+                                    onClick={() => setViewingMetric(name)}
+                                >
                                     <div className="absolute top-2 right-2 flex items-center gap-1 z-10 transition-opacity opacity-0 group-hover:opacity-100">
-                                        <Button variant="ghost" size="icon" onClick={() => handleToggleCustomArchive(data.id, true)} className="h-6 w-6 text-gray-400 hover:text-orange-500 hover:bg-orange-50" title="Ocultar (Archivar)">
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            onClick={(e) => { e.stopPropagation(); handleToggleCustomArchive(data.id, true); }}
+                                            className="h-6 w-6 text-gray-400 hover:text-orange-500 hover:bg-orange-50"
+                                            title="Ocultar (Archivar)"
+                                        >
                                             <EyeOff className="h-3.5 w-3.5" />
                                         </Button>
-                                        <Button variant="ghost" size="icon" onClick={() => setMetricToDelete({ id: data.id, name: name })} className="h-6 w-6 text-gray-400 hover:text-red-500 hover:bg-red-50" title="Eliminar Definitivamente">
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            onClick={(e) => { e.stopPropagation(); setMetricToDelete({ id: data.id, name: name }); }}
+                                            className="h-6 w-6 text-gray-400 hover:text-red-500 hover:bg-red-50"
+                                            title="Eliminar Definitivamente"
+                                        >
                                             <Trash2 className="h-3.5 w-3.5" />
                                         </Button>
                                     </div>
                                     <div className="border-b border-gray-50 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900/50 px-5 py-3 flex justify-between items-center">
                                         <div>
-                                            <div className="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-0.5">
+                                            <div className="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-0.5 flex items-center gap-1.5">
                                                 {name.replace(/_/g, ' ')}
+                                                <ExternalLink className="h-3 w-3 opacity-0 group-hover:opacity-50" />
                                             </div>
                                             <div className="text-[10px] text-gray-400 dark:text-gray-500 truncate max-w-[200px]" title={data.description}>
                                                 {data.description}
@@ -633,8 +658,9 @@ export function StatsDashboard(props: StatsDashboardProps) {
                                                 <span className="text-sm text-gray-500 font-medium uppercase tracking-wide">Promedio</span>
                                             </div>
                                         ) : (
-                                            <div className="text-sm text-gray-600 dark:text-gray-400 italic bg-gray-50 dark:bg-gray-800/50 p-3 rounded-lg border border-gray-100 dark:border-gray-700">
-                                                Texto libre (ver detalles en tabla)
+                                            <div className="text-sm text-gray-600 dark:text-gray-400 italic bg-gray-50 dark:bg-gray-800/50 p-3 rounded-lg border border-gray-100 dark:border-gray-700 flex items-center justify-between">
+                                                <span className="truncate">Ver lista de respuestas</span>
+                                                <ArrowRight className="h-4 w-4 text-gray-400" />
                                             </div>
                                         )}
                                     </div>
@@ -691,6 +717,116 @@ export function StatsDashboard(props: StatsDashboardProps) {
                     </div>
                 </div>
             )}
+
+            {/* Metric Details Dialog */}
+            <Dialog open={!!viewingMetric} onOpenChange={(open) => !open && setViewingMetric(null)}>
+                <DialogContent className="max-w-3xl max-h-[85vh] flex flex-col p-0 gap-0 overflow-hidden">
+                    <DialogHeader className="p-6 border-b border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 shrink-0">
+                        <DialogTitle className="flex items-center gap-2 text-xl">
+                            <Activity className="h-5 w-5 text-purple-600" />
+                            {viewingMetric?.replace(/_/g, ' ')}
+                        </DialogTitle>
+                        <DialogDescription>
+                            Respuestas extraídas para esta métrica ({viewingMetric && customStats[viewingMetric]?.count} llamadas)
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    <ScrollArea className="flex-1 bg-gray-50/50 dark:bg-gray-900/50 p-6">
+                        <div className="space-y-3">
+                            {viewingMetric && (() => {
+                                // Extract and filter calls that have this metric
+                                const callsWithMetric = rawCalls.filter(c => {
+                                    // Must match filters (already done in rawCalls sort of, but let's re-verify logic)
+                                    // Actually rawCalls might be larger if we filter client side for 'testing'.
+                                    // Use same logic as 'filteredCalls' basically.
+                                    const isTesting = c.metadata?.type === 'testing';
+                                    if (selectedCampaign === 'all' && isTesting) return false;
+                                    if (selectedCampaign !== 'all' && selectedCampaign !== 'testing' && c.metadata?.campaign_id !== selectedCampaign) return false;
+                                    if (selectedCampaign === 'testing' && !isTesting && (c.metadata?.campaign_id || campaignMap[c.agent_id])) return false; // Strict testing check
+
+                                    // Check if metric exists
+                                    return c.analysis?.custom_analysis_data?.some((d: any) => d.name === viewingMetric);
+                                }).sort((a, b) => (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0));
+
+                                if (callsWithMetric.length === 0) return (
+                                    <div className="text-center py-10 text-gray-500">No hay datos disponibles para los filtros actuales.</div>
+                                );
+
+                                return callsWithMetric.map(call => {
+                                    const metricData = call.analysis?.custom_analysis_data?.find((d: any) => d.name === viewingMetric);
+                                    const campaignName = (call.metadata?.campaign_id ? campaignMap[call.metadata.campaign_id] : null) || campaignMap[call.agent_id];
+
+                                    return (
+                                        <Card key={call.id} className="overflow-hidden border-gray-200 dark:border-gray-800 shadow-sm hover:shadow-md transition-shadow">
+                                            <div className="p-4 flex items-start gap-4">
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="flex items-center gap-2 mb-2">
+                                                        <Badge variant="outline" className="bg-white dark:bg-gray-900 text-xs font-normal text-gray-500">
+                                                            {call.timestamp?.toDate ? formatDistanceToNow(call.timestamp.toDate(), { addSuffix: true, locale: es }) : "Reciente"}
+                                                        </Badge>
+                                                        {campaignName && (
+                                                            <Badge variant="secondary" className="text-[10px] bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-300 border-0">
+                                                                {campaignName}
+                                                            </Badge>
+                                                        )}
+                                                    </div>
+                                                    <div className="text-sm font-medium text-gray-900 dark:text-gray-100 bg-purple-50 dark:bg-purple-900/10 p-3 rounded-lg border border-purple-100 dark:border-purple-900/20">
+                                                        "{String(metricData?.value)} "
+                                                    </div>
+                                                    {metricData?.rationale && (
+                                                        <p className="text-xs text-gray-500 mt-2 italic">
+                                                            Razón: {metricData.rationale}
+                                                        </p>
+                                                    )}
+                                                </div>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    onClick={() => setSelectedCall(call)}
+                                                    className="shrink-0 h-9 w-9 p-0 rounded-full border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-500 hover:text-blue-600 hover:border-blue-200 hover:bg-blue-50"
+                                                    title="Ver conversación completa"
+                                                >
+                                                    <MessageSquare className="h-4 w-4" />
+                                                </Button>
+                                            </div>
+                                        </Card>
+                                    );
+                                });
+                            })()}
+                        </div>
+                    </ScrollArea>
+                    <DialogFooter className="p-4 border-t border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 shrink-0">
+                        <Button variant="outline" onClick={() => setViewingMetric(null)}>Cerrar</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Chat Transcript Dialog */}
+            <Dialog open={!!selectedCall} onOpenChange={(open) => !open && setSelectedCall(null)}>
+                <DialogContent className="max-w-2xl h-[85vh] flex flex-col p-0 gap-0 overflow-hidden rounded-2xl">
+                    <DialogHeader className="p-6 border-b border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900">
+                        <DialogTitle className="flex items-center gap-3">
+                            <div className="h-10 w-10 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-600">
+                                <Phone className="h-5 w-5" />
+                            </div>
+                            <div className="flex flex-col">
+                                <span>Transcripción de Llamada</span>
+                                <span className="text-xs font-normal text-gray-500">
+                                    {selectedCall?.timestamp?.toDate ? selectedCall.timestamp.toDate().toLocaleString() : "Fecha desconocida"}
+                                </span>
+                            </div>
+                        </DialogTitle>
+                    </DialogHeader>
+                    {selectedCall && (
+                        <div className="flex-1 overflow-hidden bg-gray-50 dark:bg-gray-950">
+                            <ChatTranscript
+                                messages={selectedCall.transcript_object || []}
+                                audioUrl={selectedCall.recording_url}
+                            />
+                        </div>
+                    )}
+                </DialogContent>
+            </Dialog>
 
             <Dialog open={!!metricToDelete} onOpenChange={(open) => !open && setMetricToDelete(null)}>
                 <DialogContent>
