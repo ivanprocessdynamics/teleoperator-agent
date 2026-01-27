@@ -50,28 +50,54 @@ export function StatsDashboard(props: StatsDashboardProps) {
     // Campaign Data
     const [campaignMap, setCampaignMap] = useState<Record<string, string>>({});
 
-    // 1. Fetch Campaigns for mapping names (Real-time)
+    // 1. Fetch Campaigns and Agents for mapping names (Real-time)
     useEffect(() => {
-        const unsub = onSnapshot(collection(db, "campaigns"), (snapshot) => {
-            const map: Record<string, string> = {};
-            snapshot.docs.forEach(doc => {
-                const data = doc.data();
-                map[doc.id] = data.name || "Campaña sin nombre";
-                if (data.vapi_agent_id) {
-                    map[data.vapi_agent_id] = data.name || "Campaña sin nombre";
+        // Fetch Agents first (Subworkspaces)
+        const unsubAgents = onSnapshot(collection(db, "subworkspaces"), (agentSnap) => {
+            const agentMap: Record<string, string> = {};
+            agentSnap.docs.forEach(d => {
+                const ad = d.data();
+                if (ad.retell_agent_id) {
+                    agentMap[ad.retell_agent_id] = ad.name || "Agente sin nombre";
                 }
             });
-            setCampaignMap(map);
-        }, (err) => {
-            console.error("Error fetching campaigns:", err);
-        });
 
-        return () => unsub();
-    }, []);
+            // Fetch Campaigns
+            const unsubCampaigns = onSnapshot(collection(db, "campaigns"), (campSnap) => {
+                const map: Record<string, string> = {};
+                campSnap.docs.forEach(doc => {
+                    const data = doc.data();
+                    const campName = data.name || "Campaña sin nombre";
+
+                    // If we are in Global Mode (no specific agentId prop), append Agent Name
+                    let finalName = campName;
+                    if (!agentId && data.retell_agent_id && agentMap[data.retell_agent_id]) {
+                        finalName = `${campName} (${agentMap[data.retell_agent_id]})`;
+                    } else if (!agentId && data.agent_id && agentMap[data.agent_id]) {
+                        // Fallback for older schema using agent_id
+                        finalName = `${campName} (${agentMap[data.agent_id]})`;
+                    }
+
+                    map[doc.id] = finalName;
+                    if (data.vapi_agent_id) {
+                        map[data.vapi_agent_id] = finalName;
+                    }
+                    if (data.retell_agent_id) { // Map retell agent ID too if needed, but usually we filter by campaign_id
+                        // This might be tricky if one agent has multiple campaigns, but usually map[id] is unique
+                    }
+                });
+                setCampaignMap(map);
+            }, (err) => console.error("Error fetching campaigns:", err));
+
+            return () => unsubCampaigns();
+        }, (err) => console.error("Error fetching agents:", err));
+
+        return () => unsubAgents();
+    }, [agentId]);
 
     // 2. Fetch Data (Calls + Config)
     const fetchStats = async () => {
-        if (!agentId || !props.subworkspaceId) return;
+        // if (!agentId || !props.subworkspaceId) return; // Allow running without these for Global View
         setLoading(true);
 
         try {
@@ -80,12 +106,14 @@ export function StatsDashboard(props: StatsDashboardProps) {
             let currentHidden: string[] = [];
             let currentIgnored: string[] = [];
 
-            const subDoc = await getDoc(doc(db, "subworkspaces", props.subworkspaceId));
-            if (subDoc.exists()) {
-                const data = subDoc.data();
-                currentHidden = data.analysis_config?.hidden_standard_fields || [];
-                currentFields = data.analysis_config?.custom_fields || [];
-                currentIgnored = data.analysis_config?.ignored_custom_fields || [];
+            if (props.subworkspaceId) {
+                const subDoc = await getDoc(doc(db, "subworkspaces", props.subworkspaceId));
+                if (subDoc.exists()) {
+                    const data = subDoc.data();
+                    currentHidden = data.analysis_config?.hidden_standard_fields || [];
+                    currentFields = data.analysis_config?.custom_fields || [];
+                    currentIgnored = data.analysis_config?.ignored_custom_fields || [];
+                }
             }
 
             // If a specific Campaign is selected, try to load its config to overlay/add fields

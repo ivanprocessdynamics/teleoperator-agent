@@ -15,6 +15,8 @@ import {
     Box,
     Moon,
     Sun,
+    BarChart2,
+    History,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -45,6 +47,16 @@ export function Sidebar() {
             href: "/settings",
             icon: Settings,
         },
+        {
+            label: "Global Stats",
+            href: "/global-stats",
+            icon: BarChart2,
+        },
+        {
+            label: "Global History",
+            href: "/global-history",
+            icon: History,
+        },
     ];
 
     return (
@@ -69,7 +81,11 @@ export function Sidebar() {
                                 )}
                             >
                                 <item.icon className="h-4 w-4" />
-                                {item.label === "Agents" ? "Agentes" : item.label === "Settings" ? "Configuración" : item.label}
+                                {item.label === "Agents" ? "Agentes" :
+                                    item.label === "Settings" ? "Configuración" :
+                                        item.label === "Global Stats" ? "Estadísticas Globales" :
+                                            item.label === "Global History" ? "Historial Global" :
+                                                item.label}
                             </Link>
                         );
                     })}

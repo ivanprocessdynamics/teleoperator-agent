@@ -76,29 +76,47 @@ export function CallHistoryTable({ agentId: initialAgentId }: CallHistoryTablePr
     const [pickerStart, setPickerStart] = useState<Date | null>(null);
     const [pickerEnd, setPickerEnd] = useState<Date | null>(null);
 
-    // 1. Fetch Campaigns for mapping names (Real-time)
+    // 1. Fetch Campaigns and Agents for mapping names (Real-time)
     useEffect(() => {
-        const unsub = onSnapshot(collection(db, "campaigns"), (snapshot) => {
-            const map: Record<string, string> = {};
-            snapshot.docs.forEach(doc => {
-                const data = doc.data();
-                // Map both the ID and the Vapi Agent ID if it exists? 
-                // For now map the document ID (which is likely the campaign_id) to the title.
-                map[doc.id] = data.name || "Campaña sin nombre";
-
-                // If the campaign has a specific 'agent_id' field, map that too? 
-                // Let's assume calls.agent_id might match campaign.id OR campaign.vapi_agent_id
-                if (data.vapi_agent_id) {
-                    map[data.vapi_agent_id] = data.name || "Campaña sin nombre";
+        // Fetch Agents first (Subworkspaces)
+        const unsubAgents = onSnapshot(collection(db, "subworkspaces"), (agentSnap) => {
+            const agentMap: Record<string, string> = {};
+            agentSnap.docs.forEach(d => {
+                const ad = d.data();
+                if (ad.retell_agent_id) {
+                    agentMap[ad.retell_agent_id] = ad.name || "Agente sin nombre";
                 }
             });
-            setCampaignMap(map);
-        }, (err) => {
-            console.error("Error fetching campaigns:", err);
-        });
 
-        return () => unsub();
-    }, []);
+            // Fetch Campaigns
+            const unsubCampaigns = onSnapshot(collection(db, "campaigns"), (campSnap) => {
+                const map: Record<string, string> = {};
+                campSnap.docs.forEach(doc => {
+                    const data = doc.data();
+                    const campName = data.name || "Campaña sin nombre";
+
+                    // If we are in Global Mode (no specific initialAgentId prop), append Agent Name
+                    let finalName = campName;
+                    if (!initialAgentId && data.retell_agent_id && agentMap[data.retell_agent_id]) {
+                        finalName = `${campName} (${agentMap[data.retell_agent_id]})`;
+                    } else if (!initialAgentId && data.agent_id && agentMap[data.agent_id]) {
+                        // Fallback for older schema using agent_id
+                        finalName = `${campName} (${agentMap[data.agent_id]})`;
+                    }
+
+                    map[doc.id] = finalName;
+                    if (data.vapi_agent_id) {
+                        map[data.vapi_agent_id] = finalName;
+                    }
+                });
+                setCampaignMap(map);
+            }, (err) => console.error("Error fetching campaigns:", err));
+
+            return () => unsubCampaigns();
+        }, (err) => console.error("Error fetching agents:", err));
+
+        return () => unsubAgents();
+    }, [initialAgentId]);
 
     useEffect(() => {
         setError(null);
@@ -129,6 +147,10 @@ export function CallHistoryTable({ agentId: initialAgentId }: CallHistoryTablePr
         }
         if (end) {
             constraints.push(where("timestamp", "<=", Timestamp.fromDate(end)));
+        }
+
+        if (initialAgentId) {
+            constraints.push(where("agent_id", "==", initialAgentId));
         }
 
         const q = query(collection(db, "calls"), ...constraints);
