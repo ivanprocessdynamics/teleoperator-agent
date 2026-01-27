@@ -32,7 +32,8 @@ const DEFAULT_CONFIG: AnalysisConfig = {
         call_successful: true
     },
     custom_fields: [],
-    hidden_standard_fields: []
+    hidden_standard_fields: [],
+    ignored_custom_fields: []
 };
 
 export function CampaignAnalysis({
@@ -133,9 +134,14 @@ export function CampaignAnalysis({
                 custom_fields: config.custom_fields.filter(f => f.id !== id)
             });
         } else {
+            const field = config.custom_fields.find(f => f.id === id);
+            const ignored = config.ignored_custom_fields || [];
+            const newIgnored = field ? [...ignored, field.name] : ignored;
+
             onChange({
                 ...config,
-                custom_fields: config.custom_fields.filter(f => f.id !== id)
+                custom_fields: config.custom_fields.filter(f => f.id !== id),
+                ignored_custom_fields: newIgnored
             });
         }
     };

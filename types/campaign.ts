@@ -69,5 +69,6 @@ export interface AnalysisConfig {
     };
     custom_fields: AnalysisField[];
     hidden_standard_fields?: string[];
+    ignored_custom_fields?: string[];
 }
 

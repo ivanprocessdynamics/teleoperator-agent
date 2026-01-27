@@ -26,6 +26,7 @@ export function StatsDashboard(props: StatsDashboardProps) {
 
     // Config State
     const [hiddenStandard, setHiddenStandard] = useState<string[]>([]);
+    const [ignoredFields, setIgnoredFields] = useState<string[]>([]);
     const [period, setPeriod] = useState("7d");
     const [selectedAgent, setSelectedAgent] = useState<string>(agentId || "all");
     const [uniqueAgents, setUniqueAgents] = useState<string[]>([]); // Derived from calls
@@ -80,6 +81,7 @@ export function StatsDashboard(props: StatsDashboardProps) {
                 const data = subDoc.data();
                 setHiddenStandard(data.analysis_config?.hidden_standard_fields || []);
                 setAllFields(data.analysis_config?.custom_fields || []);
+                setIgnoredFields(data.analysis_config?.ignored_custom_fields || []);
             }
 
             // Fetch Calls
@@ -197,7 +199,11 @@ export function StatsDashboard(props: StatsDashboardProps) {
                     // CRITICAL FIX: If this field is KNOWN to be archived, ignore it entirely.
                     // Do not "rediscover" it.
                     const isArchived = allFields.some(f => f.name === name && f.isArchived);
-                    if (isArchived) return;
+
+                    // ALSO CHECK: If it is in the "ignored" list (hard deleted)
+                    const isIgnored = ignoredFields.includes(name);
+
+                    if (isArchived || isIgnored) return;
 
                     if (!customAgg[name]) {
                         // Discovered a field not in active config (maybe new)
@@ -227,7 +233,7 @@ export function StatsDashboard(props: StatsDashboardProps) {
         });
 
         setCustomStats(customAgg);
-    }, [rawCalls, allFields, selectedAgent]);
+    }, [rawCalls, allFields, ignoredFields, selectedAgent]);
 
 
     const handleHideStandard = async (metricId: string) => {
@@ -304,11 +310,15 @@ export function StatsDashboard(props: StatsDashboardProps) {
         if (!props.subworkspaceId || !metricToDelete) return;
 
         const newFields = allFields.filter(f => f.id !== metricToDelete.id);
+        const newIgnored = [...ignoredFields, metricToDelete.name];
+
         setAllFields(newFields); // Optimistic update
+        setIgnoredFields(newIgnored);
 
         try {
             await updateDoc(doc(db, "subworkspaces", props.subworkspaceId), {
-                "analysis_config.custom_fields": newFields
+                "analysis_config.custom_fields": newFields,
+                "analysis_config.ignored_custom_fields": newIgnored
             });
             setMetricToDelete(null);
         } catch (e) {
