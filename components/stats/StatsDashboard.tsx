@@ -169,14 +169,25 @@ export function StatsDashboard(props: StatsDashboardProps) {
                 constraints.push(where("agent_id", "==", agentId));
             }
 
+            if (selectedCampaign === "testing") {
+                constraints.push(where("metadata.type", "==", "testing"));
+            } else if (selectedCampaign !== "all") {
+                constraints.push(where("metadata.campaign_id", "==", selectedCampaign));
+            }
+
             if (end) {
                 constraints.push(where("timestamp", "<=", Timestamp.fromDate(end)));
             }
 
             const q = query(collection(db, "calls"), ...constraints);
-
             const snapshot = await getDocs(q);
-            const calls = snapshot.docs.map(doc => doc.data());
+            let calls = snapshot.docs.map(doc => doc.data());
+
+            // Client-side cleanup for "All" (exclude testing calls)
+            if (selectedCampaign === "all") {
+                calls = calls.filter((c: any) => c.metadata?.type !== 'testing');
+            }
+
             setRawCalls(calls);
 
         } catch (error) {
@@ -410,6 +421,9 @@ export function StatsDashboard(props: StatsDashboardProps) {
                         </SelectTrigger>
                         <SelectContent>
                             <SelectItem value="all">Todas las campañas</SelectItem>
+                            <SelectItem value="testing" className="text-amber-600 dark:text-amber-400 font-medium">
+                                🧪 Entorno de Pruebas
+                            </SelectItem>
                             {uniqueCampaigns.map(cid => (
                                 <SelectItem key={cid} value={cid}>
                                     {campaignMap[cid] || "Campaña desconocida"}

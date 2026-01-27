@@ -44,6 +44,12 @@ export function useCampaignExecutor({
     const [rows, setRows] = useState<CampaignRow[]>([]);
     const isRunningRef = useRef(false);
     const isPausedRef = useRef(false);
+    const promptRef = useRef(campaignPrompt); // Store prompt in ref to allow overrides and immediate access
+
+    // Sync ref when prop changes
+    useEffect(() => {
+        promptRef.current = campaignPrompt;
+    }, [campaignPrompt]);
 
     // Track rows that are being initiated but not yet marked 'calling' in DB to prevent race conditions
     const initiatingRowsRef = useRef<Set<string>>(new Set());
@@ -198,7 +204,7 @@ export function useCampaignExecutor({
             });
 
             // Hydrate the prompt with variables (Client-side interpolation)
-            let hydratedPrompt = campaignPrompt;
+            let hydratedPrompt = promptRef.current;
 
             // Build normalized lookup map for case-insensitive matching
             const varLookup: Record<string, string> = {};
@@ -260,7 +266,10 @@ export function useCampaignExecutor({
         }
     }, [campaignId, agentId, callingConfig.from_number, callingConfig.target_country_code, phoneColumnId, columns, campaignPrompt]);
 
-    const start = useCallback(() => {
+    const start = useCallback((promptOverride?: string) => {
+        if (promptOverride) {
+            promptRef.current = promptOverride;
+        }
         isRunningRef.current = true;
         isPausedRef.current = false;
         setState(prev => ({ ...prev, isRunning: true, isPaused: false }));

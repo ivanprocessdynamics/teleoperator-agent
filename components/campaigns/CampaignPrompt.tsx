@@ -12,11 +12,12 @@ interface CampaignPromptProps {
     prompt: string;
     columns: CampaignColumn[];
     onChange: (newPrompt: string) => void;
+    onImmediateChange?: (newPrompt: string) => void;
     onSyncAgent: (newPrompt: string) => Promise<void>;
     variableClass?: string;
 }
 
-export function CampaignPrompt({ prompt, columns, onChange, onSyncAgent, variableClass }: CampaignPromptProps) {
+export function CampaignPrompt({ prompt, columns, onChange, onImmediateChange, onSyncAgent, variableClass }: CampaignPromptProps) {
     const [localPrompt, setLocalPrompt] = useState(prompt);
     const [isFocused, setIsFocused] = useState(false);
     const [isSyncing, setIsSyncing] = useState(false);
@@ -37,6 +38,7 @@ export function CampaignPrompt({ prompt, columns, onChange, onSyncAgent, variabl
     useEffect(() => {
         if (!isFocused && prompt !== localPrompt && prompt !== lastSaveRef.current) {
             setLocalPrompt(prompt);
+            onImmediateChange?.(prompt); // Sync up
             setHistory([prompt]);
             setHistoryIndex(0);
             setHasUnsyncedChanges(false);
@@ -68,6 +70,7 @@ export function CampaignPrompt({ prompt, columns, onChange, onSyncAgent, variabl
 
     const handleChange = (newValue: string) => {
         setLocalPrompt(newValue);
+        onImmediateChange?.(newValue);
         markAsUnsynced();
 
         // Firestore Auto-Save Debounce
@@ -85,6 +88,7 @@ export function CampaignPrompt({ prompt, columns, onChange, onSyncAgent, variabl
     const handleTextareaChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
         const val = e.target.value;
         setLocalPrompt(val);
+        onImmediateChange?.(val);
 
         // Auto-save logic
         if (timeoutRef.current) clearTimeout(timeoutRef.current);
@@ -130,6 +134,7 @@ export function CampaignPrompt({ prompt, columns, onChange, onSyncAgent, variabl
     const safeHandleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
         const val = e.target.value;
         setLocalPrompt(val);
+        onImmediateChange?.(val);
         markAsUnsynced();
 
         // Firestore Save
@@ -153,6 +158,7 @@ export function CampaignPrompt({ prompt, columns, onChange, onSyncAgent, variabl
             const newVal = history[newIndex];
             setHistoryIndex(newIndex);
             setLocalPrompt(newVal);
+            onImmediateChange?.(newVal);
             onChange(newVal); // update firestore immediately on undo
             lastSaveRef.current = newVal;
             markAsUnsynced();
@@ -165,6 +171,7 @@ export function CampaignPrompt({ prompt, columns, onChange, onSyncAgent, variabl
             const newVal = history[newIndex];
             setHistoryIndex(newIndex);
             setLocalPrompt(newVal);
+            onImmediateChange?.(newVal);
             onChange(newVal);
             lastSaveRef.current = newVal;
             markAsUnsynced();
@@ -196,6 +203,7 @@ export function CampaignPrompt({ prompt, columns, onChange, onSyncAgent, variabl
         }
 
         setLocalPrompt(newValue);
+        onImmediateChange?.(newValue);
         onChange(newValue);
         markAsUnsynced();
     };

@@ -22,6 +22,10 @@ export async function POST(req: Request) {
             retell_llm_dynamic_variables: {
                 campaign_prompt: prompt || "Prompt no configurado",
             },
+            metadata: {
+                type: 'testing',
+                agent_id: agent_id
+            }
         });
 
         return NextResponse.json(webCallResponse, { status: 200 });

@@ -263,6 +263,12 @@ export function CampaignDetail({ campaignId, subworkspaceId, onBack }: CampaignD
 
     const phoneColumnId = campaign?.phone_column_id || campaign?.columns?.find(c => c.isPhoneColumn)?.id || "col_phone";
 
+    // Track latest prompt for safe launch
+    const latestPromptRef = useRef(campaign?.prompt_template || "");
+    useEffect(() => {
+        if (campaign?.prompt_template) latestPromptRef.current = campaign.prompt_template;
+    }, [campaign?.prompt_template]);
+
     // Campaign Executor
     const executor = useCampaignExecutor({
         campaignId: campaignId,
@@ -272,6 +278,20 @@ export function CampaignDetail({ campaignId, subworkspaceId, onBack }: CampaignD
         campaignPrompt: campaign?.prompt_template || '',
         columns: campaign?.columns || [] // Pass columns for dynamic variables
     });
+
+    const handleLaunch = async () => {
+        // 1. Force save pending prompt if different
+        const currentPrompt = latestPromptRef.current;
+        if (currentPrompt && currentPrompt !== campaign?.prompt_template) {
+            console.log("Saving prompt before launch...");
+            await updateDoc(doc(db, "campaigns", campaignId), {
+                prompt_template: currentPrompt
+            });
+        }
+
+        // 2. Start with EXPLICIT overriding prompt to avoid stale closure in hook
+        executor.start(currentPrompt);
+    };
 
     if (isLoading) {
         return (
@@ -364,7 +384,7 @@ export function CampaignDetail({ campaignId, subworkspaceId, onBack }: CampaignD
                                 </div>
 
                                 <Button
-                                    onClick={executor.start}
+                                    onClick={handleLaunch}
                                     disabled={executor.state.totalRows === 0}
                                     className="w-full sm:w-auto bg-green-600 hover:bg-green-700 text-white shadow-lg shadow-green-500/20 px-8 py-6 text-lg font-semibold transition-all hover:scale-105 active:scale-95 disabled:opacity-50 disabled:hover:scale-100"
                                 >
@@ -593,7 +613,8 @@ export function CampaignDetail({ campaignId, subworkspaceId, onBack }: CampaignD
                             onClick={async () => {
                                 setShowRelaunchDialog(false);
                                 await executor.resetRows(0);
-                                executor.start();
+                                await executor.resetRows(0);
+                                executor.start(latestPromptRef.current);
                             }}
                         >
                             Confirmar y Relanzar
@@ -630,7 +651,8 @@ export function CampaignDetail({ campaignId, subworkspaceId, onBack }: CampaignD
                                 const idx = parseInt(relaunchStartLine) - 1;
                                 if (!isNaN(idx) && idx >= 0) {
                                     await executor.resetRows(idx);
-                                    executor.start();
+                                    await executor.resetRows(idx);
+                                    executor.start(latestPromptRef.current);
                                 }
                             }}
                         >
@@ -664,6 +686,7 @@ export function CampaignDetail({ campaignId, subworkspaceId, onBack }: CampaignD
                                 prompt={campaign?.prompt_template || ""}
                                 columns={campaign?.columns || []}
                                 onChange={handlePromptChange}
+                                onImmediateChange={(val) => latestPromptRef.current = val}
                                 onSyncAgent={handleSyncPrompt}
                                 variableClass={styles.variable}
                             />
