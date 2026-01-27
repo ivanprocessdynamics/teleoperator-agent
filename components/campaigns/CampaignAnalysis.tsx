@@ -61,11 +61,14 @@ export function CampaignAnalysis({
     const isGlobalMode = Array.isArray(globalFields);
 
     const activeFields = isGlobalMode
-        ? config.custom_fields
+        ? config.custom_fields.filter(f => !f.isArchived)
         : config.custom_fields.filter(f => !f.isArchived);
 
     const archivedFields = isGlobalMode
-        ? (globalFields || []).filter(gf => !config.custom_fields.some(af => af.id === gf.id || af.name === gf.name))
+        ? (globalFields || []).filter(gf => {
+            const localMatch = config.custom_fields.find(af => af.name === gf.name); // Match by name to support derived local
+            return !localMatch || localMatch.isArchived;
+        })
         : config.custom_fields.filter(f => f.isArchived);
 
     const addCustomField = () => {
