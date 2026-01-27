@@ -170,7 +170,7 @@ export function StatsDashboard(props: StatsDashboardProps) {
             }
 
             if (selectedCampaign === "testing") {
-                constraints.push(where("metadata.type", "==", "testing"));
+                // Allow fetching all calls to enable 'residue' filtering for legacy test calls
             } else if (selectedCampaign !== "all") {
                 constraints.push(where("metadata.campaign_id", "==", selectedCampaign));
             }
@@ -214,7 +214,9 @@ export function StatsDashboard(props: StatsDashboardProps) {
         // Filter by Campaign first
         const filteredCalls = selectedCampaign === 'all'
             ? rawCalls
-            : rawCalls.filter(c => c.metadata?.campaign_id === selectedCampaign);
+            : selectedCampaign === 'testing'
+                ? rawCalls.filter(c => c.metadata?.type === 'testing' || (!c.metadata?.campaign_id && !campaignMap[c.agent_id]))
+                : rawCalls.filter(c => c.metadata?.campaign_id === selectedCampaign);
 
         // Basic Stats
         let totalDuration = 0;
@@ -300,7 +302,7 @@ export function StatsDashboard(props: StatsDashboardProps) {
         });
 
         setCustomStats(customAgg);
-    }, [rawCalls, allFields, ignoredFields, selectedCampaign]);
+    }, [rawCalls, allFields, ignoredFields, selectedCampaign, campaignMap]);
 
 
     const handleHideStandard = async (metricId: string) => {
