@@ -422,7 +422,7 @@ export function StatsDashboard(props: StatsDashboardProps) {
                         <SelectContent>
                             <SelectItem value="all">Todas las campañas</SelectItem>
                             <SelectItem value="testing" className="text-amber-600 dark:text-amber-400 font-medium">
-                                🧪 Entorno de Pruebas
+                                Entorno de Pruebas
                             </SelectItem>
                             {uniqueCampaigns.map(cid => (
                                 <SelectItem key={cid} value={cid}>

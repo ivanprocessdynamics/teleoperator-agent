@@ -239,6 +239,23 @@ export function TestingEnvironment({ subworkspaceId }: TestingEnvironmentProps) 
             setPrompt(latestPrompt);
             setActivePrompt(latestPrompt);
 
+            // Sync with Retell Agent (Ensure config is set to {{campaign_prompt}})
+            if (retellAgentId) {
+                console.log("Syncing agent config...");
+                try {
+                    await fetch('/api/retell/update-agent', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            agent_id: retellAgentId,
+                            prompt: "ensure-dynamic-prompt-config" // Dummy value triggers {{campaign_prompt}} config
+                        })
+                    });
+                } catch (syncErr) {
+                    console.error("Error syncing agent:", syncErr);
+                }
+            }
+
             setActiveSuccess(true);
             setTimeout(() => setActiveSuccess(false), 3000);
         } catch (error) {

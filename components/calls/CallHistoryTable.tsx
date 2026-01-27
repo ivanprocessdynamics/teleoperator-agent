@@ -24,7 +24,6 @@ import {
     RefreshCw,
     Filter,
     User,
-    LayoutGrid,
     Megaphone
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -36,6 +35,7 @@ interface CallRecord {
     agent_id: string;
     metadata?: {
         campaign_id?: string;
+        type?: string;
     };
     analysis: {
         call_summary?: string;
@@ -64,7 +64,6 @@ export function CallHistoryTable({ agentId: initialAgentId }: CallHistoryTablePr
 
     // Filters
     const [selectedCampaignId, setSelectedCampaignId] = useState<string>("all");
-    const [sourceFilter, setSourceFilter] = useState<string>("all"); // all, campaign, testing
 
     // Aggregated Filter Data
     const [uniqueCampaignIds, setUniqueCampaignIds] = useState<string[]>([]);
@@ -185,23 +184,19 @@ export function CallHistoryTable({ agentId: initialAgentId }: CallHistoryTablePr
         let result = calls;
 
         // Filter by Campaign ID (matches agent_id or campaign_id)
-        if (selectedCampaignId !== "all") {
+        if (selectedCampaignId === "testing") {
+            result = result.filter(c => c.metadata?.type === 'testing' || (!c.metadata?.campaign_id && !campaignMap[c.agent_id]));
+        } else if (selectedCampaignId !== "all") {
             result = result.filter(c =>
                 c.metadata?.campaign_id === selectedCampaignId ||
                 c.agent_id === selectedCampaignId
             );
         }
 
-        // Filter by Source (Campaign vs Testing)
-        if (sourceFilter === "campaign") {
-            // Assume it's a campaign if we can find a title for it or it has explicit metadata
-            result = result.filter(c => c.metadata?.campaign_id || campaignMap[c.agent_id]);
-        } else if (sourceFilter === "testing") {
-            result = result.filter(c => !c.metadata?.campaign_id && !campaignMap[c.agent_id]);
-        }
+        // Removed separate Source Filter logic as it is now merged
 
         setFilteredCalls(result);
-    }, [calls, selectedCampaignId, sourceFilter, campaignMap]);
+    }, [calls, selectedCampaignId, campaignMap]);
 
     const [expandedSummaries, setExpandedSummaries] = useState<Set<string>>(new Set());
 
@@ -251,18 +246,7 @@ export function CallHistoryTable({ agentId: initialAgentId }: CallHistoryTablePr
                 </div>
 
                 <div className="flex flex-wrap items-center gap-3">
-                    {/* Source Filter */}
-                    <Select value={sourceFilter} onValueChange={setSourceFilter}>
-                        <SelectTrigger className="w-[140px] h-9 bg-white dark:bg-gray-950 border-gray-200 dark:border-gray-800">
-                            <LayoutGrid className="w-3.5 h-3.5 mr-2 text-gray-400" />
-                            <SelectValue placeholder="Origen" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="all">Todos</SelectItem>
-                            <SelectItem value="campaign">Campañas</SelectItem>
-                            <SelectItem value="testing">Pruebas</SelectItem>
-                        </SelectContent>
-                    </Select>
+
 
                     {/* Campaign Filter */}
                     <Select value={selectedCampaignId} onValueChange={setSelectedCampaignId}>
@@ -272,9 +256,12 @@ export function CallHistoryTable({ agentId: initialAgentId }: CallHistoryTablePr
                         </SelectTrigger>
                         <SelectContent>
                             <SelectItem value="all">Todas las campañas</SelectItem>
+                            <SelectItem value="testing" className="text-amber-600 dark:text-amber-400 font-medium">
+                                Entorno de Pruebas
+                            </SelectItem>
                             {uniqueCampaignIds
-                                .filter(cid => (campaignMap[cid] || "Campaña desconocida") !== "Campaña desconocida")
-                                .map(cid => (
+                                .filter((cid: string) => (campaignMap[cid] || "Campaña desconocida") !== "Campaña desconocida")
+                                .map((cid: string) => (
                                     <SelectItem key={cid} value={cid}>
                                         {campaignMap[cid]}
                                     </SelectItem>
