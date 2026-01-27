@@ -77,7 +77,7 @@ export function CampaignDetail({ campaignId, subworkspaceId, onBack }: CampaignD
     const [campaign, setCampaign] = useState<Campaign | null>(null);
     const [retellAgentId, setRetellAgentId] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(true);
-    const [globalFields, setGlobalFields] = useState<AnalysisField[]>([]);
+    const [globalFields, setGlobalFields] = useState<AnalysisField[] | null>(null);
 
     const [showRelaunchDialog, setShowRelaunchDialog] = useState(false);
     const [relaunchStartLine, setRelaunchStartLine] = useState("1");
@@ -120,7 +120,7 @@ export function CampaignDetail({ campaignId, subworkspaceId, onBack }: CampaignD
     const handleAddGlobalField = async (field: AnalysisField) => {
         if (!activeSubworkspaceId) return;
         // Optimistic update of Global Fields (Source of Truth)
-        setGlobalFields(prev => [...prev, field]);
+        setGlobalFields(prev => [...(prev || []), field]);
 
         try {
             const docRef = doc(db, "subworkspaces", activeSubworkspaceId);
@@ -134,11 +134,11 @@ export function CampaignDetail({ campaignId, subworkspaceId, onBack }: CampaignD
     };
 
     const handleDeleteGlobalField = async (fieldId: string) => {
-        if (!activeSubworkspaceId) return;
+        if (!activeSubworkspaceId || !globalFields) return;
         const fieldToDelete = globalFields.find(f => f.id === fieldId);
         if (!fieldToDelete) return;
 
-        setGlobalFields(prev => prev.filter(f => f.id !== fieldId));
+        setGlobalFields(prev => (prev ? prev.filter(f => f.id !== fieldId) : null));
 
         try {
             const docRef = doc(db, "subworkspaces", activeSubworkspaceId);
@@ -195,7 +195,7 @@ export function CampaignDetail({ campaignId, subworkspaceId, onBack }: CampaignD
     // They should be available as "Archived" (Inactive) options.
     // Only Sync updates to ALREADY ACTIVE fields, and remove DELETED fields.
     useEffect(() => {
-        if (!campaign || !globalFields) return;
+        if (!campaign || globalFields === null) return;
 
         const currentLocal = campaign.analysis_config?.custom_fields || [];
         let hasChanges = false;

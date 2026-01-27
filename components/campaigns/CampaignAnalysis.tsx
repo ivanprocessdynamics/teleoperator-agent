@@ -18,7 +18,7 @@ interface CampaignAnalysisProps {
     onChange: (newConfig: AnalysisConfig) => void;
 
     // Global support
-    globalFields?: AnalysisField[];
+    globalFields?: AnalysisField[] | null;
     onAddGlobalField?: (field: AnalysisField) => void;
     onDeleteGlobalField?: (fieldId: string) => void;
     isCampaignMode?: boolean; // If true, disables creation/deletion and only allows toggling active state
