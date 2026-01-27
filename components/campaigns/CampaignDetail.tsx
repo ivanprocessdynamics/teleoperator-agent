@@ -101,9 +101,8 @@ export function CampaignDetail({ campaignId, subworkspaceId, onBack }: CampaignD
                 if (snap.exists()) {
                     const data = snap.data();
                     setRetellAgentId(data.retell_agent_id);
-                    // USE Subworkspace's active config as the "Global/Shared" source of truth
-                    const sharedFields = data.analysis_config?.custom_fields || [];
-                    setGlobalFields(sharedFields);
+                    // USE Global Definitions as the TRUE Global Source (Active + Archived)
+                    setGlobalFields(data.global_analysis_definitions || []);
                 }
             } catch (err) {
                 console.error("Error fetching subworkspace:", err);
@@ -119,16 +118,12 @@ export function CampaignDetail({ campaignId, subworkspaceId, onBack }: CampaignD
 
         try {
             const docRef = doc(db, "subworkspaces", subworkspaceId);
-            // We need to update analysis_config.custom_fields in Subworkspace
-            // We cannot easily use arrayUnion on a nested field path map cleanly without potential race if we don't have full object.
-            // But let's try reading and writing for safety, or dot notation if possible.
-            // Firestore supports "analysis_config.custom_fields": arrayUnion(...)
+            // Add to the Global Registry (Available everywhere, initially Archived)
             await updateDoc(docRef, {
-                "analysis_config.custom_fields": arrayUnion(field)
+                global_analysis_definitions: arrayUnion(field)
             });
         } catch (error) {
             console.error("Error adding global field:", error);
-            // Revert optimistic?
         }
     };
 
@@ -142,7 +137,7 @@ export function CampaignDetail({ campaignId, subworkspaceId, onBack }: CampaignD
         try {
             const docRef = doc(db, "subworkspaces", subworkspaceId);
             await updateDoc(docRef, {
-                "analysis_config.custom_fields": arrayRemove(fieldToDelete)
+                global_analysis_definitions: arrayRemove(fieldToDelete)
             });
         } catch (error) {
             console.error("Error deleting global field:", error);
