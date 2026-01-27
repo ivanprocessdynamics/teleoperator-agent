@@ -176,7 +176,8 @@ export function CampaignDetail({ campaignId, subworkspaceId, onBack }: CampaignD
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     agent_id: retellAgentId,
-                    prompt: prompt_template
+                    prompt: prompt_template,
+                    analysis_config: campaign?.analysis_config // Sync analysis config too
                 })
             });
             const result = await response.json();

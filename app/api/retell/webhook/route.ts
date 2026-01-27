@@ -3,6 +3,7 @@ import { db } from "@/lib/firebase";
 import { adminDb } from "@/lib/firebase-admin";
 import { doc, setDoc, serverTimestamp, getDoc, query, collection, where, getDocs, updateDoc, Timestamp } from "firebase/firestore";
 import crypto from 'crypto';
+import OpenAI from "openai";
 
 // Helper to normalize roles to 'user' | 'agent'
 function normalizeRole(role: string): "user" | "agent" {
@@ -310,34 +311,37 @@ async function handleCallAnalyzed(callId: string, data: any) {
             if (activeFields.length > 0 && transcriptText) {
                 console.log(`[AI Extraction] Generating analysis for ${activeFields.length} active custom fields using OpenAI (source: ${configSource})...`);
 
-                const OpenAI = require("openai");
-                const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+                if (!process.env.OPENAI_API_KEY) {
+                    console.warn("[AI Extraction] Missing OPENAI_API_KEY, skipping local extraction.");
+                } else {
+                    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-                const prompt = `
-                    Analyze the following call transcript and extract the requested variables. 
-                    Return ONLY a valid JSON object with a key "custom_analysis_data" containing an array of objects.
-                    Each object must have: "name" (string), "value" (string, number, or boolean), and "rationale" (string).
-                    
-                    Variables to extract:
-                    ${activeFields.map((f: any) => `- Name: ${f.name}, Type: ${f.type}, Description: ${f.description}`).join('\n')}
-                    
-                    Transcript:
-                    ${transcriptText}
-                `;
+                    const prompt = `
+                        Analyze the following call transcript and extract the requested variables. 
+                        Return ONLY a valid JSON object with a key "custom_analysis_data" containing an array of objects.
+                        Each object must have: "name" (string), "value" (string, number, or boolean), and "rationale" (string).
+                        
+                        Variables to extract:
+                        ${activeFields.map((f: any) => `- Name: ${f.name}, Type: ${f.type}, Description: ${f.description}`).join('\n')}
+                        
+                        Transcript:
+                        ${transcriptText}
+                    `;
 
-                const completion = await openai.chat.completions.create({
-                    messages: [{ role: "system", content: "You are a precise data extraction assistant." }, { role: "user", content: prompt }],
-                    model: "gpt-4o-mini",
-                    response_format: { type: "json_object" }
-                });
+                    const completion = await openai.chat.completions.create({
+                        messages: [{ role: "system", content: "You are a precise data extraction assistant." }, { role: "user", content: prompt }],
+                        model: "gpt-4o-mini",
+                        response_format: { type: "json_object" }
+                    });
 
-                const result = JSON.parse(completion.choices[0].message.content || "{}");
+                    const result = JSON.parse(completion.choices[0].message.content || "{}");
 
-                if (result.custom_analysis_data) {
-                    // Merge or Overwrite? User said "OpenAI principal", so we overwrite custom_analysis_data
-                    // but we preserve other analysis fields (sentiment, summary) that came from Retell if not configured otherwise.
-                    analysis.custom_analysis_data = result.custom_analysis_data;
-                    console.log(`[AI Extraction] Successfully generated ${result.custom_analysis_data.length} data points.`);
+                    if (result.custom_analysis_data) {
+                        // Merge or Overwrite? User said "OpenAI principal", so we overwrite custom_analysis_data
+                        // but we preserve other analysis fields (sentiment, summary) that came from Retell if not configured otherwise.
+                        analysis.custom_analysis_data = result.custom_analysis_data;
+                        console.log(`[AI Extraction] Successfully generated ${result.custom_analysis_data.length} data points.`);
+                    }
                 }
             } else {
                 console.log(`[AI Extraction] No active custom fields found or empty transcript.`);
