@@ -401,9 +401,25 @@ export function CallHistoryTable({ agentId: initialAgentId }: CallHistoryTablePr
                                                             : null;
 
                                                         return spanishSummary || call.analysis?.call_summary || (
-                                                            <span className="text-gray-400 italic flex items-center gap-1">
-                                                                <Loader2 className="h-3 w-3 animate-spin" /> Procesando resumen...
-                                                            </span>
+                                                            (() => {
+                                                                const callTime = call.timestamp?.toDate ? call.timestamp.toDate().getTime() : 0;
+                                                                const now = new Date().getTime();
+                                                                const diffMinutes = (now - callTime) / 1000 / 60;
+
+                                                                if (diffMinutes > 1) {
+                                                                    return (
+                                                                        <span className="text-red-400 italic flex items-center gap-1">
+                                                                            <Frown className="h-3 w-3" /> No se pudo procesar la llamada
+                                                                        </span>
+                                                                    );
+                                                                }
+
+                                                                return (
+                                                                    <span className="text-gray-400 italic flex items-center gap-1">
+                                                                        <Loader2 className="h-3 w-3 animate-spin" /> Procesando resumen...
+                                                                    </span>
+                                                                );
+                                                            })()
                                                         );
                                                     })()}
                                                 </div>
