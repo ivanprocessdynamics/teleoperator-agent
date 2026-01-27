@@ -269,7 +269,7 @@ export function CampaignDetail({ campaignId, subworkspaceId, onBack }: CampaignD
                                     <h4 className="text-lg font-bold text-gray-900 dark:text-gray-100 flex items-center gap-2">
                                         Campaña Lista
                                         <span className="text-xs font-medium px-2.5 py-0.5 rounded-full bg-green-50 text-green-700 border border-green-200 dark:bg-green-900/20 dark:text-green-400 dark:border-green-800">
-                                            Borrador
+                                            No enviada
                                         </span>
                                     </h4>
                                     <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
@@ -315,7 +315,7 @@ export function CampaignDetail({ campaignId, subworkspaceId, onBack }: CampaignD
                                     </div>
                                     <div>
                                         <h4 className="text-lg font-bold text-gray-900 dark:text-gray-100 flex items-center gap-2">
-                                            {executor.state.isPaused ? "Campaña Pausada" : "Campaña en Curso"}
+                                            {executor.state.isPaused ? "Campaña Pausada" : "Enviando..."}
                                             <span className={cn(
                                                 "text-xs font-medium px-2.5 py-0.5 rounded-full border",
                                                 executor.state.isPaused
@@ -411,7 +411,7 @@ export function CampaignDetail({ campaignId, subworkspaceId, onBack }: CampaignD
                                 </div>
                                 <div>
                                     <h4 className="text-lg font-bold text-gray-900 dark:text-gray-100 flex items-center gap-2">
-                                        Campaña Finalizada
+                                        Enviada
                                         <span className="text-xs font-normal px-2 py-0.5 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-500 border border-gray-200 dark:border-gray-700">
                                             Historial
                                         </span>
@@ -653,7 +653,7 @@ export function CampaignDetail({ campaignId, subworkspaceId, onBack }: CampaignD
                                                 País de los teléfonos
                                             </label>
                                             <Select
-                                                value={campaign.calling_config?.target_country_code || ""}
+                                                value={campaign.calling_config?.target_country_code || "+34"}
                                                 onValueChange={(value) => {
                                                     const newConfig: CallingConfig = {
                                                         ...campaign.calling_config!,

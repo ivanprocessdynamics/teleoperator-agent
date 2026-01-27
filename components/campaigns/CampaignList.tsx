@@ -420,9 +420,9 @@ export function CampaignList({ subworkspaceId, onSelectCampaign }: CampaignListP
 
     const getStatusLabel = (status: string) => {
         switch (status) {
-            case 'running': return "En Progreso";
-            case 'completed': return "Finalizada";
-            case 'draft': return "Borrador";
+            case 'running': return "Enviando";
+            case 'completed': return "Enviada";
+            case 'draft': return "No enviada";
             default: return status;
         }
     };

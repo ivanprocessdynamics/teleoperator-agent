@@ -149,9 +149,10 @@ export function useCampaignExecutor({
 
         let normalizedPhone = phoneNumber.replace(/[^0-9+]/g, '');
 
-        // Smart Normalization using Target Country Code
-        const countryCode = callingConfig.target_country_code;
-        if (countryCode && !normalizedPhone.startsWith('+')) {
+        // Smart Normalization using Target Country Code (Default to +34 Spain if not set)
+        const countryCode = callingConfig.target_country_code || '+34';
+
+        if (!normalizedPhone.startsWith('+')) {
             // Remove + from country code for comparison
             const codeDigits = countryCode.replace('+', '');
 
