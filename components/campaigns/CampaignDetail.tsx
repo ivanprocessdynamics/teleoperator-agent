@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef, useCallback } from "react";
+import { useParams } from "next/navigation";
 import { doc, onSnapshot, updateDoc, getDoc, arrayUnion, arrayRemove } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { Campaign, CampaignColumn, AnalysisConfig, AnalysisField, CallingConfig } from "@/types/campaign";
@@ -70,6 +71,9 @@ const THEME_STYLES: Record<string, { badge: string; button: string; variable: st
 };
 
 export function CampaignDetail({ campaignId, subworkspaceId, onBack }: CampaignDetailProps) {
+    const params = useParams();
+    const urlSubworkspaceId = params?.subId as string;
+
     const [campaign, setCampaign] = useState<Campaign | null>(null);
     const [retellAgentId, setRetellAgentId] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(true);
@@ -91,12 +95,14 @@ export function CampaignDetail({ campaignId, subworkspaceId, onBack }: CampaignD
         return () => unsub();
     }, [campaignId]);
 
+    const activeSubworkspaceId = subworkspaceId || campaign?.subworkspace_id || urlSubworkspaceId;
+
     // Fetch Subworkspace (for Retell Agent ID AND Global Fields)
     useEffect(() => {
         async function fetchSubworkspace() {
-            if (!subworkspaceId) return;
+            if (!activeSubworkspaceId) return;
             try {
-                const docRef = doc(db, "subworkspaces", subworkspaceId);
+                const docRef = doc(db, "subworkspaces", activeSubworkspaceId);
                 const snap = await getDoc(docRef);
                 if (snap.exists()) {
                     const data = snap.data();
@@ -109,15 +115,15 @@ export function CampaignDetail({ campaignId, subworkspaceId, onBack }: CampaignD
             }
         }
         fetchSubworkspace();
-    }, [subworkspaceId]);
+    }, [activeSubworkspaceId]);
 
     const handleAddGlobalField = async (field: AnalysisField) => {
-        if (!subworkspaceId) return;
+        if (!activeSubworkspaceId) return;
         // Optimistic update of Global Fields (Source of Truth)
         setGlobalFields(prev => [...prev, field]);
 
         try {
-            const docRef = doc(db, "subworkspaces", subworkspaceId);
+            const docRef = doc(db, "subworkspaces", activeSubworkspaceId);
             // Add to the Global Registry (Available everywhere, initially Archived)
             await updateDoc(docRef, {
                 global_analysis_definitions: arrayUnion(field)
@@ -128,14 +134,14 @@ export function CampaignDetail({ campaignId, subworkspaceId, onBack }: CampaignD
     };
 
     const handleDeleteGlobalField = async (fieldId: string) => {
-        if (!subworkspaceId) return;
+        if (!activeSubworkspaceId) return;
         const fieldToDelete = globalFields.find(f => f.id === fieldId);
         if (!fieldToDelete) return;
 
         setGlobalFields(prev => prev.filter(f => f.id !== fieldId));
 
         try {
-            const docRef = doc(db, "subworkspaces", subworkspaceId);
+            const docRef = doc(db, "subworkspaces", activeSubworkspaceId);
             await updateDoc(docRef, {
                 global_analysis_definitions: arrayRemove(fieldToDelete)
             });
@@ -653,11 +659,7 @@ export function CampaignDetail({ campaignId, subworkspaceId, onBack }: CampaignD
                                 config={campaign?.analysis_config || {
                                     enable_transcription: true,
                                     standard_fields: {
-                                        satisfaction_score: true,
-                                        sentiment: true,
-                                        summary: true,
-                                        user_sentiment: true,
-                                        call_successful: true
+                                        satisfaction_score: true, sentiment: true, summary: true, user_sentiment: true, call_successful: true
                                     },
                                     custom_fields: []
                                 }}
