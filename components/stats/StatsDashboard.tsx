@@ -56,7 +56,7 @@ function EnumPieChart({ data, name }: { data: any, name: string }) {
                             ))}
                         </Pie>
                         <RechartsTooltip
-                            formatter={(value: number) => [value, 'Respuestas']}
+                            formatter={(value: any) => [value, 'Respuestas']}
                             contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
                         />
                     </PieChart>
