@@ -277,31 +277,59 @@ async function handleCallAnalyzed(callId: string, data: any) {
 
             // 1. Check if this call is from a Campaign (via metadata)
             const campaignId = data.metadata?.campaign_id;
+
+            // USE ADMIN SDK FOR READS with Client Fallback
             if (campaignId) {
-                console.log(`[AI Extraction] Call has campaign_id: ${campaignId}, fetching Campaign config...`);
-                const campaignDoc = await getDoc(doc(db, "campaigns", campaignId));
-                if (campaignDoc.exists()) {
-                    const campaignData = campaignDoc.data();
-                    customFields = campaignData.analysis_config?.custom_fields || [];
-                    configSource = `campaign:${campaignId}`;
-                    console.log(`[AI Extraction] Loaded ${customFields.length} custom fields from Campaign.`);
+                if (adminDb) {
+                    console.log(`[AI Extraction] Call has campaign_id: ${campaignId}, fetching Campaign config (Admin)...`);
+                    const campaignDoc = await adminDb.collection("campaigns").doc(campaignId).get();
+                    if (campaignDoc.exists) {
+                        const campaignData = campaignDoc.data();
+                        customFields = campaignData?.analysis_config?.custom_fields || [];
+                        configSource = `campaign:${campaignId}`;
+                        console.log(`[AI Extraction] Loaded ${customFields.length} custom fields from Campaign (Admin).`);
+                    } else {
+                        console.log(`[AI Extraction] Campaign ${campaignId} not found (Admin).`);
+                    }
                 } else {
-                    console.log(`[AI Extraction] Campaign ${campaignId} not found, falling back to Subworkspace.`);
+                    // Fallback to Client SDK
+                    console.log(`[AI Extraction] Call has campaign_id: ${campaignId}, fetching Campaign config (Client)...`);
+                    const campaignDoc = await getDoc(doc(db, "campaigns", campaignId));
+                    if (campaignDoc.exists()) {
+                        const campaignData = campaignDoc.data();
+                        customFields = campaignData?.analysis_config?.custom_fields || [];
+                        configSource = `campaign:${campaignId}`;
+                        console.log(`[AI Extraction] Loaded ${customFields.length} custom fields from Campaign (Client).`);
+                    } else {
+                        console.log(`[AI Extraction] Campaign ${campaignId} not found (Client).`);
+                    }
                 }
             }
 
-            // 2. Fallback: Use Subworkspace config (Testing Environment or Campaign without config)
+            // 2. Fallback: Use Subworkspace config
             if (customFields.length === 0) {
-                const q = query(collection(db, "subworkspaces"), where("retell_agent_id", "==", data.agent_id));
-                const snapshot = await getDocs(q);
-
-                if (!snapshot.empty) {
-                    const subSettings = snapshot.docs[0].data();
-                    customFields = subSettings.analysis_config?.custom_fields || [];
-                    configSource = `subworkspace:${snapshot.docs[0].id}`;
-                    console.log(`[AI Extraction] Loaded ${customFields.length} custom fields from Subworkspace.`);
+                if (adminDb) {
+                    const snapshot = await adminDb.collection("subworkspaces").where("retell_agent_id", "==", data.agent_id).get();
+                    if (!snapshot.empty) {
+                        const subSettings = snapshot.docs[0].data();
+                        customFields = subSettings?.analysis_config?.custom_fields || [];
+                        configSource = `subworkspace:${snapshot.docs[0].id}`;
+                        console.log(`[AI Extraction] Loaded ${customFields.length} custom fields from Subworkspace (Admin).`);
+                    } else {
+                        console.log(`[AI Extraction] No subworkspace found for agent ${data.agent_id} (Admin)`);
+                    }
                 } else {
-                    console.log(`[AI Extraction] No subworkspace found for agent ${data.agent_id}`);
+                    // Fallback to Client SDK
+                    const q = query(collection(db, "subworkspaces"), where("retell_agent_id", "==", data.agent_id));
+                    const snapshot = await getDocs(q);
+                    if (!snapshot.empty) {
+                        const subSettings = snapshot.docs[0].data();
+                        customFields = subSettings?.analysis_config?.custom_fields || [];
+                        configSource = `subworkspace:${snapshot.docs[0].id}`;
+                        console.log(`[AI Extraction] Loaded ${customFields.length} custom fields from Subworkspace (Client).`);
+                    } else {
+                        console.log(`[AI Extraction] No subworkspace found for agent ${data.agent_id} (Client)`);
+                    }
                 }
             }
 
