@@ -68,8 +68,35 @@ export function TestingEnvironment({ subworkspaceId }: TestingEnvironmentProps) 
                     setActivePrompt(liveActive);
 
                     setRetellAgentId(data.retell_agent_id || "");
-                    setAnalysisConfig(data.analysis_config);
-                    setGlobalFields(data.global_analysis_definitions || []); // Load Global Definitions
+                    const loadedConfig = data.analysis_config;
+                    let loadedGlobals = data.global_analysis_definitions || [];
+
+                    // AUTO-MIGRATE: Ensure all active fields are in global definitions
+                    // This fixes legacy fields (like 'pregunta') that exist in Testing Env but not in Global Registry
+                    if (loadedConfig?.custom_fields?.length) {
+                        const missingGlobals: AnalysisField[] = [];
+
+                        loadedConfig.custom_fields.forEach((activeField: AnalysisField) => {
+                            // Check existence by NAME (more robust) or ID
+                            if (!loadedGlobals.some((g: AnalysisField) => g.name === activeField.name)) {
+                                console.log("🔧 Auto-migrating legacy field to Global:", activeField.name);
+                                missingGlobals.push({ ...activeField, isArchived: false });
+                            }
+                        });
+
+                        if (missingGlobals.length > 0) {
+                            const newGlobals = [...loadedGlobals, ...missingGlobals];
+                            // Update Firestore silently
+                            updateDoc(doc(db, "subworkspaces", subworkspaceId), {
+                                global_analysis_definitions: newGlobals
+                            }).catch(err => console.error("Migration failed:", err));
+
+                            loadedGlobals = newGlobals;
+                        }
+                    }
+
+                    setAnalysisConfig(loadedConfig);
+                    setGlobalFields(loadedGlobals);
                     setInitialLoadKey(prev => prev + 1);
                 } else {
                     setError("No se encontró la configuración del workspace.");
