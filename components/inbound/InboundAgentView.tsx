@@ -82,17 +82,16 @@ export function InboundAgentView({ subworkspaceId, agentId }: InboundAgentViewPr
                     </TabsTrigger>
                 </TabsList>
 
-                {/* CONFIGURATION TAB */}
-                <TabsContent value="config" forceMount className="mt-6 data-[state=inactive]:hidden text-red-500">
+                <TabsContent value="config" forceMount className="mt-6 data-[state=inactive]:hidden text-gray-900 dark:text-gray-100">
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-[calc(100vh-140px)]">
-                        {/* LEFT COLUMN: Prompt & Analysis */}
-                        <div className="flex flex-col gap-6 h-full overflow-hidden">
+                        {/* LEFT COLUMN: Prompt & Analysis (Unified Scroll) */}
+                        <div className="flex flex-col gap-6 h-full overflow-y-auto pr-2 pb-4 scrollbar-thin scrollbar-thumb-gray-200 dark:scrollbar-thumb-gray-800">
                             {/* Prompt Editor */}
-                            <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-800 flex flex-col overflow-hidden h-1/2">
-                                <div className="p-4 border-b border-gray-200 dark:border-gray-800">
+                            <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-800 flex flex-col shrink-0">
+                                <div className="p-4 border-b border-gray-200 dark:border-gray-800 sticky top-0 bg-white dark:bg-gray-900 z-10 rounded-t-lg">
                                     <h3 className="font-semibold text-gray-900 dark:text-white">Prompt del Agente</h3>
                                 </div>
-                                <div className="flex-1 overflow-y-auto p-4">
+                                <div className="p-4">
                                     <CampaignPrompt
                                         campaignId="agent_level"
                                         subworkspaceId={subworkspaceId}
@@ -108,11 +107,11 @@ export function InboundAgentView({ subworkspaceId, agentId }: InboundAgentViewPr
                             </div>
 
                             {/* Analysis Configuration */}
-                            <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-800 flex flex-col overflow-hidden h-1/2">
-                                <div className="p-4 border-b border-gray-200 dark:border-gray-800">
+                            <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-800 flex flex-col shrink-0">
+                                <div className="p-4 border-b border-gray-200 dark:border-gray-800 sticky top-0 bg-white dark:bg-gray-900 z-10 rounded-t-lg">
                                     <h3 className="font-semibold text-gray-900 dark:text-white">Análisis y Variables</h3>
                                 </div>
-                                <div className="flex-1 overflow-y-auto p-4">
+                                <div className="p-4">
                                     <CampaignAnalysis
                                         config={analysisConfig}
                                         onChange={handleSaveAnalysis}
@@ -123,8 +122,7 @@ export function InboundAgentView({ subworkspaceId, agentId }: InboundAgentViewPr
                         </div>
 
                         {/* RIGHT COLUMN: Testing Environment */}
-                        <div className="h-full bg-gray-50 dark:bg-gray-900/50 rounded-2xl border border-gray-200 dark:border-gray-800 overflow-hidden flex flex-col relative">
-                            {/* We can wrap TestingEnvironment to ensure it fits nicely */}
+                        <div className="h-full bg-gray-50 dark:bg-gray-900/50 rounded-2xl border border-gray-200 dark:border-gray-800 overflow-hidden flex flex-col relative sticky top-0">
                             <div className="absolute inset-0">
                                 <TestingEnvironment subworkspaceId={subworkspaceId} orbOnly={true} />
                             </div>
