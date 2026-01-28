@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { addDoc, collection, serverTimestamp, getDocs, query, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { RETELL_AGENT_SLOTS, RETELL_INBOUND_AGENT_SLOTS } from "@/lib/retell-agents";
+import { RETELL_AGENT_SLOTS, RetellAgentSlot } from "@/lib/retell-agents";
 import { Button } from "@/components/ui/button";
 import {
     Dialog,

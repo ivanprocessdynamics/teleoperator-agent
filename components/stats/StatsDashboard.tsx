@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { ChatTranscript } from "@/components/calls/ChatTranscript";
 import { Loader2, TrendingUp, Clock, Phone, ThumbsUp, Activity, RefreshCcw, EyeOff, Eye, Archive, Trash2, ArrowRight, MessageSquare, ExternalLink, Pencil, Users, Filter } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup, SelectLabel } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, DropdownMenuItem } from "@/components/ui/dropdown-menu";
@@ -595,71 +595,78 @@ export function StatsDashboard(props: StatsDashboardProps) {
         <div className="space-y-6 animate-fade-in pb-10">
             <div className="flex justify-between items-center">
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Resumen de Rendimiento</h3>
-                {/* NEW: Type Filter */}
-                <div className="flex flex-wrap items-center gap-2">
-                    <Select value={agentTypeFilter} onValueChange={(v: any) => setAgentTypeFilter(v)}>
-                        <SelectTrigger className="w-[140px] bg-white dark:bg-gray-800">
-                            <div className="flex items-center gap-2">
+                    {/* Master Filter */}
+                    <Select 
+                        value={
+                            // Derive value from current state
+                             agentTypeFilter === 'all' && selectedCampaign === 'all' && selectedAgentIds.length === 0 ? "all_calls" :
+                             agentTypeFilter === 'inbound' && selectedCampaign === 'all' && selectedAgentIds.length === 0 ? "all_inbound" :
+                             agentTypeFilter === 'outbound' && selectedCampaign === 'all' && selectedAgentIds.length === 0 ? "all_outbound" :
+                             selectedCampaign !== 'all' ? `campaign_${selectedCampaign}` :
+                             selectedAgentIds.length === 1 ? `agent_${selectedAgentIds[0]}` : "custom"
+                        } 
+                        onValueChange={(val) => {
+                            if (val === "all_calls") {
+                                setAgentTypeFilter('all');
+                                setSelectedCampaign('all');
+                                setSelectedAgentIds([]);
+                            } else if (val === "all_inbound") {
+                                setAgentTypeFilter('inbound');
+                                setSelectedCampaign('all');
+                                setSelectedAgentIds([]);
+                            } else if (val === "all_outbound") {
+                                setAgentTypeFilter('outbound');
+                                setSelectedCampaign('all');
+                                setSelectedAgentIds([]);
+                            } else if (val.startsWith("campaign_")) {
+                                const cid = val.replace("campaign_", "");
+                                setAgentTypeFilter('outbound'); // Campaigns are outbound
+                                setSelectedCampaign(cid);
+                                setSelectedAgentIds([]);
+                            } else if (val.startsWith("agent_")) {
+                                const aid = val.replace("agent_", "");
+                                const agent = availableAgents.find(a => a.id === aid);
+                                // Ensure type is valid
+                                const newType = agent?.type === 'inbound' ? 'inbound' : 'outbound';
+                                setAgentTypeFilter(newType); 
+                                setSelectedCampaign("all");
+                                setSelectedAgentIds([aid]);
+                            }
+                        }}
+                    >
+                        <SelectTrigger className="w-[280px] bg-white dark:bg-gray-800">
+                           <div className="flex items-center gap-2">
                                 <Filter className="h-3.5 w-3.5 text-gray-400" />
-                                <SelectValue />
+                                <SelectValue placeholder="Todas las llamadas" />
                             </div>
                         </SelectTrigger>
                         <SelectContent>
-                            <SelectItem value="all">Todo</SelectItem>
-                            <SelectItem value="outbound">Salientes</SelectItem>
-                            <SelectItem value="inbound">Entrantes</SelectItem>
+                            <SelectGroup>
+                                <SelectLabel>General</SelectLabel>
+                                <SelectItem value="all_calls">Todas las llamadas</SelectItem>
+                                <SelectItem value="all_inbound">Todas las entrantes</SelectItem>
+                                <SelectItem value="all_outbound">Todas las salientes</SelectItem>
+                            </SelectGroup>
+
+                            <SelectGroup>
+                                <SelectLabel>Campañas</SelectLabel>
+                                {uniqueCampaigns.map(cid => (
+                                    <SelectItem key={cid} value={`campaign_${cid}`}>
+                                        {campaignMap[cid] || "Campaña desconocida"}
+                                    </SelectItem>
+                                ))}
+                            </SelectGroup>
+
+                            <SelectGroup>
+                                <SelectLabel>Agentes</SelectLabel>
+                                {availableAgents.map(a => (
+                                    <SelectItem key={a.id} value={`agent_${a.id}`}>
+                                        {a.name}
+                                    </SelectItem>
+                                ))}
+                            </SelectGroup>
                         </SelectContent>
                     </Select>
-
-                    {/* NEW: Multi-select Agents */}
-                    <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                            <Button variant="outline" className="bg-white dark:bg-gray-800 border-dashed">
-                                <Users className="h-4 w-4 mr-2" />
-                                {selectedAgentIds.length > 0 ? `${selectedAgentIds.length} Agentes` : "Agentes"}
-                            </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent className="w-56 p-2 bg-white dark:bg-gray-800" align="start">
-                            <div className="mb-2 px-2 text-xs font-semibold text-gray-500">Filtrar por Agentes</div>
-                            <ScrollArea className="h-[200px]">
-                                {availableAgents
-                                    .filter(a => agentTypeFilter === 'all' || a.type === agentTypeFilter)
-                                    .map(agent => (
-                                        <div key={agent.id} className="flex items-center space-x-2 p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md cursor-pointer"
-                                            onClick={(e) => {
-                                                e.preventDefault();
-                                                setSelectedAgentIds(prev =>
-                                                    prev.includes(agent.id) ? prev.filter(id => id !== agent.id) : [...prev, agent.id]
-                                                );
-                                            }}
-                                        >
-                                            <input
-                                                type="checkbox"
-                                                checked={selectedAgentIds.includes(agent.id)}
-                                                readOnly
-                                                className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                                            />
-                                            <span className="text-sm truncate">{agent.name}</span>
-                                            <Badge variant="secondary" className="text-[10px] ml-auto">
-                                                {agent.type === 'inbound' ? 'In' : 'Out'}
-                                            </Badge>
-                                        </div>
-                                    ))}
-                                {availableAgents.length === 0 && <div className="text-sm text-gray-400 p-2">No hay agentes</div>}
-                            </ScrollArea>
-                            {selectedAgentIds.length > 0 && (
-                                <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="w-full mt-2 text-xs h-7"
-                                    onClick={() => setSelectedAgentIds([])}
-                                >
-                                    Limpiar Selección
-                                </Button>
-                            )}
-                        </DropdownMenuContent>
-                    </DropdownMenu>
-
 
                     <div className="h-6 w-px bg-gray-200 dark:bg-gray-700 mx-2" />
 
@@ -668,22 +675,6 @@ export function StatsDashboard(props: StatsDashboardProps) {
                         <RefreshCcw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
                         Actualizar
                     </Button>
-                    <Select value={selectedCampaign} onValueChange={setSelectedCampaign}>
-                        <SelectTrigger className="w-[180px] bg-white dark:bg-gray-800">
-                            <SelectValue placeholder="Campaña" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="all">Todas las campañas</SelectItem>
-                            <SelectItem value="testing" className="text-amber-600 dark:text-amber-400 font-medium">
-                                Entorno de Pruebas
-                            </SelectItem>
-                            {uniqueCampaigns.map(cid => (
-                                <SelectItem key={cid} value={cid}>
-                                    {campaignMap[cid] || "Campaña desconocida"}
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
 
                     <Select value={period} onValueChange={setPeriod}>
                         <SelectTrigger className="w-[180px] bg-white dark:bg-gray-800">
@@ -787,381 +778,381 @@ export function StatsDashboard(props: StatsDashboardProps) {
                 )}
             </div>
 
-            {/* Visual Bar for Sentiment (Hide if Sentiment is hidden) */}
-            {
-                !hiddenStandard.includes('sentiment') && (
-                    <div className="mt-4 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-6">
-                        <h4 className="text-sm font-medium mb-4 text-gray-700 dark:text-gray-300">Distribución de Sentimiento</h4>
-                        <div className="h-8 w-full rounded-full overflow-hidden flex">
-                            {stats.totalCalls > 0 ? (
-                                <>
-                                    <div style={{ width: `${(stats.sentimentBreakdown.positive / stats.totalCalls) * 100}%` }} className="bg-green-400 h-full transition-all duration-500" title="Positivo" />
-                                    <div style={{ width: `${(stats.sentimentBreakdown.neutral / stats.totalCalls) * 100}%` }} className="bg-gray-300 dark:bg-gray-600 h-full transition-all duration-500" title="Neutral" />
-                                    <div style={{ width: `${(stats.sentimentBreakdown.negative / stats.totalCalls) * 100}%` }} className="bg-red-400 h-full transition-all duration-500" title="Negativo" />
-                                </>
-                            ) : (
-                                <div className="w-full bg-gray-100 dark:bg-gray-800 h-full flex items-center justify-center text-xs text-gray-400">Sin datos</div>
-                            )}
-                        </div>
-                        <div className="flex gap-4 mt-2 justify-center">
-                            <div className="flex items-center gap-1 text-xs text-gray-500">
-                                <div className="w-3 h-3 rounded-full bg-green-400" /> Positivo ({stats.sentimentBreakdown.positive})
-                            </div>
-                            <div className="flex items-center gap-1 text-xs text-gray-500">
-                                <div className="w-3 h-3 rounded-full bg-gray-300 dark:bg-gray-600" /> Neutral ({stats.sentimentBreakdown.neutral})
-                            </div>
-                            <div className="flex items-center gap-1 text-xs text-gray-500">
-                                <div className="w-3 h-3 rounded-full bg-red-400" /> Negativo ({stats.sentimentBreakdown.negative})
-                            </div>
-                        </div>
+            {/* Visual Bar for Sentiment (Hide if Sentiment is hidden) */ }
+    {
+        !hiddenStandard.includes('sentiment') && (
+            <div className="mt-4 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-6">
+                <h4 className="text-sm font-medium mb-4 text-gray-700 dark:text-gray-300">Distribución de Sentimiento</h4>
+                <div className="h-8 w-full rounded-full overflow-hidden flex">
+                    {stats.totalCalls > 0 ? (
+                        <>
+                            <div style={{ width: `${(stats.sentimentBreakdown.positive / stats.totalCalls) * 100}%` }} className="bg-green-400 h-full transition-all duration-500" title="Positivo" />
+                            <div style={{ width: `${(stats.sentimentBreakdown.neutral / stats.totalCalls) * 100}%` }} className="bg-gray-300 dark:bg-gray-600 h-full transition-all duration-500" title="Neutral" />
+                            <div style={{ width: `${(stats.sentimentBreakdown.negative / stats.totalCalls) * 100}%` }} className="bg-red-400 h-full transition-all duration-500" title="Negativo" />
+                        </>
+                    ) : (
+                        <div className="w-full bg-gray-100 dark:bg-gray-800 h-full flex items-center justify-center text-xs text-gray-400">Sin datos</div>
+                    )}
+                </div>
+                <div className="flex gap-4 mt-2 justify-center">
+                    <div className="flex items-center gap-1 text-xs text-gray-500">
+                        <div className="w-3 h-3 rounded-full bg-green-400" /> Positivo ({stats.sentimentBreakdown.positive})
                     </div>
-                )
-            }
+                    <div className="flex items-center gap-1 text-xs text-gray-500">
+                        <div className="w-3 h-3 rounded-full bg-gray-300 dark:bg-gray-600" /> Neutral ({stats.sentimentBreakdown.neutral})
+                    </div>
+                    <div className="flex items-center gap-1 text-xs text-gray-500">
+                        <div className="w-3 h-3 rounded-full bg-red-400" /> Negativo ({stats.sentimentBreakdown.negative})
+                    </div>
+                </div>
+            </div>
+        )
+    }
 
-            {/* Custom Metrics */}
-            {
-                Object.keys(customStats).length > 0 && (
-                    <div className="mt-6">
-                        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Métricas Personalizadas</h3>
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-                            {Object.entries(customStats).map(([name, data]) => {
-                                if (name === 'resumen_espanol') return null;
-                                const yesPct = data.count > 0 ? (data.yes / data.count) * 100 : 0;
-                                const noPct = data.count > 0 ? (data.no / data.count) * 100 : 0;
+    {/* Custom Metrics */ }
+    {
+        Object.keys(customStats).length > 0 && (
+            <div className="mt-6">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Métricas Personalizadas</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                    {Object.entries(customStats).map(([name, data]) => {
+                        if (name === 'resumen_espanol') return null;
+                        const yesPct = data.count > 0 ? (data.yes / data.count) * 100 : 0;
+                        const noPct = data.count > 0 ? (data.no / data.count) * 100 : 0;
 
-                                return (
-                                    <Card
-                                        key={name}
-                                        className="group relative overflow-hidden border-gray-100 dark:border-gray-800 shadow-sm hover:shadow-md transition-shadow bg-white dark:bg-gray-800 cursor-pointer"
-                                        onClick={() => setViewingMetric(name)}
+                        return (
+                            <Card
+                                key={name}
+                                className="group relative overflow-hidden border-gray-100 dark:border-gray-800 shadow-sm hover:shadow-md transition-shadow bg-white dark:bg-gray-800 cursor-pointer"
+                                onClick={() => setViewingMetric(name)}
+                            >
+                                <div className="absolute top-2 right-2 flex items-center gap-1 z-10">
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            setMetricToEdit({
+                                                id: data.id,
+                                                name: data.name,
+                                                description: data.description || "",
+                                                type: data.type,
+                                                originalName: data.name
+                                            });
+                                        }}
+                                        className="h-6 w-6 text-gray-400 hover:text-blue-500 hover:bg-blue-50"
+                                        title="Editar"
                                     >
-                                        <div className="absolute top-2 right-2 flex items-center gap-1 z-10">
-                                            <Button
-                                                variant="ghost"
-                                                size="icon"
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    setMetricToEdit({
-                                                        id: data.id,
-                                                        name: data.name,
-                                                        description: data.description || "",
-                                                        type: data.type,
-                                                        originalName: data.name
-                                                    });
-                                                }}
-                                                className="h-6 w-6 text-gray-400 hover:text-blue-500 hover:bg-blue-50"
-                                                title="Editar"
-                                            >
-                                                <Pencil className="h-3.5 w-3.5" />
-                                            </Button>
-                                            <Button
-                                                variant="ghost"
-                                                size="icon"
-                                                onClick={(e) => { e.stopPropagation(); handleToggleCustomArchive(data.id, true); }}
-                                                className="h-6 w-6 text-gray-400 hover:text-orange-500 hover:bg-orange-50"
-                                                title="Ocultar (Archivar)"
-                                            >
-                                                <EyeOff className="h-3.5 w-3.5" />
-                                            </Button>
-                                            <Button
-                                                variant="ghost"
-                                                size="icon"
-                                                onClick={(e) => { e.stopPropagation(); setMetricToDelete({ id: data.id, name: name }); }}
-                                                className="h-6 w-6 text-gray-400 hover:text-red-500 hover:bg-red-50"
-                                                title="Eliminar Definitivamente"
-                                            >
-                                                <Trash2 className="h-3.5 w-3.5" />
-                                            </Button>
+                                        <Pencil className="h-3.5 w-3.5" />
+                                    </Button>
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        onClick={(e) => { e.stopPropagation(); handleToggleCustomArchive(data.id, true); }}
+                                        className="h-6 w-6 text-gray-400 hover:text-orange-500 hover:bg-orange-50"
+                                        title="Ocultar (Archivar)"
+                                    >
+                                        <EyeOff className="h-3.5 w-3.5" />
+                                    </Button>
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        onClick={(e) => { e.stopPropagation(); setMetricToDelete({ id: data.id, name: name }); }}
+                                        className="h-6 w-6 text-gray-400 hover:text-red-500 hover:bg-red-50"
+                                        title="Eliminar Definitivamente"
+                                    >
+                                        <Trash2 className="h-3.5 w-3.5" />
+                                    </Button>
+                                </div>
+                                <div className="border-b border-gray-50 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900/50 px-5 py-3 flex justify-between items-center">
+                                    <div>
+                                        <div className="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-0.5 flex items-center gap-1.5">
+                                            {name.replace(/_/g, ' ')}
+                                            <ExternalLink className="h-3 w-3 opacity-0 group-hover:opacity-50" />
                                         </div>
-                                        <div className="border-b border-gray-50 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900/50 px-5 py-3 flex justify-between items-center">
-                                            <div>
-                                                <div className="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-0.5 flex items-center gap-1.5">
-                                                    {name.replace(/_/g, ' ')}
-                                                    <ExternalLink className="h-3 w-3 opacity-0 group-hover:opacity-50" />
+                                        <div className="text-[10px] text-gray-400 dark:text-gray-500 truncate max-w-[200px]" title={data.description}>
+                                            {data.description}
+                                        </div>
+                                    </div>
+                                    <span className="text-[10px] bg-gray-100 dark:bg-gray-700 text-gray-500 px-2 py-1 rounded-full">
+                                        {data.count} respuestas
+                                    </span>
+                                </div>
+                                <div className="p-5">
+                                    {data.type === 'boolean' ? (
+                                        <div className="space-y-4">
+                                            <div className="flex items-center justify-between">
+                                                <div className="flex items-center gap-2">
+                                                    <div className="h-2 w-2 rounded-full bg-green-500" />
+                                                    <span className="text-sm font-medium text-gray-700 dark:text-gray-200">Sí</span>
+                                                    <span className="text-xs text-gray-500">({data.yes})</span>
                                                 </div>
-                                                <div className="text-[10px] text-gray-400 dark:text-gray-500 truncate max-w-[200px]" title={data.description}>
-                                                    {data.description}
-                                                </div>
+                                                <span className="text-sm font-bold text-green-600">{yesPct.toFixed(0)}%</span>
                                             </div>
-                                            <span className="text-[10px] bg-gray-100 dark:bg-gray-700 text-gray-500 px-2 py-1 rounded-full">
-                                                {data.count} respuestas
-                                            </span>
-                                        </div>
-                                        <div className="p-5">
-                                            {data.type === 'boolean' ? (
-                                                <div className="space-y-4">
-                                                    <div className="flex items-center justify-between">
-                                                        <div className="flex items-center gap-2">
-                                                            <div className="h-2 w-2 rounded-full bg-green-500" />
-                                                            <span className="text-sm font-medium text-gray-700 dark:text-gray-200">Sí</span>
-                                                            <span className="text-xs text-gray-500">({data.yes})</span>
-                                                        </div>
-                                                        <span className="text-sm font-bold text-green-600">{yesPct.toFixed(0)}%</span>
-                                                    </div>
-                                                    <div className="w-full h-2 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">
-                                                        <div style={{ width: `${yesPct}%` }} className="h-full bg-green-500 rounded-full" />
-                                                    </div>
+                                            <div className="w-full h-2 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">
+                                                <div style={{ width: `${yesPct}%` }} className="h-full bg-green-500 rounded-full" />
+                                            </div>
 
-                                                    <div className="flex items-center justify-between pt-1">
-                                                        <div className="flex items-center gap-2">
-                                                            <div className="h-2 w-2 rounded-full bg-red-400" />
-                                                            <span className="text-sm font-medium text-gray-700 dark:text-gray-200">No</span>
-                                                            <span className="text-xs text-gray-500">({data.no})</span>
-                                                        </div>
-                                                        <span className="text-sm font-bold text-red-500">{noPct.toFixed(0)}%</span>
-                                                    </div>
-                                                    <div className="w-full h-2 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">
-                                                        <div style={{ width: `${noPct}%` }} className="h-full bg-red-400 rounded-full" />
-                                                    </div>
+                                            <div className="flex items-center justify-between pt-1">
+                                                <div className="flex items-center gap-2">
+                                                    <div className="h-2 w-2 rounded-full bg-red-400" />
+                                                    <span className="text-sm font-medium text-gray-700 dark:text-gray-200">No</span>
+                                                    <span className="text-xs text-gray-500">({data.no})</span>
                                                 </div>
-                                            ) : data.type === 'number' ? (
-                                                <div className="flex items-baseline gap-2">
-                                                    <div className="text-4xl font-bold text-gray-900 dark:text-white tracking-tight">
-                                                        {(data.count > 0 ? data.totalSum / data.count : 0).toFixed(1)}
-                                                    </div>
-                                                    <span className="text-sm text-gray-500 font-medium uppercase tracking-wide">Promedio</span>
-                                                </div>
-                                            ) : data.type === 'enum' ? (
-                                                <EnumPieChart data={data} name={name} />
-                                            ) : (
-                                                <div className="text-sm text-gray-600 dark:text-gray-400 italic bg-gray-50 dark:bg-gray-800/50 p-3 rounded-lg border border-gray-100 dark:border-gray-700 flex items-center justify-between">
-                                                    <span className="truncate">Ver lista de respuestas ({Object.keys(data.values || {}).length} variantes)</span>
-                                                    <ArrowRight className="h-4 w-4 text-gray-400" />
-                                                </div>
+                                                <span className="text-sm font-bold text-red-500">{noPct.toFixed(0)}%</span>
+                                            </div>
+                                            <div className="w-full h-2 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">
+                                                <div style={{ width: `${noPct}%` }} className="h-full bg-red-400 rounded-full" />
+                                            </div>
+                                        </div>
+                                    ) : data.type === 'number' ? (
+                                        <div className="flex items-baseline gap-2">
+                                            <div className="text-4xl font-bold text-gray-900 dark:text-white tracking-tight">
+                                                {(data.count > 0 ? data.totalSum / data.count : 0).toFixed(1)}
+                                            </div>
+                                            <span className="text-sm text-gray-500 font-medium uppercase tracking-wide">Promedio</span>
+                                        </div>
+                                    ) : data.type === 'enum' ? (
+                                        <EnumPieChart data={data} name={name} />
+                                    ) : (
+                                        <div className="text-sm text-gray-600 dark:text-gray-400 italic bg-gray-50 dark:bg-gray-800/50 p-3 rounded-lg border border-gray-100 dark:border-gray-700 flex items-center justify-between">
+                                            <span className="truncate">Ver lista de respuestas ({Object.keys(data.values || {}).length} variantes)</span>
+                                            <ArrowRight className="h-4 w-4 text-gray-400" />
+                                        </div>
+                                    )}
+                                </div>
+                            </Card>
+                        )
+                    })}
+                </div>
+            </div>
+        )
+    }
+
+    {/* Hidden/Archived Config Logic */ }
+    {
+        hasHiddenMetrics && (
+            <div className="mt-8 border-t border-gray-200 dark:border-gray-800 pt-6">
+                <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-4 flex items-center gap-2">
+                    <Archive className="h-4 w-4" />
+                    Métricas Ocultas / Archivadas
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 opacity-75">
+                    {/* Standard Hidden */}
+                    {hiddenStandard.map(id => {
+                        const labels: any = { 'sentiment': 'Sentimiento General', 'call_successful': 'Tasa de Éxito' };
+                        return (
+                            <div key={id} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-100 dark:border-gray-800">
+                                <div className="flex items-center gap-2">
+                                    <Badge variant="outline" className="bg-white dark:bg-gray-900 text-xs">Estándar</Badge>
+                                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{labels[id] || id}</span>
+                                </div>
+                                <Button variant="ghost" size="sm" onClick={() => handleRestoreStandard(id)} className="text-blue-500 hover:text-blue-700 hover:bg-blue-50">
+                                    <Eye className="h-3.5 w-3.5 mr-1.5" />
+                                    Mostrar
+                                </Button>
+                            </div>
+                        )
+                    })}
+
+                    {/* Custom Archived */}
+                    {archivedCustomList.map(field => (
+                        <div key={field.id} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-100 dark:border-gray-800">
+                            <div className="flex items-center gap-2">
+                                <Badge variant="outline" className="bg-purple-50 dark:bg-purple-900/10 text-purple-600 border-purple-100 text-xs">Personalizada</Badge>
+                                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{field.name}</span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                                <Button variant="ghost" size="sm" onClick={() => handleToggleCustomArchive(field.id, false)} className="text-green-500 hover:text-green-700 hover:bg-green-50">
+                                    <RefreshCcw className="h-3.5 w-3.5 mr-1.5" />
+                                    Restaurar
+                                </Button>
+                                <Button variant="ghost" size="icon" onClick={() => setMetricToDelete({ id: field.id, name: field.name })} className="h-7 w-7 text-gray-400 hover:text-red-500 hover:bg-red-50" title="Eliminar Definitivamente">
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                </Button>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        )
+    }
+
+    {/* Metric Details Dialog */ }
+    <Dialog open={!!viewingMetric} onOpenChange={(open) => !open && setViewingMetric(null)}>
+        <DialogContent className="max-w-3xl max-h-[85vh] flex flex-col p-0 gap-0 overflow-hidden">
+            <DialogHeader className="p-6 border-b border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 shrink-0">
+                <DialogTitle className="flex items-center gap-2 text-xl">
+                    <Activity className="h-5 w-5 text-purple-600" />
+                    {viewingMetric?.replace(/_/g, ' ')}
+                </DialogTitle>
+                <DialogDescription>
+                    Respuestas extraídas para esta métrica ({viewingMetric && customStats[viewingMetric]?.count} llamadas)
+                </DialogDescription>
+            </DialogHeader>
+
+            <div className="flex-1 overflow-y-auto bg-gray-50/50 dark:bg-gray-900/50 p-6">
+                <div className="space-y-3">
+                    {viewingMetric && (() => {
+                        // Extract and filter calls that have this metric
+                        const callsWithMetric = rawCalls.filter(c => {
+                            // Must match filters (already done in rawCalls sort of, but let's re-verify logic)
+                            // Actually rawCalls might be larger if we filter client side for 'testing'.
+                            // Use same logic as 'filteredCalls' basically.
+                            const isTesting = c.metadata?.type === 'testing';
+                            if (selectedCampaign === 'all' && isTesting) return false;
+                            if (selectedCampaign !== 'all' && selectedCampaign !== 'testing' && c.metadata?.campaign_id !== selectedCampaign) return false;
+                            if (selectedCampaign === 'testing' && !isTesting && (c.metadata?.campaign_id || campaignMap[c.agent_id])) return false; // Strict testing check
+
+                            // Check if metric exists
+                            const customData = c.analysis?.custom_analysis_data;
+                            return Array.isArray(customData) && customData.some((d: any) => d.name === viewingMetric);
+                        }).sort((a, b) => (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0));
+
+                        if (callsWithMetric.length === 0) return (
+                            <div className="text-center py-10 text-gray-500">No hay datos disponibles para los filtros actuales.</div>
+                        );
+
+                        return callsWithMetric.map(call => {
+                            const customData = call.analysis?.custom_analysis_data;
+                            const metricData = Array.isArray(customData) ? customData.find((d: any) => d.name === viewingMetric) : undefined;
+                            const campaignName = (call.metadata?.campaign_id ? campaignMap[call.metadata.campaign_id] : null) || campaignMap[call.agent_id];
+
+                            return (
+                                <Card key={call.id} className="overflow-hidden border-gray-200 dark:border-gray-800 shadow-sm hover:shadow-md transition-shadow">
+                                    <div className="p-4 flex items-start gap-4">
+                                        <div className="flex-1 min-w-0">
+                                            <div className="flex items-center gap-2 mb-2">
+                                                <Badge variant="outline" className="bg-white dark:bg-gray-900 text-xs font-normal text-gray-500">
+                                                    {call.timestamp?.toDate ? formatDistanceToNow(call.timestamp.toDate(), { addSuffix: true, locale: es }) : "Reciente"}
+                                                </Badge>
+                                                {campaignName && (
+                                                    <Badge variant="secondary" className="text-[10px] bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-300 border-0">
+                                                        {campaignName}
+                                                    </Badge>
+                                                )}
+                                            </div>
+                                            <div className="text-sm font-medium text-gray-900 dark:text-gray-100 bg-purple-50 dark:bg-purple-900/10 p-3 rounded-lg border border-purple-100 dark:border-purple-900/20">
+                                                "{String(metricData?.value)} "
+                                            </div>
+                                            {metricData?.rationale && (
+                                                <p className="text-xs text-gray-500 mt-2 italic">
+                                                    Razón: {metricData.rationale}
+                                                </p>
                                             )}
                                         </div>
-                                    </Card>
-                                )
-                            })}
-                        </div>
-                    </div>
-                )
-            }
-
-            {/* Hidden/Archived Config Logic */}
-            {
-                hasHiddenMetrics && (
-                    <div className="mt-8 border-t border-gray-200 dark:border-gray-800 pt-6">
-                        <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-4 flex items-center gap-2">
-                            <Archive className="h-4 w-4" />
-                            Métricas Ocultas / Archivadas
-                        </h3>
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 opacity-75">
-                            {/* Standard Hidden */}
-                            {hiddenStandard.map(id => {
-                                const labels: any = { 'sentiment': 'Sentimiento General', 'call_successful': 'Tasa de Éxito' };
-                                return (
-                                    <div key={id} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-100 dark:border-gray-800">
-                                        <div className="flex items-center gap-2">
-                                            <Badge variant="outline" className="bg-white dark:bg-gray-900 text-xs">Estándar</Badge>
-                                            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{labels[id] || id}</span>
-                                        </div>
-                                        <Button variant="ghost" size="sm" onClick={() => handleRestoreStandard(id)} className="text-blue-500 hover:text-blue-700 hover:bg-blue-50">
-                                            <Eye className="h-3.5 w-3.5 mr-1.5" />
-                                            Mostrar
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={() => setSelectedCall(call)}
+                                            className="shrink-0 h-9 w-9 p-0 rounded-full border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-500 hover:text-blue-600 hover:border-blue-200 hover:bg-blue-50"
+                                            title="Ver conversación completa"
+                                        >
+                                            <MessageSquare className="h-4 w-4" />
                                         </Button>
                                     </div>
-                                )
-                            })}
+                                </Card>
+                            );
+                        });
+                    })()}
+                </div>
+            </div>
+            <DialogFooter className="p-4 border-t border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 shrink-0">
+                <Button variant="outline" onClick={() => setViewingMetric(null)}>Cerrar</Button>
+            </DialogFooter>
+        </DialogContent>
+    </Dialog>
 
-                            {/* Custom Archived */}
-                            {archivedCustomList.map(field => (
-                                <div key={field.id} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-100 dark:border-gray-800">
-                                    <div className="flex items-center gap-2">
-                                        <Badge variant="outline" className="bg-purple-50 dark:bg-purple-900/10 text-purple-600 border-purple-100 text-xs">Personalizada</Badge>
-                                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{field.name}</span>
-                                    </div>
-                                    <div className="flex items-center gap-1">
-                                        <Button variant="ghost" size="sm" onClick={() => handleToggleCustomArchive(field.id, false)} className="text-green-500 hover:text-green-700 hover:bg-green-50">
-                                            <RefreshCcw className="h-3.5 w-3.5 mr-1.5" />
-                                            Restaurar
-                                        </Button>
-                                        <Button variant="ghost" size="icon" onClick={() => setMetricToDelete({ id: field.id, name: field.name })} className="h-7 w-7 text-gray-400 hover:text-red-500 hover:bg-red-50" title="Eliminar Definitivamente">
-                                            <Trash2 className="h-3.5 w-3.5" />
-                                        </Button>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
+    {/* Chat Transcript Dialog */ }
+    <Dialog open={!!selectedCall} onOpenChange={(open) => !open && setSelectedCall(null)}>
+        <DialogContent className="max-w-2xl h-[85vh] flex flex-col p-0 gap-0 overflow-hidden rounded-2xl">
+            <DialogHeader className="p-6 border-b border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900">
+                <DialogTitle className="flex items-center gap-3">
+                    <div className="h-10 w-10 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-600">
+                        <Phone className="h-5 w-5" />
                     </div>
-                )
-            }
-
-            {/* Metric Details Dialog */}
-            <Dialog open={!!viewingMetric} onOpenChange={(open) => !open && setViewingMetric(null)}>
-                <DialogContent className="max-w-3xl max-h-[85vh] flex flex-col p-0 gap-0 overflow-hidden">
-                    <DialogHeader className="p-6 border-b border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 shrink-0">
-                        <DialogTitle className="flex items-center gap-2 text-xl">
-                            <Activity className="h-5 w-5 text-purple-600" />
-                            {viewingMetric?.replace(/_/g, ' ')}
-                        </DialogTitle>
-                        <DialogDescription>
-                            Respuestas extraídas para esta métrica ({viewingMetric && customStats[viewingMetric]?.count} llamadas)
-                        </DialogDescription>
-                    </DialogHeader>
-
-                    <div className="flex-1 overflow-y-auto bg-gray-50/50 dark:bg-gray-900/50 p-6">
-                        <div className="space-y-3">
-                            {viewingMetric && (() => {
-                                // Extract and filter calls that have this metric
-                                const callsWithMetric = rawCalls.filter(c => {
-                                    // Must match filters (already done in rawCalls sort of, but let's re-verify logic)
-                                    // Actually rawCalls might be larger if we filter client side for 'testing'.
-                                    // Use same logic as 'filteredCalls' basically.
-                                    const isTesting = c.metadata?.type === 'testing';
-                                    if (selectedCampaign === 'all' && isTesting) return false;
-                                    if (selectedCampaign !== 'all' && selectedCampaign !== 'testing' && c.metadata?.campaign_id !== selectedCampaign) return false;
-                                    if (selectedCampaign === 'testing' && !isTesting && (c.metadata?.campaign_id || campaignMap[c.agent_id])) return false; // Strict testing check
-
-                                    // Check if metric exists
-                                    const customData = c.analysis?.custom_analysis_data;
-                                    return Array.isArray(customData) && customData.some((d: any) => d.name === viewingMetric);
-                                }).sort((a, b) => (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0));
-
-                                if (callsWithMetric.length === 0) return (
-                                    <div className="text-center py-10 text-gray-500">No hay datos disponibles para los filtros actuales.</div>
-                                );
-
-                                return callsWithMetric.map(call => {
-                                    const customData = call.analysis?.custom_analysis_data;
-                                    const metricData = Array.isArray(customData) ? customData.find((d: any) => d.name === viewingMetric) : undefined;
-                                    const campaignName = (call.metadata?.campaign_id ? campaignMap[call.metadata.campaign_id] : null) || campaignMap[call.agent_id];
-
-                                    return (
-                                        <Card key={call.id} className="overflow-hidden border-gray-200 dark:border-gray-800 shadow-sm hover:shadow-md transition-shadow">
-                                            <div className="p-4 flex items-start gap-4">
-                                                <div className="flex-1 min-w-0">
-                                                    <div className="flex items-center gap-2 mb-2">
-                                                        <Badge variant="outline" className="bg-white dark:bg-gray-900 text-xs font-normal text-gray-500">
-                                                            {call.timestamp?.toDate ? formatDistanceToNow(call.timestamp.toDate(), { addSuffix: true, locale: es }) : "Reciente"}
-                                                        </Badge>
-                                                        {campaignName && (
-                                                            <Badge variant="secondary" className="text-[10px] bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-300 border-0">
-                                                                {campaignName}
-                                                            </Badge>
-                                                        )}
-                                                    </div>
-                                                    <div className="text-sm font-medium text-gray-900 dark:text-gray-100 bg-purple-50 dark:bg-purple-900/10 p-3 rounded-lg border border-purple-100 dark:border-purple-900/20">
-                                                        "{String(metricData?.value)} "
-                                                    </div>
-                                                    {metricData?.rationale && (
-                                                        <p className="text-xs text-gray-500 mt-2 italic">
-                                                            Razón: {metricData.rationale}
-                                                        </p>
-                                                    )}
-                                                </div>
-                                                <Button
-                                                    variant="ghost"
-                                                    size="sm"
-                                                    onClick={() => setSelectedCall(call)}
-                                                    className="shrink-0 h-9 w-9 p-0 rounded-full border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-500 hover:text-blue-600 hover:border-blue-200 hover:bg-blue-50"
-                                                    title="Ver conversación completa"
-                                                >
-                                                    <MessageSquare className="h-4 w-4" />
-                                                </Button>
-                                            </div>
-                                        </Card>
-                                    );
-                                });
-                            })()}
-                        </div>
+                    <div className="flex flex-col">
+                        <span>Transcripción de Llamada</span>
+                        <span className="text-xs font-normal text-gray-500">
+                            {selectedCall?.timestamp?.toDate ? selectedCall.timestamp.toDate().toLocaleString() : "Fecha desconocida"}
+                        </span>
                     </div>
-                    <DialogFooter className="p-4 border-t border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 shrink-0">
-                        <Button variant="outline" onClick={() => setViewingMetric(null)}>Cerrar</Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
+                </DialogTitle>
+            </DialogHeader>
+            {selectedCall && (
+                <div className="flex-1 overflow-hidden bg-gray-50 dark:bg-gray-950">
+                    <ChatTranscript
+                        messages={selectedCall.transcript_object || []}
+                        audioUrl={selectedCall.recording_url}
+                    />
+                </div>
+            )}
+        </DialogContent>
+    </Dialog>
 
-            {/* Chat Transcript Dialog */}
-            <Dialog open={!!selectedCall} onOpenChange={(open) => !open && setSelectedCall(null)}>
-                <DialogContent className="max-w-2xl h-[85vh] flex flex-col p-0 gap-0 overflow-hidden rounded-2xl">
-                    <DialogHeader className="p-6 border-b border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900">
-                        <DialogTitle className="flex items-center gap-3">
-                            <div className="h-10 w-10 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-600">
-                                <Phone className="h-5 w-5" />
-                            </div>
-                            <div className="flex flex-col">
-                                <span>Transcripción de Llamada</span>
-                                <span className="text-xs font-normal text-gray-500">
-                                    {selectedCall?.timestamp?.toDate ? selectedCall.timestamp.toDate().toLocaleString() : "Fecha desconocida"}
-                                </span>
-                            </div>
-                        </DialogTitle>
-                    </DialogHeader>
-                    {selectedCall && (
-                        <div className="flex-1 overflow-hidden bg-gray-50 dark:bg-gray-950">
-                            <ChatTranscript
-                                messages={selectedCall.transcript_object || []}
-                                audioUrl={selectedCall.recording_url}
-                            />
-                        </div>
-                    )}
-                </DialogContent>
-            </Dialog>
+    {/* Edit Metric Dialog */ }
+    <Dialog open={!!metricToEdit} onOpenChange={(open) => !open && setMetricToEdit(null)}>
+        <DialogContent>
+            <DialogHeader>
+                <DialogTitle>Editar Métrica: {metricToEdit?.originalName}</DialogTitle>
+                <DialogDescription>
+                    Modifica la configuración de esta métrica. Nota: Cambiar el nombre puede afectar la recolección de datos si el prompt no se actualiza (la IA usa el nombre como referencia).
+                </DialogDescription>
+            </DialogHeader>
+            {metricToEdit && (
+                <div className="space-y-4 py-4">
+                    <div className="space-y-2">
+                        <Label>Nombre (Clave)</Label>
+                        <Input
+                            value={metricToEdit.name}
+                            onChange={(e) => setMetricToEdit({ ...metricToEdit, name: e.target.value })}
+                        />
+                        <p className="text-xs text-yellow-600 dark:text-yellow-400">
+                            ¡Cuidado! Si cambias esto, asegúrate que las nuevas llamadas usen este nombre exacto.
+                        </p>
+                    </div>
+                    {/* Description removed as per request */}
+                    <div className="space-y-2">
+                        <Label>Tipo de Dato</Label>
+                        <Select
+                            value={metricToEdit.type}
+                            onValueChange={(val) => setMetricToEdit({ ...metricToEdit, type: val })}
+                        >
+                            <SelectTrigger>
+                                <SelectValue placeholder="Selecciona un tipo" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="boolean">Booleano (Sí/No)</SelectItem>
+                                <SelectItem value="number">Numérico</SelectItem>
+                                <SelectItem value="string">Texto / Categoría</SelectItem>
+                                <SelectItem value="enum">Enum (Gráfico Circular)</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+                </div>
+            )}
+            <DialogFooter>
+                <Button variant="outline" onClick={() => setMetricToEdit(null)}>Cancelar</Button>
+                <Button onClick={handleSaveEdit}>Guardar Cambios</Button>
+            </DialogFooter>
+        </DialogContent>
+    </Dialog>
 
-            {/* Edit Metric Dialog */}
-            <Dialog open={!!metricToEdit} onOpenChange={(open) => !open && setMetricToEdit(null)}>
-                <DialogContent>
-                    <DialogHeader>
-                        <DialogTitle>Editar Métrica: {metricToEdit?.originalName}</DialogTitle>
-                        <DialogDescription>
-                            Modifica la configuración de esta métrica. Nota: Cambiar el nombre puede afectar la recolección de datos si el prompt no se actualiza (la IA usa el nombre como referencia).
-                        </DialogDescription>
-                    </DialogHeader>
-                    {metricToEdit && (
-                        <div className="space-y-4 py-4">
-                            <div className="space-y-2">
-                                <Label>Nombre (Clave)</Label>
-                                <Input
-                                    value={metricToEdit.name}
-                                    onChange={(e) => setMetricToEdit({ ...metricToEdit, name: e.target.value })}
-                                />
-                                <p className="text-xs text-yellow-600 dark:text-yellow-400">
-                                    ¡Cuidado! Si cambias esto, asegúrate que las nuevas llamadas usen este nombre exacto.
-                                </p>
-                            </div>
-                            {/* Description removed as per request */}
-                            <div className="space-y-2">
-                                <Label>Tipo de Dato</Label>
-                                <Select
-                                    value={metricToEdit.type}
-                                    onValueChange={(val) => setMetricToEdit({ ...metricToEdit, type: val })}
-                                >
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="Selecciona un tipo" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="boolean">Booleano (Sí/No)</SelectItem>
-                                        <SelectItem value="number">Numérico</SelectItem>
-                                        <SelectItem value="string">Texto / Categoría</SelectItem>
-                                        <SelectItem value="enum">Enum (Gráfico Circular)</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                        </div>
-                    )}
-                    <DialogFooter>
-                        <Button variant="outline" onClick={() => setMetricToEdit(null)}>Cancelar</Button>
-                        <Button onClick={handleSaveEdit}>Guardar Cambios</Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
-
-            {/* Existing Delete Dialog */}
-            <Dialog open={!!metricToDelete} onOpenChange={(open) => !open && setMetricToDelete(null)}>
-                <DialogContent>
-                    <DialogHeader>
-                        <DialogTitle>¿Eliminar métrica "{metricToDelete?.name}"?</DialogTitle>
-                        <DialogDescription>
-                            Esta acción eliminará la configuración de esta métrica. Los datos históricos en las llamadas permanecerán, pero no se calcularán estadísticas agregadas ni se mostrará en los informes.
-                        </DialogDescription>
-                    </DialogHeader>
-                    <DialogFooter>
-                        <Button variant="outline" onClick={() => setMetricToDelete(null)}>Cancelar</Button>
-                        <Button variant="destructive" onClick={handleDeleteCustomMetric}>Eliminar</Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
+    {/* Existing Delete Dialog */ }
+    <Dialog open={!!metricToDelete} onOpenChange={(open) => !open && setMetricToDelete(null)}>
+        <DialogContent>
+            <DialogHeader>
+                <DialogTitle>¿Eliminar métrica "{metricToDelete?.name}"?</DialogTitle>
+                <DialogDescription>
+                    Esta acción eliminará la configuración de esta métrica. Los datos históricos en las llamadas permanecerán, pero no se calcularán estadísticas agregadas ni se mostrará en los informes.
+                </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+                <Button variant="outline" onClick={() => setMetricToDelete(null)}>Cancelar</Button>
+                <Button variant="destructive" onClick={handleDeleteCustomMetric}>Eliminar</Button>
+            </DialogFooter>
+        </DialogContent>
+    </Dialog>
         </div >
     );
 }
