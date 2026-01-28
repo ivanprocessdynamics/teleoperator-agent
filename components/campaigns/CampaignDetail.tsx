@@ -716,6 +716,9 @@ export function CampaignDetail({ campaignId, subworkspaceId, onBack }: CampaignD
                                 onImmediateChange={(val) => latestPromptRef.current = val}
                                 onSyncAgent={handleSyncPrompt}
                                 variableClass={styles.variable}
+                                campaignId={campaignId}
+                                subworkspaceId={activeSubworkspaceId || ""}
+                                isAgentLevel={false}
                             />
                         </TabsContent>
 
