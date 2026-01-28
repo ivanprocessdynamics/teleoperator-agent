@@ -367,12 +367,15 @@ export function StatsDashboard(props: StatsDashboardProps) {
             const customs = data.analysis?.custom_analysis_data;
             if (Array.isArray(customs)) {
                 customs.forEach((c: any) => {
-                    // Normalize Name
-                    const name = c.name;
+                    // Normalize Name: Try to find a matching config field (case-insensitive)
+                    // This links "MOTIVO CITA" (from call) to "Motivo Cita" (from config)
+                    const rawName = c.name;
+                    const configField = allFields.find(f => f.name.toLowerCase() === rawName.toLowerCase());
+                    const name = configField ? configField.name : rawName;
 
                     // CRITICAL FIX: If this field is KNOWN to be archived, ignore it entirely.
                     // Do not "rediscover" it.
-                    const isArchived = allFields.some(f => f.name === name && f.isArchived);
+                    const isArchived = configField ? configField.isArchived : allFields.some(f => f.name === name && f.isArchived);
 
                     // ALSO CHECK: If it is in the "ignored" list (hard deleted)
                     const isIgnored = ignoredFields.includes(name);
@@ -381,14 +384,15 @@ export function StatsDashboard(props: StatsDashboardProps) {
 
                     if (!customAgg[name]) {
                         // Discovered a field not in active config (maybe new)
+                        // Or if we found a configField but it wasn't in customAgg yet (shouldn't happen if initialized properly, but safe fallback)
                         customAgg[name] = {
-                            id: `auto_${name}`,
-                            type: typeof c.value === 'boolean' ? 'boolean' : typeof c.value === 'number' ? 'number' : 'string',
+                            id: configField ? configField.id : `auto_${name}`,
+                            type: configField ? configField.type : (typeof c.value === 'boolean' ? 'boolean' : typeof c.value === 'number' ? 'number' : 'string'),
                             yes: 0, no: 0, count: 0, totalSum: 0,
                             values: {}, // Track distinct values
-                            description: "Detectado automáticamente",
+                            description: configField ? configField.description : "Detectado automáticamente",
                             name: name,
-                            isConfigured: false
+                            isConfigured: !!configField
                         };
                     }
 
@@ -400,15 +404,28 @@ export function StatsDashboard(props: StatsDashboardProps) {
                     if (!entry.values) entry.values = {};
                     entry.values[valStr] = (entry.values[valStr] || 0) + 1;
 
-                    if (typeof c.value === 'boolean') {
-                        entry.type = 'boolean';
-                        if (c.value) entry.yes++; else entry.no++;
-                    } else if (typeof c.value === 'number') {
-                        entry.type = 'number';
-                        entry.totalSum += c.value;
+                    if (configField) {
+                        // Enforce config type logic if configured
+                        if (configField.type === 'boolean') {
+                            if (c.value) entry.yes++; else entry.no++;
+                        } else if (configField.type === 'number') {
+                            if (typeof c.value === 'number') entry.totalSum += c.value;
+                        }
+                        // For string/enum, we just track values which is done above.
+                        // Ensure type is set correctly
+                        entry.type = configField.type;
                     } else {
-                        // Default to string/enum - check config if it's an enum
-                        entry.type = (allFields.find(f => f.name === name)?.type === 'enum') ? 'enum' : 'string';
+                        // Auto-discovery type logic
+                        if (typeof c.value === 'boolean') {
+                            entry.type = 'boolean';
+                            if (c.value) entry.yes++; else entry.no++;
+                        } else if (typeof c.value === 'number') {
+                            entry.type = 'number';
+                            entry.totalSum += c.value;
+                        } else {
+                            // Default to string 
+                            entry.type = 'string';
+                        }
                     }
                 });
             }

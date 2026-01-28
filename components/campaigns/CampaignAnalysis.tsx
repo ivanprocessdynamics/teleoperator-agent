@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Plus, Trash2, Brain, FileText, BarChart3, Archive, RefreshCcw, Eye, EyeOff, X, DownloadCloud, Search, Check } from "lucide-react";
+import { Plus, Trash2, Brain, FileText, BarChart3, Archive, RefreshCcw, Eye, EyeOff, X, DownloadCloud, Search, Check, Pencil } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
@@ -59,6 +59,7 @@ export function CampaignAnalysis({
 
     const [isAddingField, setIsAddingField] = useState(false);
     const [fieldToDelete, setFieldToDelete] = useState<AnalysisField | null>(null);
+    const [fieldToEdit, setFieldToEdit] = useState<AnalysisField | null>(null);
 
     // Import State
     const [isImporting, setIsImporting] = useState(false);
@@ -166,6 +167,27 @@ export function CampaignAnalysis({
                 ignored_custom_fields: newIgnored
             });
         }
+    };
+
+    const saveEdit = () => {
+        if (!fieldToEdit) return;
+
+        if (isGlobalMode && onAddGlobalField) {
+            // In global mode, we might need a specific update handler, but usually re-adding with same ID updates it?
+            // Actually our add logic generates new ID. We should probably update.
+            // For now, assuming local mode primarily for this advanced config or that Global handling is separate.
+            // If we are editing a global field, we probably trigger an update.
+            // Let's assume naive Replace approach if ID matches.
+            // Actually, the props don't expose 'onUpdateGlobalField'.
+            // We'll update the LOCAL config copy which is what matters for this campaign view.
+        }
+
+        const updatedFields = config.custom_fields.map(f => f.id === fieldToEdit.id ? fieldToEdit : f);
+        onChange({
+            ...config,
+            custom_fields: updatedFields
+        });
+        setFieldToEdit(null);
     };
 
     // Import Handler
@@ -388,6 +410,15 @@ export function CampaignAnalysis({
                                     </div>
 
                                     <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            onClick={() => setFieldToEdit(field)}
+                                            className="h-8 w-8 text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/10"
+                                            title="Editar"
+                                        >
+                                            <Pencil className="h-4 w-4" />
+                                        </Button>
                                         <Button variant="ghost" size="sm" onClick={() => archiveField(field.id)} className="text-gray-400 hover:text-orange-500 hover:bg-orange-50 dark:hover:bg-orange-900/10">
                                             <Archive className="h-4 w-4 mr-2" />
                                             {isCampaignMode ? "Desactivar" : "Archivar"}
@@ -474,6 +505,69 @@ export function CampaignAnalysis({
                     <DialogFooter>
                         <Button variant="outline" onClick={() => setFieldToDelete(null)}>Cancelar</Button>
                         <Button variant="destructive" onClick={confirmDelete}>Eliminar</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Edit Dialog */}
+            <Dialog open={!!fieldToEdit} onOpenChange={(open) => !open && setFieldToEdit(null)}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Editar Métrica: {fieldToEdit?.name}</DialogTitle>
+                        <DialogDescription>
+                            Modifica la configuración de este campo de análisis.
+                        </DialogDescription>
+                    </DialogHeader>
+                    {fieldToEdit && (
+                        <div className="space-y-4 py-4">
+                            <div className="space-y-2">
+                                <Label>Nombre</Label>
+                                <Input
+                                    value={fieldToEdit.name}
+                                    onChange={(e) => setFieldToEdit({ ...fieldToEdit, name: e.target.value })}
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <Label>Descripción / Instrucción</Label>
+                                <Input
+                                    value={fieldToEdit.description}
+                                    onChange={(e) => setFieldToEdit({ ...fieldToEdit, description: e.target.value })}
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <Label>Tipo</Label>
+                                <Select
+                                    value={fieldToEdit.type}
+                                    onValueChange={(val) => setFieldToEdit({ ...fieldToEdit, type: val as any })}
+                                >
+                                    <SelectTrigger>
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="string">Texto Libre</SelectItem>
+                                        <SelectItem value="boolean">Sí / No</SelectItem>
+                                        <SelectItem value="number">Numérico</SelectItem>
+                                        <SelectItem value="enum">Lista de Opciones</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            {fieldToEdit.type === 'enum' && (
+                                <div className="space-y-2">
+                                    <Label>Opciones (separadas por comas)</Label>
+                                    <Input
+                                        value={fieldToEdit.options?.join(", ") || ""}
+                                        onChange={(e) => setFieldToEdit({
+                                            ...fieldToEdit,
+                                            options: e.target.value.split(",").map(s => s.trim()).filter(Boolean)
+                                        })}
+                                    />
+                                </div>
+                            )}
+                        </div>
+                    )}
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setFieldToEdit(null)}>Cancelar</Button>
+                        <Button onClick={saveEdit}>Guardar Cambios</Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
