@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup, SelectLabel } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, DropdownMenuItem } from "@/components/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, DropdownMenuItem, DropdownMenuLabel, DropdownMenuCheckboxItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { Label } from "@/components/ui/label";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -127,12 +127,12 @@ export function StatsDashboard(props: StatsDashboardProps) {
     const [hiddenStandard, setHiddenStandard] = useState<string[]>([]);
     const [ignoredFields, setIgnoredFields] = useState<string[]>([]);
     const [period, setPeriod] = useState("7d");
-    const [selectedCampaign, setSelectedCampaign] = useState<string>("all");
-    const [uniqueCampaigns, setUniqueCampaigns] = useState<string[]>([]); // Derived from calls
+    const [selectedCampaigns, setSelectedCampaigns] = useState<string[]>([]); // Multi-select
+    const [uniqueCampaigns, setUniqueCampaigns] = useState<string[]>([]);
 
     // NEW FILTERS
     const [agentTypeFilter, setAgentTypeFilter] = useState<'all' | 'inbound' | 'outbound'>('all');
-    const [selectedAgentIds, setSelectedAgentIds] = useState<string[]>([]); // For multi-select
+    const [selectedAgentIds, setSelectedAgentIds] = useState<string[]>([]);
     const [availableAgents, setAvailableAgents] = useState<{ id: string, name: string, type: string }[]>([]);
 
     // Date Picker State
@@ -200,7 +200,6 @@ export function StatsDashboard(props: StatsDashboardProps) {
 
     // 2. Fetch Data (Calls + Config)
     const fetchStats = async () => {
-        // if (!agentId || !props.subworkspaceId) return; // Allow running without these for Global View
         setLoading(true);
 
         try {
@@ -219,25 +218,8 @@ export function StatsDashboard(props: StatsDashboardProps) {
                 }
             }
 
-            // If a specific Campaign is selected, try to load its config to overlay/add fields
-            if (selectedCampaign !== 'all') {
-                try {
-                    const campDoc = await getDoc(doc(db, "campaigns", selectedCampaign));
-                    if (campDoc.exists()) {
-                        const cData = campDoc.data();
-                        const cFields = cData.analysis_config?.custom_fields || [];
-                        // Merge strategies? For now, we'll append unique fields from Campaign
-                        // or should we replace? The user expects to see Campaign fields.
-                        // Let's just create a map by name to unified them.
-                        const fieldMap = new Map();
-                        currentFields.forEach(f => fieldMap.set(f.name, f));
-                        cFields.forEach((f: any) => fieldMap.set(f.name, f)); // Campaign overrides/adds
-                        currentFields = Array.from(fieldMap.values());
-                    }
-                } catch (err) {
-                    console.error("Error loading campaign config:", err);
-                }
-            }
+            // Note: We skip loading specific campaign config in multi-select mode for simplicity
+            // Rely on auto-discovery and subworkspace config.
 
             setHiddenStandard(currentHidden);
             setAllFields(currentFields);
@@ -268,15 +250,12 @@ export function StatsDashboard(props: StatsDashboardProps) {
                 orderBy("timestamp", "desc")
             ];
 
-            if (agentId) { // If provided as prop, lock it. Otherwise allow all.
+            if (agentId) {
                 constraints.push(where("agent_id", "==", agentId));
             }
 
-            if (selectedCampaign === "testing") {
-                // Allow fetching all calls to enable 'residue' filtering for legacy test calls
-            } else if (selectedCampaign !== "all") {
-                constraints.push(where("metadata.campaign_id", "==", selectedCampaign));
-            }
+            // Note: We removed the Firestore level campaign filter to allow flexible client-side filtering
+            // for multi-select without complex 'in' queries or multiple fetches.
 
             if (end) {
                 constraints.push(where("timestamp", "<=", Timestamp.fromDate(end)));
@@ -286,10 +265,8 @@ export function StatsDashboard(props: StatsDashboardProps) {
             const snapshot = await getDocs(q);
             let calls = snapshot.docs.map(doc => doc.data());
 
-            // Client-side cleanup for "All" (exclude testing calls)
-            if (selectedCampaign === "all") {
-                calls = calls.filter((c: any) => c.metadata?.type !== 'testing');
-            }
+            // Client-side cleanup only for testing residue if needed, generally we keep all
+            // We'll filter strictly in the useEffect
 
             setRawCalls(calls);
 
@@ -304,7 +281,7 @@ export function StatsDashboard(props: StatsDashboardProps) {
     useEffect(() => {
         if (period === "custom" && (!pickerStart || !pickerEnd)) return;
         fetchStats();
-    }, [agentId, period, props.subworkspaceId, pickerStart, pickerEnd, selectedCampaign]);
+    }, [agentId, period, props.subworkspaceId, pickerStart, pickerEnd]); // Removed selectedCampaigns from dependency to avoid refetch
 
     // 2.5 Extract Campaigns
     useEffect(() => {
@@ -317,12 +294,9 @@ export function StatsDashboard(props: StatsDashboardProps) {
         // Filter by Campaign / Type / Agent Selection
         const filteredCalls = rawCalls.filter(c => {
             // 1. Campaign Filter
-            if (selectedCampaign !== 'all') {
-                if (selectedCampaign === 'testing') {
-                    if (c.metadata?.type !== 'testing' && (c.metadata?.campaign_id || campaignMap[c.agent_id])) return false;
-                } else {
-                    if (c.metadata?.campaign_id !== selectedCampaign) return false;
-                }
+            if (selectedCampaigns.length > 0) {
+                // strict check: must be in the list
+                if (!c.metadata?.campaign_id || !selectedCampaigns.includes(c.metadata?.campaign_id)) return false;
             }
 
             // 2. Agent Type Filter
@@ -336,6 +310,10 @@ export function StatsDashboard(props: StatsDashboardProps) {
             if (selectedAgentIds.length > 0) {
                 if (!selectedAgentIds.includes(c.agent_id)) return false;
             }
+
+            // Special case: if filtered by "Testing" (not strictly a campaign id usually, but a type)
+            // If user wants to see testing calls, they should probably have a way.
+            // For now assuming campaign IDs are enough.
 
             return true;
         });
@@ -452,7 +430,7 @@ export function StatsDashboard(props: StatsDashboardProps) {
         });
 
         setCustomStats(customAgg);
-    }, [rawCalls, allFields, ignoredFields, selectedCampaign, campaignMap]);
+    }, [rawCalls, allFields, ignoredFields, selectedCampaigns, selectedAgentIds, agentTypeFilter, campaignMap]);
 
 
     const handleHideStandard = async (metricId: string) => {
@@ -593,116 +571,143 @@ export function StatsDashboard(props: StatsDashboardProps) {
 
     return (
         <div className="space-y-6 animate-fade-in pb-10">
-            <div className="flex justify-between items-center">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Resumen de Rendimiento</h3>
-                {/* Master Filter */}
-                <Select
-                    value={
-                        // Derive value from current state
-                        agentTypeFilter === 'all' && selectedCampaign === 'all' && selectedAgentIds.length === 0 ? "all_calls" :
-                            agentTypeFilter === 'inbound' && selectedCampaign === 'all' && selectedAgentIds.length === 0 ? "all_inbound" :
-                                agentTypeFilter === 'outbound' && selectedCampaign === 'all' && selectedAgentIds.length === 0 ? "all_outbound" :
-                                    selectedCampaign !== 'all' ? `campaign_${selectedCampaign}` :
-                                        selectedAgentIds.length === 1 ? `agent_${selectedAgentIds[0]}` : "custom"
-                    }
-                    onValueChange={(val) => {
-                        if (val === "all_calls") {
-                            setAgentTypeFilter('all');
-                            setSelectedCampaign('all');
-                            setSelectedAgentIds([]);
-                        } else if (val === "all_inbound") {
-                            setAgentTypeFilter('inbound');
-                            setSelectedCampaign('all');
-                            setSelectedAgentIds([]);
-                        } else if (val === "all_outbound") {
-                            setAgentTypeFilter('outbound');
-                            setSelectedCampaign('all');
-                            setSelectedAgentIds([]);
-                        } else if (val.startsWith("campaign_")) {
-                            const cid = val.replace("campaign_", "");
-                            setAgentTypeFilter('outbound'); // Campaigns are outbound
-                            setSelectedCampaign(cid);
-                            setSelectedAgentIds([]);
-                        } else if (val.startsWith("agent_")) {
-                            const aid = val.replace("agent_", "");
-                            const agent = availableAgents.find(a => a.id === aid);
-                            // Ensure type is valid
-                            const newType = agent?.type === 'inbound' ? 'inbound' : 'outbound';
-                            setAgentTypeFilter(newType);
-                            setSelectedCampaign("all");
-                            setSelectedAgentIds([aid]);
-                        }
-                    }}
-                >
-                    <SelectTrigger className="w-[280px] bg-white dark:bg-gray-800">
-                        <div className="flex items-center gap-2">
-                            <Filter className="h-3.5 w-3.5 text-gray-400" />
-                            <SelectValue placeholder="Todas las llamadas" />
-                        </div>
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectGroup>
-                            <SelectLabel>General</SelectLabel>
-                            <SelectItem value="all_calls">Todas las llamadas</SelectItem>
-                            <SelectItem value="all_inbound">Todas las entrantes</SelectItem>
-                            <SelectItem value="all_outbound">Todas las salientes</SelectItem>
-                        </SelectGroup>
 
-                        <SelectGroup>
-                            <SelectLabel>Campañas</SelectLabel>
+                <div className="flex flex-wrap items-center gap-2">
+                    {/* Master Filter Dropdown */}
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button variant="outline" className="w-[300px] justify-between text-left font-normal bg-white dark:bg-gray-800">
+                                <div className="flex items-center gap-2 truncate">
+                                    <Filter className="h-4 w-4 text-gray-400" />
+                                    <span className="truncate">
+                                        {selectedCampaigns.length > 0
+                                            ? `${selectedCampaigns.length} Campañas`
+                                            : selectedAgentIds.length > 0
+                                                ? `${selectedAgentIds.length} Agentes`
+                                                : agentTypeFilter === 'all'
+                                                    ? "Todas las llamadas"
+                                                    : agentTypeFilter === 'inbound'
+                                                        ? "Todas las entrantes"
+                                                        : "Todas las salientes"
+                                        }
+                                    </span>
+                                </div>
+                                <span className="opacity-50">▼</span>
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent className="w-[300px] max-h-[400px] overflow-y-auto" align="end">
+                            {/* General Presets */}
+                            <DropdownMenuLabel>General</DropdownMenuLabel>
+                            <DropdownMenuItem onClick={() => {
+                                setAgentTypeFilter('all');
+                                setSelectedCampaigns([]);
+                                setSelectedAgentIds([]);
+                            }}>
+                                <span className={agentTypeFilter === 'all' && selectedCampaigns.length === 0 && selectedAgentIds.length === 0 ? "font-bold text-blue-600" : ""}>
+                                    Todas las llamadas
+                                </span>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => {
+                                setAgentTypeFilter('inbound');
+                                setSelectedCampaigns([]);
+                                setSelectedAgentIds([]);
+                            }}>
+                                <span className={agentTypeFilter === 'inbound' && selectedCampaigns.length === 0 && selectedAgentIds.length === 0 ? "font-bold text-blue-600" : ""}>
+                                    Todas las entrantes
+                                </span>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => {
+                                setAgentTypeFilter('outbound');
+                                setSelectedCampaigns([]);
+                                setSelectedAgentIds([]);
+                            }}>
+                                <span className={agentTypeFilter === 'outbound' && selectedCampaigns.length === 0 && selectedAgentIds.length === 0 ? "font-bold text-blue-600" : ""}>
+                                    Todas las salientes
+                                </span>
+                            </DropdownMenuItem>
+
+                            <DropdownMenuSeparator />
+
+                            {/* Campaigns */}
+                            <DropdownMenuLabel>Campañas Salientes</DropdownMenuLabel>
                             {uniqueCampaigns.map(cid => (
-                                <SelectItem key={cid} value={`campaign_${cid}`}>
+                                <DropdownMenuCheckboxItem
+                                    key={cid}
+                                    checked={selectedCampaigns.includes(cid)}
+                                    onCheckedChange={(checked) => {
+                                        setSelectedCampaigns(prev =>
+                                            checked ? [...prev, cid] : prev.filter(id => id !== cid)
+                                        );
+                                        // If selecting campaigns, implicitly switch to outbound context or just keep as 'all' ? 
+                                        // User logic: Campaigns are typically outbound.
+                                        // If we are adding a campaign, we probably want to ensure we aren't filtering to 'inbound' only.
+                                        if (checked) {
+                                            if (agentTypeFilter === 'inbound') setAgentTypeFilter('all');
+                                        }
+                                    }}
+                                >
                                     {campaignMap[cid] || "Campaña desconocida"}
-                                </SelectItem>
+                                </DropdownMenuCheckboxItem>
                             ))}
-                        </SelectGroup>
+                            {uniqueCampaigns.length === 0 && <div className="px-2 py-1 text-xs text-gray-500 italic">No hay campañas disponibles</div>}
 
-                        <SelectGroup>
-                            <SelectLabel>Agentes</SelectLabel>
-                            {availableAgents.map(a => (
-                                <SelectItem key={a.id} value={`agent_${a.id}`}>
+                            <DropdownMenuSeparator />
+
+                            {/* Inbound Agents */}
+                            <DropdownMenuLabel>Entrantes</DropdownMenuLabel>
+                            {availableAgents.filter(a => a.type === 'inbound').map(a => (
+                                <DropdownMenuCheckboxItem
+                                    key={a.id}
+                                    checked={selectedAgentIds.includes(a.id)}
+                                    onCheckedChange={(checked) => {
+                                        setSelectedAgentIds(prev =>
+                                            checked ? [...prev, a.id] : prev.filter(id => id !== a.id)
+                                        );
+                                        if (checked) {
+                                            if (agentTypeFilter === 'outbound') setAgentTypeFilter('all');
+                                        }
+                                    }}
+                                >
                                     {a.name}
-                                </SelectItem>
+                                </DropdownMenuCheckboxItem>
                             ))}
-                        </SelectGroup>
-                    </SelectContent>
-                </Select>
+                            {availableAgents.filter(a => a.type === 'inbound').length === 0 && (
+                                <div className="px-2 py-1 text-xs text-gray-500 italic">No hay agentes entrantes</div>
+                            )}
+                        </DropdownMenuContent>
+                    </DropdownMenu>
 
-                <div className="h-6 w-px bg-gray-200 dark:bg-gray-700 mx-2" />
+                    <Button variant="outline" size="sm" onClick={() => fetchStats()} disabled={loading} className="bg-white dark:bg-gray-800">
+                        <RefreshCcw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+                        Actualizar
+                    </Button>
 
-                {/* Existing Controls */}
-                <Button variant="outline" size="sm" onClick={() => fetchStats()} disabled={loading} className="bg-white dark:bg-gray-800">
-                    <RefreshCcw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-                    Actualizar
-                </Button>
+                    <DateRangePicker
+                        startDate={pickerStart}
+                        endDate={pickerEnd}
+                        onChange={(s, e) => {
+                            setPickerStart(s);
+                            setPickerEnd(e);
+                            if (period !== 'custom') setPeriod('custom');
+                        }}
+                    />
 
-                <Select value={period} onValueChange={setPeriod}>
-                    <SelectTrigger className="w-[180px] bg-white dark:bg-gray-800">
-                        <SelectValue placeholder="Periodo" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="24h">Últimas 24 horas</SelectItem>
-                        <SelectItem value="7d">Últimos 7 días</SelectItem>
-                        <SelectItem value="30d">Últimos 30 días</SelectItem>
-                        <SelectItem value="all">Todo el tiempo</SelectItem>
-                        <SelectItem value="custom">Personalizado</SelectItem>
-                    </SelectContent>
-                </Select>
-
-                {period === "custom" && (
-                    <div className="animate-in fade-in slide-in-from-right-4 duration-300">
-                        <DateRangePicker
-                            startDate={pickerStart}
-                            endDate={pickerEnd}
-                            onChange={(s, e) => {
-                                setPickerStart(s);
-                                setPickerEnd(e);
-                            }}
-                        />
-                    </div>
-                )}
+                    <Select value={period} onValueChange={setPeriod}>
+                        <SelectTrigger className="w-[140px] bg-white dark:bg-gray-800">
+                            <SelectValue placeholder="Periodo" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="24h">Últimas 24h</SelectItem>
+                            <SelectItem value="7d">Últimos 7 días</SelectItem>
+                            <SelectItem value="30d">Últimos 30 días</SelectItem>
+                            <SelectItem value="all">Todo el tiempo</SelectItem>
+                            <SelectItem value="custom">Personalizado</SelectItem>
+                        </SelectContent>
+                    </Select>
+                </div>
             </div>
-
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 <Card className="group relative bg-gradient-to-br from-blue-50 to-white dark:from-blue-900/10 dark:to-gray-900 border-blue-100 dark:border-blue-900/30">
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -998,10 +1003,8 @@ export function StatsDashboard(props: StatsDashboardProps) {
                                     // Must match filters (already done in rawCalls sort of, but let's re-verify logic)
                                     // Actually rawCalls might be larger if we filter client side for 'testing'.
                                     // Use same logic as 'filteredCalls' basically.
-                                    const isTesting = c.metadata?.type === 'testing';
-                                    if (selectedCampaign === 'all' && isTesting) return false;
-                                    if (selectedCampaign !== 'all' && selectedCampaign !== 'testing' && c.metadata?.campaign_id !== selectedCampaign) return false;
-                                    if (selectedCampaign === 'testing' && !isTesting && (c.metadata?.campaign_id || campaignMap[c.agent_id])) return false; // Strict testing check
+                                    // Use same logic as 'filteredCalls' basically.
+                                    if (selectedCampaigns.length > 0 && (!c.metadata?.campaign_id || !selectedCampaigns.includes(c.metadata?.campaign_id))) return false;
 
                                     // Check if metric exists
                                     const customData = c.analysis?.custom_analysis_data;
