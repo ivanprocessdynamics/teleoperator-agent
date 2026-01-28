@@ -286,69 +286,73 @@ export function CallHistoryTable({ agentId: initialAgentId }: CallHistoryTablePr
                 <div className="flex flex-wrap items-center gap-3">
 
 
-                    {/* Type Filter */}
-                    <Select value={agentTypeFilter} onValueChange={(v: any) => setAgentTypeFilter(v)}>
-                        <SelectTrigger className="w-[140px] h-9 bg-white dark:bg-gray-950 border-gray-200 dark:border-gray-800">
-                            <div className="flex items-center gap-2">
-                                <Filter className="h-3.5 w-3.5 text-gray-400" />
-                                <SelectValue />
-                            </div>
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="all">Todo</SelectItem>
-                            <SelectItem value="outbound">Salientes</SelectItem>
-                            <SelectItem value="inbound">Entrantes</SelectItem>
-                        </SelectContent>
-                    </Select>
+                    {/* Type Filter - Only show if NO initialAgentId */}
+                    {!initialAgentId && (
+                        <Select value={agentTypeFilter} onValueChange={(v: any) => setAgentTypeFilter(v)}>
+                            <SelectTrigger className="w-[140px] h-9 bg-white dark:bg-gray-950 border-gray-200 dark:border-gray-800">
+                                <div className="flex items-center gap-2">
+                                    <Filter className="h-3.5 w-3.5 text-gray-400" />
+                                    <SelectValue />
+                                </div>
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">Todo</SelectItem>
+                                <SelectItem value="outbound">Salientes</SelectItem>
+                                <SelectItem value="inbound">Entrantes</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    )}
 
-                    {/* Multi-select Agents */}
-                    <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                            <Button variant="outline" className="h-9 bg-white dark:bg-gray-950 border-dashed border-gray-200 dark:border-gray-800 text-sm font-normal">
-                                <Users className="h-4 w-4 mr-2" />
-                                {selectedAgentIds.length > 0 ? `${selectedAgentIds.length} Agentes` : "Agentes"}
-                            </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent className="w-56 p-2 bg-white dark:bg-gray-800" align="start">
-                            <div className="mb-2 px-2 text-xs font-semibold text-gray-500">Filtrar por Agentes</div>
-                            <ScrollArea className="h-[200px]">
-                                {availableAgents
-                                    .filter(a => agentTypeFilter === 'all' || a.type === agentTypeFilter)
-                                    .map(agent => (
-                                        <div key={agent.id} className="flex items-center space-x-2 p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md cursor-pointer"
-                                            onClick={(e) => {
-                                                e.preventDefault();
-                                                setSelectedAgentIds(prev =>
-                                                    prev.includes(agent.id) ? prev.filter(id => id !== agent.id) : [...prev, agent.id]
-                                                );
-                                            }}
-                                        >
-                                            <input
-                                                type="checkbox"
-                                                checked={selectedAgentIds.includes(agent.id)}
-                                                readOnly
-                                                className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                                            />
-                                            <span className="text-sm truncate">{agent.name}</span>
-                                            <Badge variant="secondary" className="text-[10px] ml-auto">
-                                                {agent.type === 'inbound' ? 'In' : 'Out'}
-                                            </Badge>
-                                        </div>
-                                    ))}
-                                {availableAgents.length === 0 && <div className="text-sm text-gray-400 p-2">No hay agentes</div>}
-                            </ScrollArea>
-                            {selectedAgentIds.length > 0 && (
-                                <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="w-full mt-2 text-xs h-7"
-                                    onClick={() => setSelectedAgentIds([])}
-                                >
-                                    Limpiar Selección
+                    {/* Multi-select Agents - Only show if NO initialAgentId (Global View) */}
+                    {!initialAgentId && (
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button variant="outline" className="h-9 bg-white dark:bg-gray-950 border-dashed border-gray-200 dark:border-gray-800 text-sm font-normal">
+                                    <Users className="h-4 w-4 mr-2" />
+                                    {selectedAgentIds.length > 0 ? `${selectedAgentIds.length} Agentes` : "Agentes"}
                                 </Button>
-                            )}
-                        </DropdownMenuContent>
-                    </DropdownMenu>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent className="w-56 p-2 bg-white dark:bg-gray-800" align="start">
+                                <div className="mb-2 px-2 text-xs font-semibold text-gray-500">Filtrar por Agentes</div>
+                                <ScrollArea className="h-[200px]">
+                                    {availableAgents
+                                        .filter(a => agentTypeFilter === 'all' || a.type === agentTypeFilter)
+                                        .map(agent => (
+                                            <div key={agent.id} className="flex items-center space-x-2 p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md cursor-pointer"
+                                                onClick={(e) => {
+                                                    e.preventDefault();
+                                                    setSelectedAgentIds(prev =>
+                                                        prev.includes(agent.id) ? prev.filter(id => id !== agent.id) : [...prev, agent.id]
+                                                    );
+                                                }}
+                                            >
+                                                <input
+                                                    type="checkbox"
+                                                    checked={selectedAgentIds.includes(agent.id)}
+                                                    readOnly
+                                                    className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                                />
+                                                <span className="text-sm truncate">{agent.name}</span>
+                                                <Badge variant="secondary" className="text-[10px] ml-auto">
+                                                    {agent.type === 'inbound' ? 'In' : 'Out'}
+                                                </Badge>
+                                            </div>
+                                        ))}
+                                    {availableAgents.length === 0 && <div className="text-sm text-gray-400 p-2">No hay agentes</div>}
+                                </ScrollArea>
+                                {selectedAgentIds.length > 0 && (
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="w-full mt-2 text-xs h-7"
+                                        onClick={() => setSelectedAgentIds([])}
+                                    >
+                                        Limpiar Selección
+                                    </Button>
+                                )}
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+                    )}
 
                     {/* Campaign Filter */}
                     <Select value={selectedCampaignId} onValueChange={setSelectedCampaignId}>

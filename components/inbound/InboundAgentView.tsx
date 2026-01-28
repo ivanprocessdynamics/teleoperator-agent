@@ -4,8 +4,10 @@ import { useState, useEffect } from "react";
 import { doc, updateDoc, onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { FlaskConical, BarChart3, History, Settings2 } from "lucide-react";
+import { FlaskConical, BarChart3, History, Settings2, Mic } from "lucide-react";
 import { TestingEnvironment } from "@/components/TestingEnvironment";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { CallHistoryTable } from "@/components/calls/CallHistoryTable";
 import { StatsDashboard } from "@/components/stats/StatsDashboard";
 import { CampaignPrompt } from "@/components/campaigns/CampaignPrompt";
@@ -82,9 +84,22 @@ export function InboundAgentView({ subworkspaceId, agentId }: InboundAgentViewPr
 
                 {/* CONFIGURATION TAB */}
                 <TabsContent value="config" forceMount className="mt-6 data-[state=inactive]:hidden">
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-[calc(100vh-200px)]">
+                    <div className="flex flex-col gap-6 pb-20">
+                        <div className="flex justify-end">
+                            <Dialog>
+                                <DialogTrigger asChild>
+                                    <Button className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:from-blue-700 hover:to-indigo-700 shadow-md">
+                                        <Mic className="mr-2 h-4 w-4" /> Probar Agente
+                                    </Button>
+                                </DialogTrigger>
+                                <DialogContent className="max-w-4xl h-[80vh] p-0 overflow-hidden bg-gray-50 dark:bg-gray-900 border-gray-200 dark:border-gray-800">
+                                    <TestingEnvironment subworkspaceId={subworkspaceId} />
+                                </DialogContent>
+                            </Dialog>
+                        </div>
+
                         {/* Prompt Editor */}
-                        <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-800 flex flex-col overflow-hidden">
+                        <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-800 flex flex-col overflow-hidden min-h-[500px]">
                             <div className="p-4 border-b border-gray-200 dark:border-gray-800">
                                 <h3 className="font-semibold text-gray-900 dark:text-white">Prompt del Agente</h3>
                             </div>

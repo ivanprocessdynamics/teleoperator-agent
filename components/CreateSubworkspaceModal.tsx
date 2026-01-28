@@ -214,7 +214,11 @@ export function CreateSubworkspaceModal({ workspaceId, children }: CreateSubwork
                                             COLORS.find(c => c.name === selectedColor)?.class
                                         )}
                                     >
-                                        <Mic className="h-5 w-5" />
+                                        {agentType === 'inbound' ? (
+                                            <PhoneIncoming className="h-5 w-5" />
+                                        ) : (
+                                            <Mic className="h-5 w-5" />
+                                        )}
                                     </div>
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent className="p-2 w-auto bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 shadow-xl" align="start">
