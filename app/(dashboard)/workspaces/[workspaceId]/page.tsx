@@ -6,7 +6,7 @@ import { collection, query, where, getDocs, doc, getDoc, updateDoc, deleteDoc } 
 import { db } from "@/lib/firebase";
 import { CreateSubworkspaceModal } from "@/components/CreateSubworkspaceModal";
 import { Button } from "@/components/ui/button";
-import { Mic, Users, ArrowRight, Pencil, Check, X, Trash2 } from "lucide-react";
+import { Mic, Users, ArrowRight, Pencil, Check, X, Trash2, PhoneIncoming } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import Link from "next/link";
 import { SkeletonPage } from "@/components/ui/skeleton";
@@ -23,6 +23,7 @@ interface Subworkspace {
     workspace_id: string;
     color?: string;
     retell_agent_id?: string;
+    type?: string;
 }
 
 const COLORS = [
@@ -208,7 +209,11 @@ export default function WorkspacePage() {
                                             )}
                                             onClick={(e) => e.stopPropagation()}
                                         >
-                                            <Mic className="h-6 w-6" />
+                                            {sub.type === 'inbound' ? (
+                                                <PhoneIncoming className="h-6 w-6" />
+                                            ) : (
+                                                <Mic className="h-6 w-6" />
+                                            )}
                                         </div>
                                     </DropdownMenuTrigger>
                                     <DropdownMenuContent className="p-2 w-auto bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 shadow-xl" align="start">

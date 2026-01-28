@@ -868,7 +868,7 @@ export function StatsDashboard(props: StatsDashboardProps) {
                                                 <Trash2 className="h-3.5 w-3.5" />
                                             </Button>
                                         </div>
-                                        <div className="border-b border-gray-50 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900/50 px-5 py-3 flex justify-between items-center">
+                                        <div className="border-b border-gray-50 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900/50 px-5 py-3 flex justify-between items-center pr-20">
                                             <div>
                                                 <div className="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-0.5 flex items-center gap-1.5">
                                                     {name.replace(/_/g, ' ')}
