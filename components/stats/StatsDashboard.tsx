@@ -906,7 +906,7 @@ export function StatsDashboard(props: StatsDashboardProps) {
                         </DialogDescription>
                     </DialogHeader>
 
-                    <ScrollArea className="flex-1 bg-gray-50/50 dark:bg-gray-900/50 p-6">
+                    <div className="flex-1 overflow-y-auto bg-gray-50/50 dark:bg-gray-900/50 p-6">
                         <div className="space-y-3">
                             {viewingMetric && (() => {
                                 // Extract and filter calls that have this metric
@@ -971,7 +971,7 @@ export function StatsDashboard(props: StatsDashboardProps) {
                                 });
                             })()}
                         </div>
-                    </ScrollArea>
+                    </div>
                     <DialogFooter className="p-4 border-t border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 shrink-0">
                         <Button variant="outline" onClick={() => setViewingMetric(null)}>Cerrar</Button>
                     </DialogFooter>
@@ -1026,13 +1026,7 @@ export function StatsDashboard(props: StatsDashboardProps) {
                                     ¡Cuidado! Si cambias esto, asegúrate que las nuevas llamadas usen este nombre exacto.
                                 </p>
                             </div>
-                            <div className="space-y-2">
-                                <Label>Descripción</Label>
-                                <Input
-                                    value={metricToEdit.description}
-                                    onChange={(e) => setMetricToEdit({ ...metricToEdit, description: e.target.value })}
-                                />
-                            </div>
+                            {/* Description removed as per request */}
                             <div className="space-y-2">
                                 <Label>Tipo de Dato</Label>
                                 <Select
