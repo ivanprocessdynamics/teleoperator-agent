@@ -9,6 +9,9 @@ import { cn } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface CampaignPromptProps {
+    campaignId: string;
+    subworkspaceId: string;
+    isAgentLevel?: boolean;
     prompt: string;
     columns: CampaignColumn[];
     onChange: (newPrompt: string) => void;
@@ -17,7 +20,7 @@ interface CampaignPromptProps {
     variableClass?: string;
 }
 
-export function CampaignPrompt({ prompt, columns, onChange, onImmediateChange, onSyncAgent, variableClass }: CampaignPromptProps) {
+export function CampaignPrompt({ campaignId, subworkspaceId, isAgentLevel = false, prompt, columns, onChange, onImmediateChange, onSyncAgent, variableClass }: CampaignPromptProps) {
     const [localPrompt, setLocalPrompt] = useState(prompt);
     const [isFocused, setIsFocused] = useState(false);
     const [isSyncing, setIsSyncing] = useState(false);

@@ -24,8 +24,12 @@ import {
     RefreshCw,
     Filter,
     User,
+    Users,
     Megaphone
 } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, DropdownMenuItem } from "@/components/ui/dropdown-menu";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import { formatDistanceToNow } from "date-fns";
 import { es } from "date-fns/locale";
@@ -157,18 +161,6 @@ export function CallHistoryTable({ agentId: initialAgentId }: CallHistoryTablePr
         const unsub = onSnapshot(q, (snapshot) => {
             const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as CallRecord));
             setCalls(data);
-
-            // Extract unique campaigns for filter
-            // Check both agent_id and metadata.campaign_id
-            const cIds = Array.from(new Set(data.map(c => {
-                // If we have a mapped title for the agent_id, use that ID (or the agent_id itself)
-                // We prefer metadata.campaign_id, then agent_id
-                const candidateId = c.metadata?.campaign_id || c.agent_id;
-                // Filter out if it's not a valid ID or if it maps to "Unknown" (optional, but requested)
-                return candidateId;
-            }).filter(id => id && id !== "undefined" && id !== "null"))) as string[];
-            setUniqueCampaignIds(cIds);
-
             setLoading(false);
         }, (err) => {
             console.error("Error fetching calls:", err);
@@ -177,13 +169,48 @@ export function CallHistoryTable({ agentId: initialAgentId }: CallHistoryTablePr
         });
 
         return () => unsub();
-    }, [interval, pickerStart, pickerEnd, refreshTrigger]);
+    }, [interval, pickerStart, pickerEnd, refreshTrigger, initialAgentId]);
+
+    // NEW STATE FOR FILTERS
+    const [agentTypeFilter, setAgentTypeFilter] = useState<'all' | 'inbound' | 'outbound'>('all');
+    const [selectedAgentIds, setSelectedAgentIds] = useState<string[]>([]);
+    const [availableAgents, setAvailableAgents] = useState<{ id: string, name: string, type: string }[]>([]);
+    const [agentMap, setAgentMap] = useState<Record<string, { name: string, type: string }>>({});
+
+    // Fetch Agent Info for Filtering
+    useEffect(() => {
+        const unsub = onSnapshot(collection(db, "subworkspaces"), (snap) => {
+            const list: { id: string, name: string, type: string }[] = [];
+            const map: Record<string, { name: string, type: string }> = {};
+            snap.docs.forEach(d => {
+                const data = d.data();
+                if (data.retell_agent_id) {
+                    const info = {
+                        id: data.retell_agent_id,
+                        name: data.name || "Agente",
+                        type: data.type || 'outbound'
+                    };
+                    list.push(info);
+                    map[data.retell_agent_id] = info;
+                }
+            });
+            setAvailableAgents(list);
+            setAgentMap(map);
+        });
+        return () => unsub();
+    }, []);
+
+    // Derived Campaign IDs
+    useEffect(() => {
+        const cIds = Array.from(new Set(filteredCalls.map(c => c.metadata?.campaign_id || c.agent_id).filter(Boolean))) as string[];
+        setUniqueCampaignIds(cIds);
+    }, [filteredCalls]);
 
     // Client-side Filtering
     useEffect(() => {
         let result = calls;
 
-        // Filter by Campaign ID (matches agent_id or campaign_id)
+        // 1. Campaign Filter
         if (selectedCampaignId === "testing") {
             result = result.filter(c => c.metadata?.type === 'testing' || (!c.metadata?.campaign_id && !campaignMap[c.agent_id]));
         } else if (selectedCampaignId !== "all") {
@@ -193,10 +220,22 @@ export function CallHistoryTable({ agentId: initialAgentId }: CallHistoryTablePr
             );
         }
 
-        // Removed separate Source Filter logic as it is now merged
+        // 2. Type Filter
+        if (agentTypeFilter !== 'all') {
+            result = result.filter(c => {
+                const info = agentMap[c.agent_id];
+                const type = info?.type || 'outbound';
+                return type === agentTypeFilter;
+            });
+        }
+
+        // 3. Multi-Agent Filter
+        if (selectedAgentIds.length > 0) {
+            result = result.filter(c => selectedAgentIds.includes(c.agent_id));
+        }
 
         setFilteredCalls(result);
-    }, [calls, selectedCampaignId, campaignMap]);
+    }, [calls, selectedCampaignId, campaignMap, agentTypeFilter, selectedAgentIds, agentMap]);
 
     const [expandedSummaries, setExpandedSummaries] = useState<Set<string>>(new Set());
 
@@ -247,6 +286,70 @@ export function CallHistoryTable({ agentId: initialAgentId }: CallHistoryTablePr
 
                 <div className="flex flex-wrap items-center gap-3">
 
+
+                    {/* Type Filter */}
+                    <Select value={agentTypeFilter} onValueChange={(v: any) => setAgentTypeFilter(v)}>
+                        <SelectTrigger className="w-[140px] h-9 bg-white dark:bg-gray-950 border-gray-200 dark:border-gray-800">
+                            <div className="flex items-center gap-2">
+                                <Filter className="h-3.5 w-3.5 text-gray-400" />
+                                <SelectValue />
+                            </div>
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all">Todo</SelectItem>
+                            <SelectItem value="outbound">Salientes</SelectItem>
+                            <SelectItem value="inbound">Entrantes</SelectItem>
+                        </SelectContent>
+                    </Select>
+
+                    {/* Multi-select Agents */}
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button variant="outline" className="h-9 bg-white dark:bg-gray-950 border-dashed border-gray-200 dark:border-gray-800 text-sm font-normal">
+                                <Users className="h-4 w-4 mr-2" />
+                                {selectedAgentIds.length > 0 ? `${selectedAgentIds.length} Agentes` : "Agentes"}
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent className="w-56 p-2 bg-white dark:bg-gray-800" align="start">
+                            <div className="mb-2 px-2 text-xs font-semibold text-gray-500">Filtrar por Agentes</div>
+                            <ScrollArea className="h-[200px]">
+                                {availableAgents
+                                    .filter(a => agentTypeFilter === 'all' || a.type === agentTypeFilter)
+                                    .map(agent => (
+                                        <div key={agent.id} className="flex items-center space-x-2 p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md cursor-pointer"
+                                            onClick={(e) => {
+                                                e.preventDefault();
+                                                setSelectedAgentIds(prev =>
+                                                    prev.includes(agent.id) ? prev.filter(id => id !== agent.id) : [...prev, agent.id]
+                                                );
+                                            }}
+                                        >
+                                            <input
+                                                type="checkbox"
+                                                checked={selectedAgentIds.includes(agent.id)}
+                                                readOnly
+                                                className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                            />
+                                            <span className="text-sm truncate">{agent.name}</span>
+                                            <Badge variant="secondary" className="text-[10px] ml-auto">
+                                                {agent.type === 'inbound' ? 'In' : 'Out'}
+                                            </Badge>
+                                        </div>
+                                    ))}
+                                {availableAgents.length === 0 && <div className="text-sm text-gray-400 p-2">No hay agentes</div>}
+                            </ScrollArea>
+                            {selectedAgentIds.length > 0 && (
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="w-full mt-2 text-xs h-7"
+                                    onClick={() => setSelectedAgentIds([])}
+                                >
+                                    Limpiar Selección
+                                </Button>
+                            )}
+                        </DropdownMenuContent>
+                    </DropdownMenu>
 
                     {/* Campaign Filter */}
                     <Select value={selectedCampaignId} onValueChange={setSelectedCampaignId}>

@@ -16,6 +16,8 @@ import { CallHistoryTable } from "@/components/calls/CallHistoryTable";
 import { StatsDashboard } from "@/components/stats/StatsDashboard";
 import { BarChart3 } from "lucide-react";
 
+import { InboundAgentView } from "@/components/inbound/InboundAgentView";
+
 export default function SubworkspacePage() {
     const params = useParams();
     const router = useRouter();
@@ -27,6 +29,7 @@ export default function SubworkspacePage() {
 
     const [subName, setSubName] = useState("");
     const [agentId, setAgentId] = useState<string | null>(null);
+    const [agentType, setAgentType] = useState<'outbound' | 'inbound'>('outbound');
     const [isEditing, setIsEditing] = useState(false);
     const [activeTab, setActiveTab] = useState(initialTab);
     const selectedCampaignId = searchParams.get("campaignId");
@@ -100,6 +103,7 @@ export default function SubworkspacePage() {
                     const data = snap.data();
                     setSubName(data.name || "Nuevo Agente");
                     setAgentId(data.retell_agent_id || null);
+                    setAgentType(data.type || 'outbound');
                 }
             } catch (error) {
                 console.error("Error fetching subworkspace:", error);
@@ -152,6 +156,8 @@ export default function SubworkspacePage() {
                     subworkspaceId={subId}
                     onBack={handleCloseCampaign}
                 />
+            ) : agentType === 'inbound' ? (
+                <InboundAgentView subworkspaceId={subId} agentId={agentId} />
             ) : (
                 // Tabs containing Campaign List
                 <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">

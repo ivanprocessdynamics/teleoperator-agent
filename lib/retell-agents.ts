@@ -22,6 +22,15 @@ export const RETELL_AGENT_SLOTS: RetellAgentSlot[] = [
     { slot: 10, agentId: "agent_c23eba4ca9342855a408f0f694", name: "Agent Slot 10" },
 ];
 
+// 5 pre-configured Retell INBOUND agent slots
+export const RETELL_INBOUND_AGENT_SLOTS: RetellAgentSlot[] = [
+    { slot: 1, agentId: "agent_inbound_01", name: "Inbound Agent 1" },
+    { slot: 2, agentId: "agent_inbound_02", name: "Inbound Agent 2" },
+    { slot: 3, agentId: "agent_inbound_03", name: "Inbound Agent 3" },
+    { slot: 4, agentId: "agent_inbound_04", name: "Inbound Agent 4" },
+    { slot: 5, agentId: "agent_inbound_05", name: "Inbound Agent 5" },
+];
+
 // Helper function to get a slot by number
 export function getSlotByNumber(slotNumber: number): RetellAgentSlot | undefined {
     return RETELL_AGENT_SLOTS.find(s => s.slot === slotNumber);
