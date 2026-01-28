@@ -76,10 +76,9 @@ export function CreateSubworkspaceModal({ workspaceId, children }: CreateSubwork
             // Or does "slot 1" exist for both types?
             // Yes, slot 1 can exist for inbound AND outbound if they map to different actual agentIds.
 
-            // Let's check used slots for THIS specific type.
+            // Let's check used slots globally across ALL subworkspaces to avoid ID collision
             const allSubsSnap = await getDocs(collection(db, "subworkspaces"));
             const usedSlots = allSubsSnap.docs
-                .filter(doc => doc.data().type === agentType || (!doc.data().type && agentType === 'outbound')) // Default to outbound
                 .map(doc => doc.data().retell_slot)
                 .filter((slot): slot is number => typeof slot === 'number');
 

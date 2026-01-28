@@ -320,26 +320,25 @@ export function CampaignPrompt({ campaignId, subworkspaceId, isAgentLevel = fals
                     ) : null}
                 </div>
 
-                <div className="p-3 border-t border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-900/30">
-                    <p className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Variables Disponibles</p>
-                    <div className="flex flex-wrap gap-2 max-h-[100px] overflow-y-auto pr-2 custom-scrollbar">
-                        {columns.map(col => (
-                            <button
-                                key={col.id}
-                                onClick={() => insertVariable(col.key)}
-                                className={cn("inline-flex items-center px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors border shadow-sm active:scale-95 group",
-                                    variableClass || "bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-700 hover:text-blue-600 dark:hover:text-blue-400"
-                                )}
-                            >
-                                <Copy className="mr-1.5 h-3 w-3 opacity-50 group-hover:opacity-100" />
-                                {col.label} <span className="ml-1 opacity-50 font-mono group-hover:opacity-75">{'{{' + col.key + '}}'}</span>
-                            </button>
-                        ))}
-                        {columns.length === 0 && (
-                            <span className="text-xs text-gray-400 dark:text-gray-500 italic">Añade columnas en la tabla para ver variables aquí.</span>
-                        )}
+                {columns.length > 0 && (
+                    <div className="p-3 border-t border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-900/30">
+                        <p className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Variables Disponibles</p>
+                        <div className="flex flex-wrap gap-2 max-h-[100px] overflow-y-auto pr-2 custom-scrollbar">
+                            {columns.map(col => (
+                                <button
+                                    key={col.id}
+                                    onClick={() => insertVariable(col.key)}
+                                    className={cn("inline-flex items-center px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors border shadow-sm active:scale-95 group",
+                                        variableClass || "bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-700 hover:text-blue-600 dark:hover:text-blue-400"
+                                    )}
+                                >
+                                    <Copy className="mr-1.5 h-3 w-3 opacity-50 group-hover:opacity-100" />
+                                    {col.label} <span className="ml-1 opacity-50 font-mono group-hover:opacity-75">{'{{' + col.key + '}}'}</span>
+                                </button>
+                            ))}
+                        </div>
                     </div>
-                </div>
+                )}
             </div>
         </div>
     );

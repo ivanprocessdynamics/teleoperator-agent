@@ -44,11 +44,11 @@ export async function POST(req: Request) {
                 console.log("Updating LLM with new prompt...");
 
                 try {
-                    // CRITICAL FIX: Set LLM Prompt to use the dynamic variable {{campaign_prompt}}
-                    // This allows both Campaign Calls (hydrated client-side) and Test Calls (hydrated from draft)
-                    // to use the same Retell Agent configuration without overwriting each other.
+                    // CRITICAL FIX: Use the actual prompt provided by the client.
+                    // This allows Inbound Agents to have their specific instructions.
+                    // If dynamic behavior is needed, the client should send "{{campaign_prompt}}" as the prompt string.
                     const llmUpdateResult = await retell.llm.update(llmId, {
-                        general_prompt: "{{campaign_prompt}}"
+                        general_prompt: prompt
                     });
                     console.log("LLM update successful (configured for dynamic prompt):", llmUpdateResult.llm_id);
                     updates.prompt_updated = true;

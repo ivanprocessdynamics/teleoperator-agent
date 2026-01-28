@@ -101,6 +101,26 @@ export function InboundAgentView({ subworkspaceId, agentId }: InboundAgentViewPr
                                         onChange={(val) => handleSavePrompt(val)}
                                         onSyncAgent={async (val) => {
                                             await handleSavePrompt(val);
+                                            // Call API to update Retell
+                                            if (agentId) {
+                                                try {
+                                                    const response = await fetch("/api/retell/update-agent", {
+                                                        method: "POST",
+                                                        headers: { "Content-Type": "application/json" },
+                                                        body: JSON.stringify({
+                                                            agent_id: agentId,
+                                                            prompt: val
+                                                        }),
+                                                    });
+
+                                                    if (!response.ok) {
+                                                        throw new Error("Failed to update Retell agent");
+                                                    }
+                                                } catch (err) {
+                                                    console.error("Error syncing with Retell:", err);
+                                                    // Optionally show toast error
+                                                }
+                                            }
                                         }}
                                     />
                                 </div>
