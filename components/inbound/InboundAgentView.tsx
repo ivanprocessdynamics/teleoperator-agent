@@ -83,57 +83,50 @@ export function InboundAgentView({ subworkspaceId, agentId }: InboundAgentViewPr
                 </TabsList>
 
                 {/* CONFIGURATION TAB */}
-                <TabsContent value="config" forceMount className="mt-6 data-[state=inactive]:hidden">
-                    <div className="flex flex-col gap-6 pb-20">
-                        <div className="flex justify-end">
-                            <Dialog>
-                                <DialogTrigger asChild>
-                                    <Button className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:from-blue-700 hover:to-indigo-700 shadow-md">
-                                        <Mic className="mr-2 h-4 w-4" /> Probar Agente
-                                    </Button>
-                                </DialogTrigger>
-                                <DialogContent className="max-w-4xl h-[80vh] p-0 overflow-hidden bg-gray-50 dark:bg-gray-900 border-gray-200 dark:border-gray-800">
-                                    <TestingEnvironment subworkspaceId={subworkspaceId} />
-                                </DialogContent>
-                            </Dialog>
+                <TabsContent value="config" forceMount className="mt-6 data-[state=inactive]:hidden text-red-500">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-[calc(100vh-140px)]">
+                        {/* LEFT COLUMN: Prompt & Analysis */}
+                        <div className="flex flex-col gap-6 h-full overflow-hidden">
+                            {/* Prompt Editor */}
+                            <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-800 flex flex-col overflow-hidden h-1/2">
+                                <div className="p-4 border-b border-gray-200 dark:border-gray-800">
+                                    <h3 className="font-semibold text-gray-900 dark:text-white">Prompt del Agente</h3>
+                                </div>
+                                <div className="flex-1 overflow-y-auto p-4">
+                                    <CampaignPrompt
+                                        campaignId="agent_level"
+                                        subworkspaceId={subworkspaceId}
+                                        isAgentLevel={true}
+                                        prompt={promptData.prompt}
+                                        columns={[]}
+                                        onChange={(val) => handleSavePrompt(val)}
+                                        onSyncAgent={async (val) => {
+                                            await handleSavePrompt(val);
+                                        }}
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Analysis Configuration */}
+                            <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-800 flex flex-col overflow-hidden h-1/2">
+                                <div className="p-4 border-b border-gray-200 dark:border-gray-800">
+                                    <h3 className="font-semibold text-gray-900 dark:text-white">Análisis y Variables</h3>
+                                </div>
+                                <div className="flex-1 overflow-y-auto p-4">
+                                    <CampaignAnalysis
+                                        config={analysisConfig}
+                                        onChange={handleSaveAnalysis}
+                                        isCampaignMode={false}
+                                    />
+                                </div>
+                            </div>
                         </div>
 
-                        {/* Prompt Editor */}
-                        <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-800 flex flex-col overflow-hidden min-h-[500px]">
-                            <div className="p-4 border-b border-gray-200 dark:border-gray-800">
-                                <h3 className="font-semibold text-gray-900 dark:text-white">Prompt del Agente</h3>
-                            </div>
-                            <div className="flex-1 overflow-y-auto p-4">
-                                <CampaignPrompt
-                                    campaignId="agent_level" // Placeholder
-                                    subworkspaceId={subworkspaceId}
-                                    isAgentLevel={true}
-                                    prompt={promptData.prompt}
-                                    columns={[]} // No column variables for inbound usually, or maybe generic ones?
-                                    onChange={(val) => handleSavePrompt(val)}
-                                    onSyncAgent={async (val) => {
-                                        // Specific sync logic if needed, or just save
-                                        await handleSavePrompt(val);
-                                        // Verify if we need to call Retell api here?
-                                        // CampaignPrompt usually calls 'onSyncAgent' which triggers backend sync.
-                                        // We might need an API endpoint for syncing agent-level prompt if different.
-                                        // For now, save to firestore is primary.
-                                    }}
-                                />
-                            </div>
-                        </div>
-
-                        {/* Analysis Configuration */}
-                        <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-800 flex flex-col overflow-hidden">
-                            <div className="p-4 border-b border-gray-200 dark:border-gray-800">
-                                <h3 className="font-semibold text-gray-900 dark:text-white">Análisis y Variables</h3>
-                            </div>
-                            <div className="flex-1 overflow-y-auto p-4">
-                                <CampaignAnalysis
-                                    config={analysisConfig}
-                                    onChange={handleSaveAnalysis}
-                                    isCampaignMode={false} // Allows editing freely
-                                />
+                        {/* RIGHT COLUMN: Testing Environment */}
+                        <div className="h-full bg-gray-50 dark:bg-gray-900/50 rounded-2xl border border-gray-200 dark:border-gray-800 overflow-hidden flex flex-col relative">
+                            {/* We can wrap TestingEnvironment to ensure it fits nicely */}
+                            <div className="absolute inset-0">
+                                <TestingEnvironment subworkspaceId={subworkspaceId} />
                             </div>
                         </div>
                     </div>
