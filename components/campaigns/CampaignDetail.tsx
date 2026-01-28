@@ -797,28 +797,7 @@ export function CampaignDetail({ campaignId, subworkspaceId, onBack }: CampaignD
                                             <p className="text-[10px] text-gray-400 mt-1">Máximo de llamadas en paralelo (recomendado: 1-2)</p>
                                         </div>
 
-                                        {/* Retry Failed */}
-                                        <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                                            <div>
-                                                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Reintentar fallidas</span>
-                                                <p className="text-[10px] text-gray-400">Volver a llamar si no contestan</p>
-                                            </div>
-                                            <label className="relative inline-flex items-center cursor-pointer">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={campaign.calling_config?.retry_failed || false}
-                                                    onChange={(e) => {
-                                                        const newConfig: CallingConfig = {
-                                                            ...campaign.calling_config!,
-                                                            retry_failed: e.target.checked
-                                                        };
-                                                        debouncedSave({ calling_config: newConfig });
-                                                    }}
-                                                    className="sr-only peer"
-                                                />
-                                                <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
-                                            </label>
-                                        </div>
+
 
                                         {/* Country Selector */}
                                         <div className="pt-2 border-t border-gray-100 dark:border-gray-800">

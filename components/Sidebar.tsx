@@ -32,11 +32,7 @@ export function Sidebar() {
     }, []);
 
     const navItems = [
-        {
-            label: "Dashboard",
-            href: "/dashboard",
-            icon: LayoutDashboard,
-        },
+
         {
             label: "Workspaces",
             href: "/workspaces",

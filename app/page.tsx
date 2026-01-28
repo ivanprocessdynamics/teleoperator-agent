@@ -14,7 +14,7 @@ export default function Home() {
 
   useEffect(() => {
     if (!loading && user) {
-      router.push("/dashboard");
+      router.push("/global-stats");
     }
   }, [user, loading, router]);
 

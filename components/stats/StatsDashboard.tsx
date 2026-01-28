@@ -409,7 +409,10 @@ export function StatsDashboard(props: StatsDashboardProps) {
                         if (configField.type === 'boolean') {
                             if (c.value) entry.yes++; else entry.no++;
                         } else if (configField.type === 'number') {
-                            if (typeof c.value === 'number') entry.totalSum += c.value;
+                            const numValue = Number(c.value);
+                            if (!isNaN(numValue)) {
+                                entry.totalSum += numValue;
+                            }
                         }
                         // For string/enum, we just track values which is done above.
                         // Ensure type is set correctly
