@@ -6,10 +6,12 @@ import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, L
 import { db } from "@/lib/firebase";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { ChatTranscript } from "@/components/calls/ChatTranscript";
-import { Loader2, TrendingUp, Clock, Phone, ThumbsUp, Activity, RefreshCcw, EyeOff, Eye, Archive, Trash2, ArrowRight, MessageSquare, ExternalLink } from "lucide-react";
+import { Loader2, TrendingUp, Clock, Phone, ThumbsUp, Activity, RefreshCcw, EyeOff, Eye, Archive, Trash2, ArrowRight, MessageSquare, ExternalLink, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -56,7 +58,8 @@ function EnumPieChart({ data, name }: { data: any, name: string }) {
                             ))}
                         </Pie>
                         <RechartsTooltip
-                            formatter={(value: any) => [value, 'Respuestas']}
+                            // Recharts can pass undefined for value, so we must type it as any or number | undefined
+                            formatter={(value: any) => [value || 0, 'Respuestas']}
                             contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
                         />
                     </PieChart>
@@ -141,6 +144,9 @@ export function StatsDashboard(props: StatsDashboardProps) {
 
     // Delete Confirmation State
     const [metricToDelete, setMetricToDelete] = useState<{ id: string, name: string } | null>(null);
+
+    // Edit Metric State
+    const [metricToEdit, setMetricToEdit] = useState<{ id: string, name: string, description: string, type: string, originalName: string } | null>(null);
 
     // Interactive Details State
     const [viewingMetric, setViewingMetric] = useState<string | null>(null); // Name of the metric to view details
@@ -502,6 +508,39 @@ export function StatsDashboard(props: StatsDashboardProps) {
         }
     };
 
+    const handleSaveEdit = async () => {
+        if (!props.subworkspaceId || !metricToEdit) return;
+
+        let newFields = [...allFields];
+        const existingIndex = newFields.findIndex(f => f.id === metricToEdit.id);
+
+        const updatedField = {
+            id: metricToEdit.id,
+            name: metricToEdit.name,
+            description: metricToEdit.description,
+            type: metricToEdit.type,
+            isArchived: existingIndex >= 0 ? newFields[existingIndex].isArchived : false
+        };
+
+        if (existingIndex >= 0) {
+            newFields[existingIndex] = updatedField;
+        } else {
+            // If it was auto-discovered (not in fields yet), we add it
+            newFields.push(updatedField);
+        }
+
+        setAllFields(newFields); // Optimistic
+
+        try {
+            await updateDoc(doc(db, "subworkspaces", props.subworkspaceId), {
+                "analysis_config.custom_fields": newFields
+            });
+            setMetricToEdit(null);
+        } catch (e) {
+            console.error("Error saving metric", e);
+        }
+    };
+
     const formatDuration = (seconds: number) => {
         const mins = Math.floor(seconds / 60);
         const secs = Math.floor(seconds % 60);
@@ -688,7 +727,25 @@ export function StatsDashboard(props: StatsDashboardProps) {
                                     className="group relative overflow-hidden border-gray-100 dark:border-gray-800 shadow-sm hover:shadow-md transition-shadow bg-white dark:bg-gray-800 cursor-pointer"
                                     onClick={() => setViewingMetric(name)}
                                 >
-                                    <div className="absolute top-2 right-2 flex items-center gap-1 z-10 transition-opacity opacity-0 group-hover:opacity-100">
+                                    <div className="absolute top-2 right-2 flex items-center gap-1 z-10">
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setMetricToEdit({
+                                                    id: data.id,
+                                                    name: data.name,
+                                                    description: data.description || "",
+                                                    type: data.type,
+                                                    originalName: data.name
+                                                });
+                                            }}
+                                            className="h-6 w-6 text-gray-400 hover:text-blue-500 hover:bg-blue-50"
+                                            title="Editar"
+                                        >
+                                            <Pencil className="h-3.5 w-3.5" />
+                                        </Button>
                                         <Button
                                             variant="ghost"
                                             size="icon"
@@ -931,6 +988,61 @@ export function StatsDashboard(props: StatsDashboardProps) {
                 </DialogContent>
             </Dialog>
 
+            {/* Edit Metric Dialog */}
+            <Dialog open={!!metricToEdit} onOpenChange={(open) => !open && setMetricToEdit(null)}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Editar Métrica: {metricToEdit?.originalName}</DialogTitle>
+                        <DialogDescription>
+                            Modifica la configuración de esta métrica. Nota: Cambiar el nombre puede afectar la recolección de datos si el prompt no se actualiza (la IA usa el nombre como referencia).
+                        </DialogDescription>
+                    </DialogHeader>
+                    {metricToEdit && (
+                        <div className="space-y-4 py-4">
+                            <div className="space-y-2">
+                                <Label>Nombre (Clave)</Label>
+                                <Input
+                                    value={metricToEdit.name}
+                                    onChange={(e) => setMetricToEdit({ ...metricToEdit, name: e.target.value })}
+                                />
+                                <p className="text-xs text-yellow-600 dark:text-yellow-400">
+                                    ¡Cuidado! Si cambias esto, asegúrate que las nuevas llamadas usen este nombre exacto.
+                                </p>
+                            </div>
+                            <div className="space-y-2">
+                                <Label>Descripción</Label>
+                                <Input
+                                    value={metricToEdit.description}
+                                    onChange={(e) => setMetricToEdit({ ...metricToEdit, description: e.target.value })}
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <Label>Tipo de Dato</Label>
+                                <Select
+                                    value={metricToEdit.type}
+                                    onValueChange={(val) => setMetricToEdit({ ...metricToEdit, type: val })}
+                                >
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Selecciona un tipo" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="boolean">Booleano (Sí/No)</SelectItem>
+                                        <SelectItem value="number">Numérico</SelectItem>
+                                        <SelectItem value="string">Texto / Categoría</SelectItem>
+                                        <SelectItem value="enum">Enum (Gráfico Circular)</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        </div>
+                    )}
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setMetricToEdit(null)}>Cancelar</Button>
+                        <Button onClick={handleSaveEdit}>Guardar Cambios</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Existing Delete Dialog */}
             <Dialog open={!!metricToDelete} onOpenChange={(open) => !open && setMetricToDelete(null)}>
                 <DialogContent>
                     <DialogHeader>
