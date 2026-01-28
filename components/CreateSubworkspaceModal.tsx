@@ -83,8 +83,8 @@ export function CreateSubworkspaceModal({ workspaceId, children }: CreateSubwork
                 .map(doc => doc.data().retell_slot)
                 .filter((slot): slot is number => typeof slot === 'number');
 
-            // Select the pool based on type
-            const pool = agentType === 'outbound' ? RETELL_AGENT_SLOTS : RETELL_INBOUND_AGENT_SLOTS;
+            // Select the pool based on type (Now handling both types with the same pool of real IDs)
+            const pool = RETELL_AGENT_SLOTS;
             const maxSlots = pool.length;
 
             // Find next available slot

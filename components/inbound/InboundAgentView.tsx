@@ -65,12 +65,7 @@ export function InboundAgentView({ subworkspaceId, agentId }: InboundAgentViewPr
                     >
                         <Settings2 className="h-4 w-4" /> Configuración
                     </TabsTrigger>
-                    <TabsTrigger
-                        value="test"
-                        className="gap-2 text-gray-900 dark:text-gray-300 data-[state=active]:bg-white dark:data-[state=active]:bg-gray-700 data-[state=active]:text-gray-900 dark:data-[state=active]:text-white data-[state=active]:shadow-sm transition-all"
-                    >
-                        <FlaskConical className="h-4 w-4" /> Entorno de Pruebas
-                    </TabsTrigger>
+
                     <TabsTrigger
                         value="history"
                         className="gap-2 text-gray-900 dark:text-gray-300 data-[state=active]:bg-white dark:data-[state=active]:bg-gray-700 data-[state=active]:text-gray-900 dark:data-[state=active]:text-white data-[state=active]:shadow-sm transition-all"
@@ -129,10 +124,7 @@ export function InboundAgentView({ subworkspaceId, agentId }: InboundAgentViewPr
                     </div>
                 </TabsContent>
 
-                {/* TESTING TAB */}
-                <TabsContent value="test" forceMount className="mt-6 data-[state=inactive]:hidden">
-                    <TestingEnvironment subworkspaceId={subworkspaceId} />
-                </TabsContent>
+
 
                 {/* HISTORY TAB */}
                 <TabsContent value="history" forceMount className="mt-6 data-[state=inactive]:hidden">
