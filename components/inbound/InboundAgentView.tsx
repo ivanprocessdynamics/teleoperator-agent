@@ -126,7 +126,7 @@ export function InboundAgentView({ subworkspaceId, agentId }: InboundAgentViewPr
                         <div className="h-full bg-gray-50 dark:bg-gray-900/50 rounded-2xl border border-gray-200 dark:border-gray-800 overflow-hidden flex flex-col relative">
                             {/* We can wrap TestingEnvironment to ensure it fits nicely */}
                             <div className="absolute inset-0">
-                                <TestingEnvironment subworkspaceId={subworkspaceId} />
+                                <TestingEnvironment subworkspaceId={subworkspaceId} orbOnly={true} />
                             </div>
                         </div>
                     </div>
