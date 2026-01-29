@@ -137,6 +137,8 @@ export function WorkspaceSelector() {
     const handleSelectWorkspace = (workspace: Workspace) => {
         // Save to localStorage for other pages (global-stats, historial)
         localStorage.setItem("selectedWorkspaceId", workspace.id);
+        // Dispatch custom event for same-tab listeners (StorageEvent only fires cross-tab)
+        window.dispatchEvent(new CustomEvent("workspaceChanged", { detail: workspace.id }));
         router.push(`/workspaces/${workspace.id}`);
     };
 

@@ -13,14 +13,25 @@ export default function GlobalHistoryPage() {
             setCurrentWorkspaceId(storedWorkspaceId);
         }
 
-        // Listen for storage changes (when user switches workspace)
+        // Listen for storage changes (when user switches workspace in another tab)
         const handleStorageChange = (e: StorageEvent) => {
             if (e.key === "selectedWorkspaceId" && e.newValue) {
                 setCurrentWorkspaceId(e.newValue);
             }
         };
+
+        // Listen for custom event (when user switches workspace in same tab)
+        const handleWorkspaceChanged = (e: CustomEvent) => {
+            setCurrentWorkspaceId(e.detail);
+        };
+
         window.addEventListener("storage", handleStorageChange);
-        return () => window.removeEventListener("storage", handleStorageChange);
+        window.addEventListener("workspaceChanged", handleWorkspaceChanged as EventListener);
+
+        return () => {
+            window.removeEventListener("storage", handleStorageChange);
+            window.removeEventListener("workspaceChanged", handleWorkspaceChanged as EventListener);
+        };
     }, []);
 
     return (
