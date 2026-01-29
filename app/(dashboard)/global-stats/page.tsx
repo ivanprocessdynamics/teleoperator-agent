@@ -9,7 +9,13 @@ import { useAuth } from "@/contexts/AuthContext";
 export default function GlobalStatsPage() {
     const { userData } = useAuth();
     const [subworkspaceId, setSubworkspaceId] = useState<string>("");
-    const [currentWorkspaceId, setCurrentWorkspaceId] = useState<string>("");
+    const [currentWorkspaceId, setCurrentWorkspaceId] = useState<string>(() => {
+        // Initialize from localStorage if available to avoid race conditions
+        if (typeof window !== 'undefined') {
+            return localStorage.getItem("selectedWorkspaceId") || "";
+        }
+        return "";
+    });
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {

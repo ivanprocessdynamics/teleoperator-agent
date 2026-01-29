@@ -4,7 +4,12 @@ import { CallHistoryTable } from "@/components/calls/CallHistoryTable";
 import { useEffect, useState } from "react";
 
 export default function GlobalHistoryPage() {
-    const [currentWorkspaceId, setCurrentWorkspaceId] = useState<string>("");
+    const [currentWorkspaceId, setCurrentWorkspaceId] = useState<string>(() => {
+        if (typeof window !== 'undefined') {
+            return localStorage.getItem("selectedWorkspaceId") || "";
+        }
+        return "";
+    });
 
     useEffect(() => {
         // Check localStorage for selected workspace
