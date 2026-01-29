@@ -24,6 +24,7 @@ interface Subworkspace {
     color?: string;
     retell_agent_id?: string;
     type?: string;
+    phone_number?: string;
 }
 
 const COLORS = [
@@ -238,10 +239,19 @@ export default function WorkspacePage() {
 
                                 {/* Active status and Actions */}
                                 <div className="flex items-center gap-2">
-                                    <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800">
-                                        <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
-                                        <span className="text-xs font-medium text-green-700 dark:text-green-400">Activo</span>
-                                    </div>
+                                    {sub.type === 'inbound' && (
+                                        sub.phone_number ? (
+                                            <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800">
+                                                <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
+                                                <span className="text-xs font-medium text-green-700 dark:text-green-400">Activo</span>
+                                            </div>
+                                        ) : (
+                                            <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
+                                                <div className="h-2 w-2 rounded-full bg-gray-400" />
+                                                <span className="text-xs font-medium text-gray-600 dark:text-gray-400">Inactivo</span>
+                                            </div>
+                                        )
+                                    )}
                                     <Button
                                         variant="ghost"
                                         size="icon"
