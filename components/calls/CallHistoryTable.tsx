@@ -582,9 +582,7 @@ export function CallHistoryTable({ agentId: initialAgentId, subworkspaceId, work
                                 <TableHead className="w-[140px]">Campaña</TableHead>
                                 <TableHead className="w-[100px]">Duración</TableHead>
                                 <TableHead className="w-[140px]">Sentimiento</TableHead>
-                                {customFields.map(f => (
-                                    <TableHead key={f.id} className="whitespace-nowrap">{f.name}</TableHead>
-                                ))}
+                                {/* Custom Fields Columns Removed */}
                                 <TableHead>Resumen de la Conversación</TableHead>
                                 <TableHead className="text-right w-[120px]">Acciones</TableHead>
                             </TableRow>
@@ -639,21 +637,7 @@ export function CallHistoryTable({ agentId: initialAgentId, subworkspaceId, work
                                                 {sentiment.label}
                                             </div>
                                         </TableCell>
-                                        {customFields.map(f => {
-                                            const customData = Array.isArray(call.analysis?.custom_analysis_data) ? call.analysis?.custom_analysis_data : [];
-                                            const item = customData.find((d: any) =>
-                                                d.name === f.name ||
-                                                d.name === f.description ||
-                                                d.name.toLowerCase() === f.name.toLowerCase()
-                                            ); // Improved matching logic
-                                            return (
-                                                <TableCell key={f.id}>
-                                                    <span className="text-sm text-gray-700 dark:text-gray-300">
-                                                        {item ? String(item.value) : "-"}
-                                                    </span>
-                                                </TableCell>
-                                            );
-                                        })}
+                                        {/* Custom Fields Columns Removed */}
                                         <TableCell>
                                             <div className="max-w-md">
                                                 <div
@@ -693,24 +677,37 @@ export function CallHistoryTable({ agentId: initialAgentId, subworkspaceId, work
                                                         );
                                                     })()}
                                                 </div>
-                                                {(() => {
-                                                    const customData = call.analysis?.custom_analysis_data;
+                                                    // Render badges for all custom fields found in the data
+                                                const customData = call.analysis?.custom_analysis_data;
                                                     if (Array.isArray(customData) && customData.length > 0) {
-                                                        return (
-                                                            <div className="flex gap-2 mt-2 flex-wrap">
-                                                                {customData
-                                                                    .filter(d => d.name !== "resumen_espanol")
-                                                                    .map((d, i) => (
-                                                                        <span key={i} className="inline-flex items-center text-[11px] bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300 px-2 py-1 rounded-md border border-purple-100 dark:border-purple-800/50 font-medium shadow-sm">
-                                                                            <span className="opacity-70 mr-1 uppercase text-[9px] tracking-wider">{d.name}:</span>
-                                                                            <span>{String(d.value)}</span>
-                                                                        </span>
-                                                                    ))}
-                                                            </div>
-                                                        );
+                                                        const visibleMetrics = customData.filter((d: any) =>
+                                                // Filter out internal or summary text fields to only show "metrics"
+                                                d.name !== 'resumen_espanol' &&
+                                                d.name !== 'summary' &&
+                                                d.value !== null &&
+                                                d.value !== undefined &&
+                                                d.value !== ""
+                                                );
+
+                                                        if (visibleMetrics.length > 0) {
+                                                            return (
+                                                <div className="flex gap-2 mt-2 flex-wrap">
+                                                    {visibleMetrics.map((d: any, i: number) => (
+                                                        <Badge
+                                                            key={i}
+                                                            variant="secondary"
+                                                            className="rounded-md font-medium text-[10px] px-1.5 py-0.5 bg-purple-50 text-purple-700 border border-purple-100 dark:bg-purple-900/20 dark:text-purple-300 dark:border-purple-800"
+                                                        >
+                                                            <span className="opacity-70 mr-1.5 uppercase tracking-wide font-bold">{d.name}:</span>
+                                                            <span className="truncate max-w-[200px]">{String(d.value)}</span>
+                                                        </Badge>
+                                                    ))}
+                                                </div>
+                                                );
+                                                        }
                                                     }
-                                                    return null;
                                                 })()}
+
                                             </div>
                                         </TableCell>
                                         <TableCell className="text-right">
@@ -729,8 +726,9 @@ export function CallHistoryTable({ agentId: initialAgentId, subworkspaceId, work
                             })}
                         </TableBody>
                     </Table>
-                </div>
-            )}
+                </div >
+            )
+            }
 
             <Dialog open={!!selectedCall} onOpenChange={(open) => !open && setSelectedCall(null)}>
                 <DialogContent className="max-w-2xl h-[85vh] flex flex-col p-0 gap-0 overflow-hidden rounded-2xl">
