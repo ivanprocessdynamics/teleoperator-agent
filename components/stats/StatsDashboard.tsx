@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { collection, query, where, getDocs, Timestamp, orderBy, doc, getDoc, updateDoc, onSnapshot } from "firebase/firestore";
+import { collection, query, where, getDocs, Timestamp, orderBy, doc, getDoc, updateDoc, onSnapshot, collectionGroup } from "firebase/firestore";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, Legend } from "recharts";
 import { db } from "@/lib/firebase";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -113,6 +113,7 @@ interface StatsDashboardProps {
     agentId?: string;
     subworkspaceId?: string;
     workspaceId?: string; // Filter stats by specific workspace
+    showWorkspaceSelector?: boolean;
 }
 
 
@@ -142,6 +143,49 @@ export function StatsDashboard(props: StatsDashboardProps) {
     // Date Picker State
     const [pickerStart, setPickerStart] = useState<Date | null>(null);
     const [pickerEnd, setPickerEnd] = useState<Date | null>(null);
+
+    // Workspace Selector State
+    const [userWorkspaces, setUserWorkspaces] = useState<any[]>([]);
+
+    useEffect(() => {
+        if (!props.showWorkspaceSelector || !userData?.uid) return;
+
+        const fetchWorkspaces = async () => {
+            try {
+                // Fetch owned
+                const ownedQ = query(collection(db, "workspaces"), where("owner_uid", "==", userData.uid));
+                const ownedSnap = await getDocs(ownedQ);
+                let wsList = ownedSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+                // Fetch memberships
+                const memberQ = query(collectionGroup(db, "members"), where("uid", "==", userData.uid));
+                const memberSnap = await getDocs(memberQ);
+
+                for (const memDoc of memberSnap.docs) {
+                    const wsRef = memDoc.ref.parent.parent;
+                    if (wsRef) {
+                        const wsSnap = await getDoc(wsRef);
+                        if (wsSnap.exists()) {
+                            // Avoid duplicates
+                            if (!wsList.some(w => w.id === wsRef.id)) {
+                                wsList.push({ id: wsRef.id, ...wsSnap.data() });
+                            }
+                        }
+                    }
+                }
+                setUserWorkspaces(wsList);
+            } catch (e) {
+                console.error("Error fetching workspaces for selector", e);
+            }
+        };
+        fetchWorkspaces();
+    }, [props.showWorkspaceSelector, userData]);
+
+    const handleWorkspaceChange = (newId: string) => {
+        localStorage.setItem("selectedWorkspaceId", newId);
+        window.dispatchEvent(new CustomEvent("workspaceChanged", { detail: newId }));
+        // Note: Parent GlobalStatsPage listens to this and updates props.workspaceId
+    };
 
     // Derived UI State
     const [stats, setStats] = useState({
@@ -631,6 +675,22 @@ export function StatsDashboard(props: StatsDashboardProps) {
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Resumen de Rendimiento</h3>
 
                 <div className="flex flex-wrap items-center gap-2">
+                    {/* Workspace Selector (Global Mode) */}
+                    {props.showWorkspaceSelector && (
+                        <Select value={props.workspaceId} onValueChange={handleWorkspaceChange}>
+                            <SelectTrigger className="w-[200px] bg-white dark:bg-gray-800">
+                                <SelectValue placeholder="Seleccionar equipo" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {userWorkspaces.map(ws => (
+                                    <SelectItem key={ws.id} value={ws.id}>
+                                        {ws.name}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    )}
+
                     {/* Master Filter Dropdown */}
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
