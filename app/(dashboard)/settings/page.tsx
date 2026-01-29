@@ -3,8 +3,10 @@
 import { useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
-import { Loader2, Database, CheckCircle, AlertCircle } from "lucide-react";
+import { Loader2, Database, Users } from "lucide-react";
 import { toast } from "sonner";
+import { collection, getDocs, doc, setDoc, getDoc, serverTimestamp } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 
 export default function SettingsPage() {
     const { userData, user } = useAuth();
@@ -12,28 +14,73 @@ export default function SettingsPage() {
     const [migrationResult, setMigrationResult] = useState<string | null>(null);
 
     const handleMigrateWorkspaces = async () => {
-        if (!user?.uid) return;
+        if (!user?.uid || userData?.role !== 'superadmin') return;
 
         setMigrating(true);
         setMigrationResult(null);
 
         try {
-            const response = await fetch(
-                `/api/admin/migrate-workspace-members?superadminUid=${user.uid}&addSuperadmin=true`
-            );
-            const data = await response.json();
+            // Fetch all workspaces
+            const workspacesSnap = await getDocs(collection(db, "workspaces"));
+            let updatedCount = 0;
+            const details: string[] = [];
 
-            if (data.success) {
-                setMigrationResult(`✅ ${data.message}`);
-                toast.success("Migración completada");
+            for (const wsDoc of workspacesSnap.docs) {
+                const wsData = wsDoc.data();
+                const ownerUid = wsData.owner_uid;
+
+                // Add owner to members if not already there
+                if (ownerUid) {
+                    const ownerMemberRef = doc(db, "workspaces", wsDoc.id, "members", ownerUid);
+                    const ownerMemberSnap = await getDoc(ownerMemberRef);
+
+                    if (!ownerMemberSnap.exists()) {
+                        // Get owner's email
+                        const ownerUserSnap = await getDoc(doc(db, "users", ownerUid));
+                        const ownerEmail = ownerUserSnap.exists() ? ownerUserSnap.data().email : "unknown";
+
+                        await setDoc(ownerMemberRef, {
+                            uid: ownerUid,
+                            email: ownerEmail,
+                            role: "admin",
+                            joined_at: serverTimestamp(),
+                            migrated: true
+                        });
+                        details.push(`✓ ${wsData.name || wsDoc.id}: owner añadido`);
+                        updatedCount++;
+                    }
+                }
+
+                // Add superadmin to workspace if not already there
+                if (user.uid !== ownerUid) {
+                    const superadminMemberRef = doc(db, "workspaces", wsDoc.id, "members", user.uid);
+                    const superadminMemberSnap = await getDoc(superadminMemberRef);
+
+                    if (!superadminMemberSnap.exists()) {
+                        await setDoc(superadminMemberRef, {
+                            uid: user.uid,
+                            email: user.email,
+                            role: "admin",
+                            joined_at: serverTimestamp(),
+                            migrated: true
+                        });
+                        details.push(`✓ ${wsData.name || wsDoc.id}: superadmin añadido`);
+                        updatedCount++;
+                    }
+                }
+            }
+
+            if (updatedCount > 0) {
+                setMigrationResult(`✅ Migración completada. ${updatedCount} cambios realizados.\n\n${details.join('\n')}`);
+                toast.success(`Migración completada: ${updatedCount} cambios`);
             } else {
-                setMigrationResult(`❌ Error: ${data.error}`);
-                toast.error("Error en la migración");
+                setMigrationResult("✅ Todos los workspaces ya están correctamente configurados.");
+                toast.success("No se necesitaron cambios");
             }
         } catch (error) {
             console.error("Migration error:", error);
-            setMigrationResult("❌ Error de conexión");
-            toast.error("Error de conexión");
+            setMigrationResult(`❌ Error: ${String(error)}`);
+            toast.error("Error en la migración");
         } finally {
             setMigrating(false);
         }
@@ -60,11 +107,12 @@ export default function SettingsPage() {
 
                     <div className="space-y-4">
                         <div className="p-4 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-900/50">
-                            <h3 className="font-medium text-amber-800 dark:text-amber-200 mb-2">
+                            <h3 className="font-medium text-amber-800 dark:text-amber-200 mb-2 flex items-center gap-2">
+                                <Users className="h-4 w-4" />
                                 Migrar Miembros de Workspaces
                             </h3>
                             <p className="text-sm text-amber-700 dark:text-amber-300 mb-4">
-                                Añade a los propietarios de workspaces existentes como miembros en la subcolección.
+                                Añade a los propietarios de workspaces existentes como miembros.
                                 Esto es necesario para que aparezcan en el listado de equipos.
                             </p>
                             <Button
@@ -86,7 +134,7 @@ export default function SettingsPage() {
                             </Button>
 
                             {migrationResult && (
-                                <div className="mt-4 p-3 rounded bg-white dark:bg-gray-900 text-sm">
+                                <div className="mt-4 p-3 rounded bg-white dark:bg-gray-900 text-sm whitespace-pre-wrap font-mono text-xs">
                                     {migrationResult}
                                 </div>
                             )}
