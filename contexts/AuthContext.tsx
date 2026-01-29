@@ -57,6 +57,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 } else {
                     // Check for invite
                     let role: UserRole | null = null;
+                    let invitedWorkspaceId: string | undefined = undefined;
                     if (currentUser.email) {
                         try {
                             const inviteRef = doc(db, "invites", currentUser.email.toLowerCase());
@@ -65,7 +66,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                             if (inviteSnap.exists()) {
                                 const inviteData = inviteSnap.data();
                                 role = inviteData.role as UserRole;
-                                const invitedWorkspaceId = inviteData.workspaceId;
+                                invitedWorkspaceId = inviteData.workspaceId;
 
                                 // Mark invite as used/accepted
                                 await updateDoc(inviteRef, {
@@ -100,7 +101,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                             uid: currentUser.uid,
                             email: currentUser.email,
                             role: role,
-                            current_workspace_id: inviteSnap?.data()?.workspaceId || undefined
+                            current_workspace_id: invitedWorkspaceId
                         };
                         await setDoc(userRef, fetchedData);
                         setUserData(fetchedData);
