@@ -115,8 +115,11 @@ interface StatsDashboardProps {
 }
 
 
+import { useAuth } from "@/contexts/AuthContext";
+
 export function StatsDashboard(props: StatsDashboardProps) {
     const { agentId } = props;
+    const { userData } = useAuth(); // Access User Scope
     const [loading, setLoading] = useState(true);
 
     // Data State
@@ -156,47 +159,76 @@ export function StatsDashboard(props: StatsDashboardProps) {
 
     const [campaignMap, setCampaignMap] = useState<Record<string, string>>({});
     const [agentMap, setAgentMap] = useState<Record<string, { name: string, type: string }>>({});
+    const [allowedAgentIds, setAllowedAgentIds] = useState<Set<string>>(new Set());
 
-    // 1. Fetch Campaigns and Agents
+    // 1. Fetch Campaigns and Agents (Scoped to User)
     useEffect(() => {
-        const unsubAgents = onSnapshot(collection(db, "subworkspaces"), (agentSnap) => {
-            const map: Record<string, { name: string, type: string }> = {};
-            const list: { id: string, name: string, type: string }[] = [];
+        if (!userData?.uid) return;
 
-            agentSnap.docs.forEach(d => {
-                const ad = d.data();
-                if (ad.retell_agent_id) {
-                    const type = ad.type || 'outbound';
-                    map[ad.retell_agent_id] = { name: ad.name || "Agente sin nombre", type };
-                    list.push({ id: ad.retell_agent_id, name: ad.name || "Agente", type });
-                }
-            });
-            setAgentMap(map);
-            setAvailableAgents(list);
+        const fetchScopedData = async () => {
+            // 1. Get User's Workspaces
+            const wsQ = query(collection(db, "workspaces"), where("owner_uid", "==", userData.uid));
+            const wsSnap = await getDocs(wsQ);
+            const wsIds = wsSnap.docs.map(d => d.id);
 
-            // Fetch Campaigns
-            const unsubCampaigns = onSnapshot(collection(db, "campaigns"), (campSnap) => {
-                const cMap: Record<string, string> = {};
-                campSnap.docs.forEach(doc => {
-                    const data = doc.data();
-                    const campName = data.name || "Campaña sin nombre";
+            // If no workspaces, no agents to show
+            if (wsIds.length === 0) {
+                setAvailableAgents([]);
+                setAllowedAgentIds(new Set());
+                setAgentMap({});
+                return;
+            }
 
-                    // Logic to append Agent Name if needed
-                    let finalName = campName;
-                    const linkedAgentId = data.retell_agent_id || data.agent_id;
-                    if (!agentId && linkedAgentId && map[linkedAgentId]) {
-                        finalName = `${campName} (${map[linkedAgentId].name})`;
+            // 2. Listen to Subworkspaces (Agents) for these workspaces
+            const unsubAgents = onSnapshot(collection(db, "subworkspaces"), (agentSnap) => {
+                const map: Record<string, { name: string, type: string }> = {};
+                const list: { id: string, name: string, type: string }[] = [];
+                const allowed = new Set<string>();
+
+                agentSnap.docs.forEach(d => {
+                    const ad = d.data();
+                    // FILTER: Only include if workspace_id is in user's workspaces
+                    if (wsIds.includes(ad.workspace_id) && ad.retell_agent_id) {
+                        const type = ad.type || 'outbound';
+                        map[ad.retell_agent_id] = { name: ad.name || "Agente sin nombre", type };
+                        list.push({ id: ad.retell_agent_id, name: ad.name || "Agente", type });
+                        allowed.add(ad.retell_agent_id);
                     }
-
-                    cMap[doc.id] = finalName;
-                    if (data.vapi_agent_id) cMap[data.vapi_agent_id] = finalName;
                 });
-                setCampaignMap(cMap);
+                setAgentMap(map);
+                setAvailableAgents(list);
+                setAllowedAgentIds(allowed);
+
+                // Fetch Campaigns (Nested to have access to map)
+                // We fetch all but map names using local scoped agent map helps context.
+                const unsubCampaigns = onSnapshot(collection(db, "campaigns"), (campSnap) => {
+                    const cMap: Record<string, string> = {};
+                    campSnap.docs.forEach(doc => {
+                        const data = doc.data();
+                        const campName = data.name || "Campaña sin nombre";
+
+                        // Logic to append Agent Name if needed
+                        let finalName = campName;
+                        const linkedAgentId = data.retell_agent_id || data.agent_id;
+                        if (!agentId && linkedAgentId && map[linkedAgentId]) {
+                            finalName = `${campName} (${map[linkedAgentId].name})`;
+                        }
+
+                        cMap[doc.id] = finalName;
+                        if (data.vapi_agent_id) cMap[data.vapi_agent_id] = finalName;
+                    });
+                    setCampaignMap(cMap);
+                });
+
+                return () => unsubCampaigns();
             });
-            return () => unsubCampaigns();
-        });
-        return () => unsubAgents();
-    }, [agentId]);
+
+            return () => unsubAgents();
+        };
+
+        const cleanup = fetchScopedData();
+        return () => { cleanup.then(unsub => unsub && unsub()); };
+    }, [agentId, userData]);
 
     // 2. Fetch Data (Calls + Config)
     const fetchStats = async () => {
@@ -265,8 +297,14 @@ export function StatsDashboard(props: StatsDashboardProps) {
             const snapshot = await getDocs(q);
             let calls = snapshot.docs.map(doc => doc.data());
 
-            // Client-side cleanup only for testing residue if needed, generally we keep all
-            // We'll filter strictly in the useEffect
+            // SECURITY FILTER for Global Mode
+            if (!agentId) {
+                if (allowedAgentIds.size === 0) {
+                    calls = [];
+                } else {
+                    calls = calls.filter(c => allowedAgentIds.has(c.agent_id));
+                }
+            }
 
             setRawCalls(calls);
 
@@ -281,7 +319,7 @@ export function StatsDashboard(props: StatsDashboardProps) {
     useEffect(() => {
         if (period === "custom" && (!pickerStart || !pickerEnd)) return;
         fetchStats();
-    }, [agentId, period, props.subworkspaceId, pickerStart, pickerEnd]); // Removed selectedCampaigns from dependency to avoid refetch
+    }, [agentId, period, props.subworkspaceId, pickerStart, pickerEnd, allowedAgentIds]); // Added allowedAgentIds
 
     // 2.5 Extract Campaigns
     useEffect(() => {
