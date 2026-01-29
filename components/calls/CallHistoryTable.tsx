@@ -624,7 +624,8 @@ export function CallHistoryTable({ agentId: initialAgentId, workspaceId }: CallH
                                             </div>
                                         </TableCell>
                                         {customFields.map(f => {
-                                            const item = call.analysis?.custom_analysis_data?.find((d: any) => d.name === f.name || d.name === f.description); // Fallback logic
+                                            const customData = Array.isArray(call.analysis?.custom_analysis_data) ? call.analysis?.custom_analysis_data : [];
+                                            const item = customData.find((d: any) => d.name === f.name || d.name === f.description); // Fallback logic
                                             return (
                                                 <TableCell key={f.id}>
                                                     <span className="text-sm text-gray-700 dark:text-gray-300">
