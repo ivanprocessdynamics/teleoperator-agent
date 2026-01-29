@@ -19,6 +19,7 @@ import {
     History,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { WorkspaceSelector } from "@/components/WorkspaceSelector";
 
 export function Sidebar() {
     const pathname = usePathname();
@@ -86,7 +87,10 @@ export function Sidebar() {
 
             <div className="flex-1 overflow-auto py-4">
                 <nav className="grid gap-1 px-2 text-gray-500 dark:text-gray-400 font-medium">
-                    {navItems.map((item, index) => {
+                    {/* Workspace Selector - replaces static link */}
+                    <WorkspaceSelector />
+
+                    {navItems.filter(item => item.label !== "Workspaces").map((item, index) => {
                         const isActive = pathname === item.href;
                         return (
                             <Link
@@ -98,12 +102,11 @@ export function Sidebar() {
                                 )}
                             >
                                 <item.icon className="h-4 w-4" />
-                                {item.label === "Workspaces" ? "Workspaces" :
-                                    item.label === "Team" ? "Equipo" :
-                                        item.label === "Settings" ? "Configuración" :
-                                            item.label === "Global Stats" ? "Estadísticas Globales" :
-                                                item.label === "Global History" ? "Historial Global" :
-                                                    item.label}
+                                {item.label === "Team" ? "Equipo" :
+                                    item.label === "Settings" ? "Configuración" :
+                                        item.label === "Global Stats" ? "Estadísticas Globales" :
+                                            item.label === "Global History" ? "Historial Global" :
+                                                item.label}
                             </Link>
                         );
                     })}
