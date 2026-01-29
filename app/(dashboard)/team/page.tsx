@@ -32,14 +32,8 @@ export default function TeamPage() {
     const router = useRouter();
 
     useEffect(() => {
-        // Simple protection
+        // Simple protection - Allow any role to VIEW
         if (!userData) return;
-
-        if (userData.role !== 'superadmin') {
-            router.push("/");
-            return;
-        }
-
         fetchUsers();
     }, [userData, router]);
 
@@ -88,6 +82,8 @@ export default function TeamPage() {
         router.push("/"); // Redirect to dashboard to see their view
     };
 
+    // ... handles ...
+
     if (loading) {
         return (
             <div className="flex h-full items-center justify-center">
@@ -96,9 +92,9 @@ export default function TeamPage() {
         );
     }
 
-    if (!userData || (userData.role !== 'superadmin' && userData.role !== 'admin')) {
-        return null;
-    }
+    if (!userData) return null;
+
+    const canInvite = userData.role === 'superadmin' || userData.role === 'admin';
 
     return (
         <div className="space-y-6">
@@ -109,7 +105,7 @@ export default function TeamPage() {
                         Gestiona los usuarios y accesos de la plataforma.
                     </p>
                 </div>
-                <InviteUserModal />
+                {canInvite && <InviteUserModal />}
             </div>
 
             <div className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 overflow-hidden shadow-sm">
@@ -152,33 +148,37 @@ export default function TeamPage() {
                                     </Badge>
                                 </TableCell>
                                 <TableCell className="text-right">
-                                    <DropdownMenu>
-                                        <DropdownMenuTrigger asChild>
-                                            <Button variant="ghost" size="icon" className="h-8 w-8">
-                                                <MoreVertical className="h-4 w-4" />
-                                            </Button>
-                                        </DropdownMenuTrigger>
-                                        <DropdownMenuContent align="end">
-                                            {userData.role === 'superadmin' && u.role !== 'superadmin' && (
-                                                <>
+                                    {(userData.role === 'superadmin' || (userData.role === 'admin' && u.role === 'visitor')) && (
+                                        <DropdownMenu>
+                                            <DropdownMenuTrigger asChild>
+                                                <Button variant="ghost" size="icon" className="h-8 w-8">
+                                                    <MoreVertical className="h-4 w-4" />
+                                                </Button>
+                                            </DropdownMenuTrigger>
+                                            <DropdownMenuContent align="end">
+                                                {/* Super Admin specific actions */}
+                                                {userData.role === 'superadmin' && u.role !== 'superadmin' && (
                                                     <DropdownMenuItem onClick={() => handleImpersonate(u)}>
                                                         <LogIn className="mr-2 h-4 w-4" />
                                                         Suplantar Identidad
                                                     </DropdownMenuItem>
-                                                    <DropdownMenuItem onClick={() => handleRoleChange(u.uid, u.role === 'admin' ? 'visitor' : 'admin')}>
-                                                        <Shield className="mr-2 h-4 w-4" />
-                                                        {u.role === 'admin' ? 'Hacer Visitante' : 'Hacer Admin'}
-                                                    </DropdownMenuItem>
-                                                </>
-                                            )}
-                                            {u.role === 'superadmin' && (
-                                                <DropdownMenuItem disabled>
-                                                    <Shield className="mr-2 h-4 w-4" />
-                                                    Super Admin
-                                                </DropdownMenuItem>
-                                            )}
-                                        </DropdownMenuContent>
-                                    </DropdownMenu>
+                                                )}
+
+                                                {/* Role Management */}
+                                                {(userData.role === 'superadmin' || (userData.role === 'admin' && u.role === 'visitor')) && u.uid !== userData.uid && (
+                                                    <>
+                                                        {/* Prevent modifying Super Admins */}
+                                                        {u.role !== 'superadmin' && (
+                                                            <DropdownMenuItem onClick={() => handleRoleChange(u.uid, u.role === 'admin' ? 'visitor' : 'admin')}>
+                                                                <Shield className="mr-2 h-4 w-4" />
+                                                                {u.role === 'admin' ? 'Hacer Visitante' : 'Hacer Admin'}
+                                                            </DropdownMenuItem>
+                                                        )}
+                                                    </>
+                                                )}
+                                            </DropdownMenuContent>
+                                        </DropdownMenu>
+                                    )}
                                 </TableCell>
                             </TableRow>
                         ))}

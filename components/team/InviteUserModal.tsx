@@ -1,5 +1,6 @@
 "use client";
 
+import { useAuth } from "@/contexts/AuthContext";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -26,19 +27,33 @@ import { db } from "@/lib/firebase";
 import { toast } from "sonner";
 
 export function InviteUserModal() {
+    const { userData } = useAuth();
     const [open, setOpen] = useState(false);
     const [email, setEmail] = useState("");
-    const [role, setRole] = useState<"admin" | "visitor">("admin");
+
+    // Default to 'visitor'
+    const [role, setRole] = useState<"admin" | "visitor">("visitor");
     const [loading, setLoading] = useState(false);
+
+    const handleOpenChange = (open: boolean) => {
+        setOpen(open);
+        if (!open) {
+            setEmail("");
+            setRole("visitor");
+        } else {
+            // Reset to visitor when opening to be safe
+            setRole("visitor");
+        }
+    };
 
     const handleInvite = async () => {
         if (!email.trim()) return;
         setLoading(true);
         try {
-            // Create an invite document keyed by email
             await setDoc(doc(db, "invites", email.toLowerCase().trim()), {
                 email: email.toLowerCase().trim(),
                 role,
+                authorUid: userData?.uid,
                 createdAt: new Date(),
                 status: 'pending'
             });
@@ -46,7 +61,7 @@ export function InviteUserModal() {
             toast.success(`Invitación creada para ${email}`);
             setOpen(false);
             setEmail("");
-            setRole("admin");
+            setRole("visitor");
         } catch (error) {
             console.error("Error creating invite:", error);
             toast.error("Error al crear la invitación");
@@ -56,7 +71,7 @@ export function InviteUserModal() {
     };
 
     return (
-        <Dialog open={open} onOpenChange={setOpen}>
+        <Dialog open={open} onOpenChange={handleOpenChange}>
             <DialogTrigger asChild>
                 <Button>
                     <Mail className="mr-2 h-4 w-4" />
@@ -87,7 +102,9 @@ export function InviteUserModal() {
                                 <SelectValue placeholder="Selecciona un rol" />
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="admin">Administrador</SelectItem>
+                                {userData?.role === 'superadmin' && (
+                                    <SelectItem value="admin">Administrador</SelectItem>
+                                )}
                                 <SelectItem value="visitor">Visitante</SelectItem>
                             </SelectContent>
                         </Select>

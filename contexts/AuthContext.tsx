@@ -56,7 +56,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                     fetchedData = userSnap.data() as UserData;
                 } else {
                     // Check for invite
-                    let role: UserRole = "visitor";
+                    let role: UserRole | null = null;
                     if (currentUser.email) {
                         try {
                             const inviteRef = doc(db, "invites", currentUser.email.toLowerCase());
@@ -76,23 +76,46 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                         }
                     }
 
-                    // New user creation
-                    fetchedData = {
-                        uid: currentUser.uid,
-                        email: currentUser.email,
-                        role: role,
-                    };
-                    await setDoc(userRef, fetchedData);
+                    // STRICT WHITELIST CHECK
+                    if (role) {
+                        // User was invited, create account
+                        fetchedData = {
+                            uid: currentUser.uid,
+                            email: currentUser.email,
+                            role: role,
+                        };
+                        await setDoc(userRef, fetchedData);
+                        setUserData(fetchedData);
+                    } else if (currentUser.email === SUPER_ADMIN_EMAIL) {
+                        // Exception for hardcoded Super Admin
+                        fetchedData = {
+                            uid: currentUser.uid,
+                            email: currentUser.email,
+                            role: 'superadmin',
+                        };
+                        await setDoc(userRef, fetchedData);
+                        setUserData(fetchedData);
+                    } else {
+                        // NOT WHITELISTED
+                        console.warn("User not on whitelist:", currentUser.email);
+                        window.location.href = "/unauthorized";
+                        // Do not set userData, so app stays in loading/unauth state or redirects
+                        return;
+                    }
                 }
 
-                // Force Super Admin Role
-                if (currentUser.email === SUPER_ADMIN_EMAIL && fetchedData.role !== 'superadmin') {
-                    fetchedData.role = 'superadmin';
-                    // Optional: Persist this change to DB so it sticks
-                    await updateDoc(userRef, { role: 'superadmin' });
+                // If existing user (fetchedData is set from "if" block above)
+                if (userSnap.exists()) {
+                    // Force Super Admin Role check for existing users too
+                    if (currentUser.email === SUPER_ADMIN_EMAIL && fetchedData!.role !== 'superadmin') {
+                        fetchedData!.role = 'superadmin';
+                        await updateDoc(userRef, { role: 'superadmin' });
+                    }
+                    setUserData(fetchedData!);
                 }
 
-                setUserData(fetchedData);
+                // Force Super Admin Role (Redundant but safe to keep specific logic clean)
+                // The above block handles setting userData for both cases (new and existing)
             } else {
                 setUserData(null);
                 setOriginalUserData(null); // Reset impersonation on logout
