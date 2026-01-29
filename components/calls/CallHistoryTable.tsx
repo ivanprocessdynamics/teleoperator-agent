@@ -124,7 +124,7 @@ export function CallHistoryTable({ agentId: initialAgentId }: CallHistoryTablePr
         setError(null);
 
         // Base query
-        let constraints: any[] = [orderBy("timestamp", "desc"), limit(100)];
+        let constraints: any[] = [orderBy("timestamp", "desc")];
 
         // Calculate Date Range
         const now = new Date();
