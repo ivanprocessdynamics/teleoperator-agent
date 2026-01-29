@@ -5,11 +5,19 @@ import { collection, getDocs, query, where, collectionGroup, doc, getDoc } from 
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
-import { Loader2, Users, ArrowRight, Building2, Mail } from "lucide-react";
+import { Loader2, Users, ArrowRight, Building2, Mail, UserCog, Eye } from "lucide-react";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { CreateWorkspaceModal } from "@/components/CreateWorkspaceModal";
 import { PendingInviteCard, PendingInvite } from "@/components/team/PendingInviteCard";
+import { Badge } from "@/components/ui/badge";
+
+interface UserListData {
+    uid: string;
+    email: string;
+    role: string;
+    displayName?: string;
+}
 
 interface WorkspaceData {
     id: string;
@@ -20,10 +28,12 @@ interface WorkspaceData {
 }
 
 export default function TeamPage() {
-    const { userData, user } = useAuth();
+    const { userData, user, startImpersonating, isImpersonating } = useAuth();
     const [workspaces, setWorkspaces] = useState<WorkspaceData[]>([]);
     const [pendingInvites, setPendingInvites] = useState<PendingInvite[]>([]);
+    const [allUsers, setAllUsers] = useState<UserListData[]>([]);
     const [loading, setLoading] = useState(true);
+    const [impersonating, setImpersonating] = useState<string | null>(null);
     const router = useRouter();
 
     useEffect(() => {
@@ -34,12 +44,49 @@ export default function TeamPage() {
     const fetchData = async () => {
         try {
             setLoading(true);
-            await Promise.all([fetchWorkspaces(), fetchPendingInvites()]);
+            const promises = [fetchWorkspaces(), fetchPendingInvites()];
+            if (userData?.role === 'superadmin') {
+                promises.push(fetchAllUsers());
+            }
+            await Promise.all(promises);
         } catch (error) {
             console.error("Error fetching data:", error);
             toast.error("Error al cargar datos");
         } finally {
             setLoading(false);
+        }
+    };
+
+    const fetchAllUsers = async () => {
+        try {
+            const usersSnap = await getDocs(collection(db, "users"));
+            const users: UserListData[] = usersSnap.docs.map(doc => ({
+                uid: doc.id,
+                ...doc.data()
+            } as UserListData));
+            // Sort: superadmin first, then by email
+            users.sort((a, b) => {
+                if (a.role === 'superadmin' && b.role !== 'superadmin') return -1;
+                if (b.role === 'superadmin' && a.role !== 'superadmin') return 1;
+                return (a.email || '').localeCompare(b.email || '');
+            });
+            setAllUsers(users);
+        } catch (error) {
+            console.error("Error fetching users:", error);
+        }
+    };
+
+    const handleImpersonate = async (targetUid: string) => {
+        setImpersonating(targetUid);
+        try {
+            await startImpersonating(targetUid);
+            toast.success("Ahora estás viendo como este usuario");
+            router.push('/workspaces');
+        } catch (error) {
+            console.error("Error impersonating:", error);
+            toast.error("Error al suplantar usuario");
+        } finally {
+            setImpersonating(null);
         }
     };
 
@@ -251,6 +298,64 @@ export default function TeamPage() {
                     </div>
                 )}
             </div>
+
+            {/* User Impersonation Section - Superadmin Only */}
+            {userData?.role === 'superadmin' && !isImpersonating && allUsers.length > 0 && (
+                <div className="mt-8 space-y-4">
+                    <div className="flex items-center gap-2">
+                        <UserCog className="h-5 w-5 text-purple-500" />
+                        <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                            Usuarios del Sistema ({allUsers.length})
+                        </h2>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {allUsers.map((u) => (
+                            <div
+                                key={u.uid}
+                                className="flex items-center justify-between p-4 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950"
+                            >
+                                <div className="flex items-center gap-3">
+                                    <div className="h-9 w-9 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-xs font-bold text-gray-600 dark:text-gray-300">
+                                        {u.email?.substring(0, 2).toUpperCase()}
+                                    </div>
+                                    <div>
+                                        <p className="text-sm font-medium text-gray-900 dark:text-white truncate max-w-[180px]">
+                                            {u.email}
+                                        </p>
+                                        <Badge
+                                            variant="secondary"
+                                            className={
+                                                u.role === 'superadmin'
+                                                    ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300 text-xs"
+                                                    : u.role === 'admin'
+                                                        ? "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300 text-xs"
+                                                        : "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300 text-xs"
+                                            }
+                                        >
+                                            {u.role === 'superadmin' ? 'Super Admin' : u.role === 'admin' ? 'Admin' : 'Member'}
+                                        </Badge>
+                                    </div>
+                                </div>
+                                {u.uid !== userData?.uid && (
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => handleImpersonate(u.uid)}
+                                        disabled={impersonating === u.uid}
+                                        className="text-purple-600 hover:text-purple-700 hover:bg-purple-50 dark:text-purple-400 dark:hover:bg-purple-900/20"
+                                    >
+                                        {impersonating === u.uid ? (
+                                            <Loader2 className="h-4 w-4 animate-spin" />
+                                        ) : (
+                                            <Eye className="h-4 w-4" />
+                                        )}
+                                    </Button>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

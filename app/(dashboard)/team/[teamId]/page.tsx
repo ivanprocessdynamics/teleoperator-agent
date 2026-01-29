@@ -30,7 +30,7 @@ interface MemberData {
     email: string;
     role: "admin" | "member";
     joined_at: any;
-    // Optional: display name, photo if we fetch from users collection
+    isOwner?: boolean; // Mark if this is the workspace owner
 }
 
 interface WorkspaceData {
@@ -69,12 +69,35 @@ export default function TeamDetailPage() {
 
             setWorkspace({ id: wsSnap.id, ...wsSnap.data() } as WorkspaceData);
 
-            // 2. Fetch Members
-            // Query subcollection 'members'
+            const ownerUid = wsSnap.data().owner_uid;
+
+            // 2. Fetch Members from subcollection
             const membersRef = collection(db, "workspaces", teamId, "members");
             const membersSnap = await getDocs(membersRef);
 
             const membersList: MemberData[] = membersSnap.docs.map(doc => doc.data() as MemberData);
+
+            // 3. Check if owner is already in members list, if not add them
+            const ownerInList = membersList.find(m => m.uid === ownerUid);
+            if (!ownerInList && ownerUid) {
+                // Fetch owner's email from users collection
+                const ownerUserRef = doc(db, "users", ownerUid);
+                const ownerUserSnap = await getDoc(ownerUserRef);
+
+                if (ownerUserSnap.exists()) {
+                    const ownerData = ownerUserSnap.data();
+                    membersList.unshift({
+                        uid: ownerUid,
+                        email: ownerData.email || "Owner",
+                        role: "admin", // Owner is always admin
+                        joined_at: wsSnap.data().created_at || null,
+                        isOwner: true // Mark as owner for special display
+                    } as MemberData & { isOwner?: boolean });
+                }
+            } else if (ownerInList) {
+                // Mark existing owner entry
+                (ownerInList as MemberData & { isOwner?: boolean }).isOwner = true;
+            }
 
             setMembers(membersList);
 
@@ -183,13 +206,14 @@ export default function TeamDetailPage() {
                                 </TableCell>
                                 <TableCell>
                                     <Badge
-                                        variant={m.role === 'admin' ? "default" : "secondary"}
+                                        variant={m.role === 'admin' || m.isOwner ? "default" : "secondary"}
                                         className={
-                                            m.role === 'admin' ? "bg-purple-100 text-purple-700 hover:bg-purple-200 dark:bg-purple-900/30 dark:text-purple-300" :
-                                                "bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300"
+                                            m.isOwner ? "bg-amber-100 text-amber-700 hover:bg-amber-200 dark:bg-amber-900/30 dark:text-amber-300" :
+                                                m.role === 'admin' ? "bg-purple-100 text-purple-700 hover:bg-purple-200 dark:bg-purple-900/30 dark:text-purple-300" :
+                                                    "bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300"
                                         }
                                     >
-                                        {m.role === 'admin' ? 'Admin' : 'Miembro'}
+                                        {m.isOwner ? 'Propietario' : m.role === 'admin' ? 'Admin' : 'Miembro'}
                                     </Badge>
                                 </TableCell>
                                 <TableCell className="text-right">
