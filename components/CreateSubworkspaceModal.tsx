@@ -52,6 +52,7 @@ export function CreateSubworkspaceModal({ workspaceId, children }: CreateSubwork
     const router = useRouter();
 
     const [error, setError] = useState(false);
+    const [creationError, setCreationError] = useState<string | null>(null);
 
     const handleCreate = async () => {
         if (!workspaceId) return;
@@ -62,6 +63,7 @@ export function CreateSubworkspaceModal({ workspaceId, children }: CreateSubwork
         }
 
         setLoading(true);
+        setCreationError(null);
         try {
             // Find the next available Retell slot (Globally across all workspaces)
             // Filter by type: outbound slots for outbound, inbound slots for inbound
@@ -87,12 +89,18 @@ export function CreateSubworkspaceModal({ workspaceId, children }: CreateSubwork
             const maxSlots = pool.length;
 
             // Find next available slot
-            let nextSlot = 1;
+            let nextSlot = -1;
             for (let i = 1; i <= maxSlots; i++) {
                 if (!usedSlots.includes(i)) {
                     nextSlot = i;
                     break;
                 }
+            }
+
+            if (nextSlot === -1) {
+                setCreationError("Error: No hay más agentes disponibles. Libera un hueco eliminando uno o contacta con el administrador para que te proporcione más agentes.");
+                setLoading(false);
+                return;
             }
 
             const assignedSlot = pool.find(s => s.slot === nextSlot);
@@ -115,6 +123,7 @@ export function CreateSubworkspaceModal({ workspaceId, children }: CreateSubwork
             setSelectedColor("blue");
             setAgentType('outbound');
             setError(false);
+            setCreationError(null);
             router.refresh();
             window.location.reload();
         } catch (error) {
@@ -139,6 +148,7 @@ export function CreateSubworkspaceModal({ workspaceId, children }: CreateSubwork
                 setSelectedColor("blue");
                 setAgentType('outbound');
                 setError(false);
+                setCreationError(null);
             }
         }}>
             <DialogTrigger asChild>
@@ -157,6 +167,14 @@ export function CreateSubworkspaceModal({ workspaceId, children }: CreateSubwork
                     </DialogDescription>
                 </DialogHeader>
                 <div className="grid gap-6 py-4">
+                    {/* Error Message */}
+                    {creationError && (
+                        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 text-sm p-3 rounded-lg flex items-start">
+                            <span className="mr-2">⚠️</span>
+                            <span>{creationError}</span>
+                        </div>
+                    )}
+
                     {/* Agent Type Selection */}
                     <div className="grid grid-cols-2 gap-4">
                         <div
