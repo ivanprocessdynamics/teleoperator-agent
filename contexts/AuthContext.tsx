@@ -63,13 +63,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                             const inviteSnap = await getDoc(inviteRef);
 
                             if (inviteSnap.exists()) {
-                                role = inviteSnap.data().role as UserRole;
+                                const inviteData = inviteSnap.data();
+                                role = inviteData.role as UserRole;
+                                const invitedWorkspaceId = inviteData.workspaceId;
+
                                 // Mark invite as used/accepted
                                 await updateDoc(inviteRef, {
                                     status: 'accepted',
                                     acceptedAt: new Date(),
                                     uid: currentUser.uid
                                 });
+
+                                // If invite has a workspace, add user to it
+                                if (invitedWorkspaceId) {
+                                    await setDoc(doc(db, "workspaces", invitedWorkspaceId, "members", currentUser.uid), {
+                                        uid: currentUser.uid,
+                                        email: currentUser.email,
+                                        role: role === 'superadmin' ? 'admin' : role, // Map superadmin to admin if accidentally sent
+                                        joined_at: new Date()
+                                    });
+                                }
                             }
                         } catch (error) {
                             console.error("Error checking invite:", error);
@@ -79,10 +92,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                     // STRICT WHITELIST CHECK
                     if (role) {
                         // User was invited, create account
+                        // NOTE: Global role is set here. If it's a workspace invite, global role might differ?
+                        // For now, assume if invited as 'member' to a workspace, they become a global 'member' (or 'visitor' previously)
+                        // If we want them to be 'user' globally and 'member' locally, we need to decide on global roles.
+                        // Keeping it simple: Invite sets INITIAL global role.
                         fetchedData = {
                             uid: currentUser.uid,
                             email: currentUser.email,
                             role: role,
+                            current_workspace_id: inviteSnap?.data()?.workspaceId || undefined
                         };
                         await setDoc(userRef, fetchedData);
                         setUserData(fetchedData);

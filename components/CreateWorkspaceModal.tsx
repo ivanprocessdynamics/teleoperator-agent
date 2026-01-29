@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { addDoc, collection, serverTimestamp, updateDoc, doc } from "firebase/firestore";
+import { addDoc, collection, serverTimestamp, updateDoc, doc, setDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -45,6 +45,14 @@ export function CreateWorkspaceModal({ children }: { children?: React.ReactNode 
                 created_at: serverTimestamp(),
             });
 
+            // Add owner as admin member
+            await setDoc(doc(db, "workspaces", workspaceRef.id, "members", user.uid), {
+                uid: user.uid,
+                email: user.email,
+                role: 'admin',
+                joined_at: serverTimestamp()
+            });
+
             // Update User's current workspace
             await updateDoc(doc(db, "users", user.uid), {
                 current_workspace_id: workspaceRef.id,
@@ -53,6 +61,8 @@ export function CreateWorkspaceModal({ children }: { children?: React.ReactNode 
             setOpen(false);
             setName("");
             setError(false);
+
+            // If on team page, it might refresh automatically, but we might want a toast
         } catch (error) {
             console.error("Error creating workspace:", error);
             alert("Failed to create workspace. Check console for details.");
@@ -102,8 +112,8 @@ export function CreateWorkspaceModal({ children }: { children?: React.ReactNode 
                             }}
                             onKeyDown={handleKeyDown}
                             className={`col-span-3 bg-white text-gray-900 focus:ring-blue-500 ${error
-                                    ? "border-red-500 focus:border-red-500 ring-red-500 placeholder:text-red-300"
-                                    : "border-gray-300 focus:border-blue-500"
+                                ? "border-red-500 focus:border-red-500 ring-red-500 placeholder:text-red-300"
+                                : "border-gray-300 focus:border-blue-500"
                                 }`}
                             placeholder="Ej: Agente de Ventas"
                         />
