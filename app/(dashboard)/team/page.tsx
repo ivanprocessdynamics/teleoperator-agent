@@ -53,7 +53,7 @@ export default function TeamPage() {
         }
     };
 
-    const handleRoleChange = async (uid: string, newRole: "admin" | "visitor") => {
+    const handleRoleChange = async (uid: string, newRole: "admin" | "member") => {
         try {
             await updateDoc(doc(db, "users", uid), { role: newRole });
 
@@ -144,11 +144,11 @@ export default function TeamPage() {
                                         }
                                     >
                                         {u.role === 'superadmin' ? 'Super Admin' :
-                                            u.role === 'admin' ? 'Administrador' : 'Visitante'}
+                                            u.role === 'admin' ? 'Administrador' : 'Miembro'}
                                     </Badge>
                                 </TableCell>
                                 <TableCell className="text-right">
-                                    {(userData.role === 'superadmin' || (userData.role === 'admin' && u.role === 'visitor')) && (
+                                    {(userData.role === 'superadmin' || (userData.role === 'admin' && u.role === 'member')) && (
                                         <DropdownMenu>
                                             <DropdownMenuTrigger asChild>
                                                 <Button variant="ghost" size="icon" className="h-8 w-8">
@@ -165,13 +165,13 @@ export default function TeamPage() {
                                                 )}
 
                                                 {/* Role Management */}
-                                                {(userData.role === 'superadmin' || (userData.role === 'admin' && u.role === 'visitor')) && u.uid !== userData.uid && (
+                                                {(userData.role === 'superadmin' || (userData.role === 'admin' && u.role === 'member')) && u.uid !== userData.uid && (
                                                     <>
                                                         {/* Prevent modifying Super Admins */}
                                                         {u.role !== 'superadmin' && (
-                                                            <DropdownMenuItem onClick={() => handleRoleChange(u.uid, u.role === 'admin' ? 'visitor' : 'admin')}>
+                                                            <DropdownMenuItem onClick={() => handleRoleChange(u.uid, u.role === 'admin' ? 'member' : 'admin')}>
                                                                 <Shield className="mr-2 h-4 w-4" />
-                                                                {u.role === 'admin' ? 'Hacer Visitante' : 'Hacer Admin'}
+                                                                {u.role === 'admin' ? 'Hacer Miembro' : 'Hacer Admin'}
                                                             </DropdownMenuItem>
                                                         )}
                                                     </>

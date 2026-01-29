@@ -5,14 +5,14 @@ import { User, signInWithPopup, signOut } from "firebase/auth";
 import { doc, getDoc, setDoc, updateDoc } from "firebase/firestore"; // Added updateDoc
 import { auth, db, googleProvider } from "@/lib/firebase";
 
-type UserRole = "superadmin" | "admin" | "visitor";
+type UserRole = "superadmin" | "admin" | "member";
 
 export interface UserData { // Exported for re-use
     uid: string;
     email: string | null;
     role: UserRole;
     current_workspace_id?: string;
-    photoURL?: string; // Ideally sync this too
+    photoURL?: string;
     displayName?: string;
 }
 
@@ -114,8 +114,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                     setUserData(fetchedData!);
                 }
 
-                // Force Super Admin Role (Redundant but safe to keep specific logic clean)
-                // The above block handles setting userData for both cases (new and existing)
             } else {
                 setUserData(null);
                 setOriginalUserData(null); // Reset impersonation on logout

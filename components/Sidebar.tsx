@@ -37,11 +37,11 @@ export function Sidebar() {
             href: "/workspaces",
             icon: Box, // Changed to Box to differentiate
         },
-        ...(userData?.role === 'superadmin' ? [{
+        {
             label: "Team",
             href: "/team",
             icon: Users,
-        }] : []),
+        },
         {
             label: "Settings",
             href: "/settings",
@@ -124,7 +124,7 @@ export function Sidebar() {
                             {userData?.email || user?.email} {isImpersonating ? '(Ver)' : ''}
                         </span>
                         <span className="truncate text-[10px] text-gray-500 dark:text-gray-400">
-                            {userData?.role === 'superadmin' ? 'Super Admin' : userData?.role === 'admin' ? 'Admin' : 'Visitante'}
+                            {userData?.role === 'superadmin' ? 'Super Admin' : userData?.role === 'admin' ? 'Admin' : 'Miembro'}
                         </span>
                     </div>
                 </div>
