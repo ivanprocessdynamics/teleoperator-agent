@@ -55,7 +55,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 if (userSnap.exists()) {
                     fetchedData = userSnap.data() as UserData;
                 } else {
-                    // Check for invite
+                    // Check for invite (to allow user creation)
                     let role: UserRole | null = null;
                     let invitedWorkspaceId: string | undefined = undefined;
                     if (currentUser.email) {
@@ -68,22 +68,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                                 role = inviteData.role as UserRole;
                                 invitedWorkspaceId = inviteData.workspaceId;
 
-                                // Mark invite as used/accepted
+                                // For NEW users: Auto-accept the invitation since they
+                                // won't have access to the team page to accept manually
+                                if (invitedWorkspaceId) {
+                                    // Add user to workspace members
+                                    await setDoc(doc(db, "workspaces", invitedWorkspaceId, "members", currentUser.uid), {
+                                        uid: currentUser.uid,
+                                        email: currentUser.email,
+                                        role: role === 'superadmin' ? 'admin' : role,
+                                        joined_at: new Date()
+                                    });
+                                }
+
+                                // Mark invite as accepted
                                 await updateDoc(inviteRef, {
                                     status: 'accepted',
                                     acceptedAt: new Date(),
                                     uid: currentUser.uid
                                 });
-
-                                // If invite has a workspace, add user to it
-                                if (invitedWorkspaceId) {
-                                    await setDoc(doc(db, "workspaces", invitedWorkspaceId, "members", currentUser.uid), {
-                                        uid: currentUser.uid,
-                                        email: currentUser.email,
-                                        role: role === 'superadmin' ? 'admin' : role, // Map superadmin to admin if accidentally sent
-                                        joined_at: new Date()
-                                    });
-                                }
                             }
                         } catch (error) {
                             console.error("Error checking invite:", error);

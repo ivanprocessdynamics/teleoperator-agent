@@ -1,14 +1,15 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { collection, getDocs, query, where, collectionGroup } from "firebase/firestore";
+import { collection, getDocs, query, where, collectionGroup, doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
-import { Loader2, Users, ArrowRight, Building2 } from "lucide-react";
+import { Loader2, Users, ArrowRight, Building2, Mail } from "lucide-react";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { CreateWorkspaceModal } from "@/components/CreateWorkspaceModal";
+import { PendingInviteCard, PendingInvite } from "@/components/team/PendingInviteCard";
 
 interface WorkspaceData {
     id: string;
@@ -19,66 +20,128 @@ interface WorkspaceData {
 }
 
 export default function TeamPage() {
-    const { userData } = useAuth();
+    const { userData, user } = useAuth();
     const [workspaces, setWorkspaces] = useState<WorkspaceData[]>([]);
+    const [pendingInvites, setPendingInvites] = useState<PendingInvite[]>([]);
     const [loading, setLoading] = useState(true);
     const router = useRouter();
 
     useEffect(() => {
-        if (!userData) return;
-        fetchWorkspaces();
-    }, [userData]);
+        if (!userData || !user) return;
+        fetchData();
+    }, [userData, user]);
 
-    const fetchWorkspaces = async () => {
+    const fetchData = async () => {
         try {
             setLoading(true);
-            let workspacesList: WorkspaceData[] = [];
-
-            if (userData?.role === 'superadmin') {
-                // Super Admin sees ALL workspaces
-                const querySnapshot = await getDocs(collection(db, "workspaces"));
-                workspacesList = querySnapshot.docs.map(doc => ({
-                    id: doc.id,
-                    ...doc.data()
-                } as WorkspaceData));
-            } else {
-                // Regular admin/member sees only their workspaces
-                // Allow querying members group where uid == user.uid
-                const membersQuery = query(collectionGroup(db, "members"), where("uid", "==", userData?.uid));
-                const membersSnap = await getDocs(membersQuery);
-
-                // Get workspace IDs
-                const workspaceIds = membersSnap.docs.map(doc => doc.ref.parent.parent?.id).filter(Boolean) as string[];
-
-                // Fetch actual workspace details (in parallel or batched)
-                // Firestore 'in' limitation is 10, so if > 10 handle carefully. For now assume < 10.
-                if (workspaceIds.length > 0) {
-                    // We can't do 'in' query on document IDs easily with a large list,
-                    // but for < 10 it's fine. If large, fetch individually.
-                    // A safer way for scalability is just fetching them one by one or using 'in' batches.
-                    // For MVP, let's fetch individually to be safe against 'in' limits if user is in many teams
-                    const promises = workspaceIds.map(async (wid) => {
-                        const wsSnap = await getDocs(query(collection(db, "workspaces"), where("__name__", "==", wid)));
-                        if (!wsSnap.empty) {
-                            return { id: wsSnap.docs[0].id, ...wsSnap.docs[0].data() } as WorkspaceData;
-                        }
-                        return null;
-                    });
-
-                    const results = await Promise.all(promises);
-                    workspacesList = results.filter(Boolean) as WorkspaceData[];
-                }
-            }
-
-            // Optional: Fetch member counts? (Can be expensive, skip for now)
-
-            setWorkspaces(workspacesList);
+            await Promise.all([fetchWorkspaces(), fetchPendingInvites()]);
         } catch (error) {
-            console.error("Error fetching teams:", error);
-            toast.error("Error al cargar equipos");
+            console.error("Error fetching data:", error);
+            toast.error("Error al cargar datos");
         } finally {
             setLoading(false);
         }
+    };
+
+    const fetchPendingInvites = async () => {
+        if (!user?.email) return;
+
+        try {
+            // Query invites collection where email matches and status is pending
+            const invitesQuery = query(
+                collection(db, "invites"),
+                where("email", "==", user.email.toLowerCase()),
+                where("status", "==", "pending")
+            );
+            const invitesSnap = await getDocs(invitesQuery);
+
+            const invites: PendingInvite[] = [];
+
+            for (const inviteDoc of invitesSnap.docs) {
+                const data = inviteDoc.data();
+                let workspaceName = undefined;
+
+                // Fetch workspace name if workspaceId exists
+                if (data.workspaceId) {
+                    try {
+                        const wsDoc = await getDoc(doc(db, "workspaces", data.workspaceId));
+                        if (wsDoc.exists()) {
+                            workspaceName = wsDoc.data().name;
+                        }
+                    } catch (e) {
+                        console.warn("Could not fetch workspace name:", e);
+                    }
+                }
+
+                invites.push({
+                    id: inviteDoc.id,
+                    email: data.email,
+                    role: data.role,
+                    workspaceId: data.workspaceId,
+                    workspaceName: workspaceName || data.workspaceName,
+                    authorEmail: data.authorEmail,
+                    authorName: data.authorName,
+                    createdAt: data.createdAt,
+                    status: data.status
+                });
+            }
+
+            setPendingInvites(invites);
+        } catch (error) {
+            console.error("Error fetching pending invites:", error);
+        }
+    };
+
+    const fetchWorkspaces = async () => {
+        let workspacesList: WorkspaceData[] = [];
+
+        if (userData?.role === 'superadmin') {
+            // Super Admin sees ALL workspaces
+            const querySnapshot = await getDocs(collection(db, "workspaces"));
+            workspacesList = querySnapshot.docs.map(doc => ({
+                id: doc.id,
+                ...doc.data()
+            } as WorkspaceData));
+        } else {
+            // Regular admin/member sees only their workspaces
+            // Allow querying members group where uid == user.uid
+            const membersQuery = query(collectionGroup(db, "members"), where("uid", "==", userData?.uid));
+            const membersSnap = await getDocs(membersQuery);
+
+            // Get workspace IDs
+            const workspaceIds = membersSnap.docs.map(doc => doc.ref.parent.parent?.id).filter(Boolean) as string[];
+
+            // Fetch actual workspace details (in parallel or batched)
+            // Firestore 'in' limitation is 10, so if > 10 handle carefully. For now assume < 10.
+            if (workspaceIds.length > 0) {
+                // We can't do 'in' query on document IDs easily with a large list,
+                // but for < 10 it's fine. If large, fetch individually.
+                // A safer way for scalability is just fetching them one by one or using 'in' batches.
+                // For MVP, let's fetch individually to be safe against 'in' limits if user is in many teams
+                const promises = workspaceIds.map(async (wid) => {
+                    const wsSnap = await getDocs(query(collection(db, "workspaces"), where("__name__", "==", wid)));
+                    if (!wsSnap.empty) {
+                        return { id: wsSnap.docs[0].id, ...wsSnap.docs[0].data() } as WorkspaceData;
+                    }
+                    return null;
+                });
+
+                const results = await Promise.all(promises);
+                workspacesList = results.filter(Boolean) as WorkspaceData[];
+            }
+        }
+
+        setWorkspaces(workspacesList);
+    };
+
+    const handleInviteAccepted = () => {
+        // Refresh data after accepting invite
+        fetchData();
+    };
+
+    const handleInviteRejected = (inviteId: string) => {
+        // Remove from local state
+        setPendingInvites(prev => prev.filter(i => i.id !== inviteId));
     };
 
     if (loading) {
@@ -108,6 +171,29 @@ export default function TeamPage() {
                 )}
             </div>
 
+            {/* Pending Invitations Section */}
+            {pendingInvites.length > 0 && (
+                <div className="space-y-3">
+                    <div className="flex items-center gap-2">
+                        <Mail className="h-5 w-5 text-amber-500" />
+                        <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                            Invitaciones Pendientes ({pendingInvites.length})
+                        </h2>
+                    </div>
+                    <div className="space-y-3">
+                        {pendingInvites.map((invite) => (
+                            <PendingInviteCard
+                                key={invite.id}
+                                invite={invite}
+                                onAccept={handleInviteAccepted}
+                                onReject={() => handleInviteRejected(invite.id)}
+                            />
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {/* Workspaces Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {workspaces.map((ws) => (
                     <div

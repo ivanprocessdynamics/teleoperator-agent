@@ -151,7 +151,7 @@ export default function TeamDetailPage() {
                     </p>
                 </div>
                 <div className="ml-auto">
-                    {canManage && <InviteUserModal workspaceId={teamId} />}
+                    {canManage && <InviteUserModal workspaceId={teamId} workspaceName={workspace.name} />}
                 </div>
             </div>
 

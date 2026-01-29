@@ -22,12 +22,17 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import { Loader2, Mail, Plus } from "lucide-react";
-import { doc, setDoc } from "firebase/firestore";
+import { doc, setDoc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { toast } from "sonner";
 
-export function InviteUserModal({ workspaceId }: { workspaceId?: string }) {
-    const { userData } = useAuth();
+interface InviteUserModalProps {
+    workspaceId?: string;
+    workspaceName?: string;
+}
+
+export function InviteUserModal({ workspaceId, workspaceName }: InviteUserModalProps) {
+    const { userData, user } = useAuth();
     const [open, setOpen] = useState(false);
     const [email, setEmail] = useState("");
 
@@ -50,11 +55,27 @@ export function InviteUserModal({ workspaceId }: { workspaceId?: string }) {
         if (!email.trim()) return;
         setLoading(true);
         try {
+            // Fetch workspace name if not provided
+            let wsName = workspaceName;
+            if (workspaceId && !wsName) {
+                try {
+                    const wsDoc = await getDoc(doc(db, "workspaces", workspaceId));
+                    if (wsDoc.exists()) {
+                        wsName = wsDoc.data().name;
+                    }
+                } catch (e) {
+                    console.warn("Could not fetch workspace name:", e);
+                }
+            }
+
             await setDoc(doc(db, "invites", email.toLowerCase().trim()), {
                 email: email.toLowerCase().trim(),
                 role,
                 workspaceId: workspaceId || null,
+                workspaceName: wsName || null,
                 authorUid: userData?.uid,
+                authorEmail: user?.email || userData?.email,
+                authorName: user?.displayName || null,
                 createdAt: new Date(),
                 status: 'pending'
             });
