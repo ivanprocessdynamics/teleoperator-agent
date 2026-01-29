@@ -103,22 +103,33 @@ export default function TeamPage() {
                 ...doc.data()
             } as WorkspaceData));
         } else {
-            // Regular admin/member sees only their workspaces
-            // Allow querying members group where uid == user.uid
+            // Regular admin/member sees workspaces they own OR are members of
+            const workspaceMap = new Map<string, WorkspaceData>();
+
+            // 1. First, get workspaces where user is OWNER
+            const ownedQuery = query(
+                collection(db, "workspaces"),
+                where("owner_uid", "==", userData?.uid)
+            );
+            const ownedSnap = await getDocs(ownedQuery);
+            for (const doc of ownedSnap.docs) {
+                workspaceMap.set(doc.id, { id: doc.id, ...doc.data() } as WorkspaceData);
+            }
+
+            // 2. Then, get workspaces where user is MEMBER
             const membersQuery = query(collectionGroup(db, "members"), where("uid", "==", userData?.uid));
             const membersSnap = await getDocs(membersQuery);
 
-            // Get workspace IDs
-            const workspaceIds = membersSnap.docs.map(doc => doc.ref.parent.parent?.id).filter(Boolean) as string[];
+            // Get workspace IDs from membership
+            const workspaceIds = membersSnap.docs
+                .map(doc => doc.ref.parent.parent?.id)
+                .filter(Boolean) as string[];
 
-            // Fetch actual workspace details (in parallel or batched)
-            // Firestore 'in' limitation is 10, so if > 10 handle carefully. For now assume < 10.
-            if (workspaceIds.length > 0) {
-                // We can't do 'in' query on document IDs easily with a large list,
-                // but for < 10 it's fine. If large, fetch individually.
-                // A safer way for scalability is just fetching them one by one or using 'in' batches.
-                // For MVP, let's fetch individually to be safe against 'in' limits if user is in many teams
-                const promises = workspaceIds.map(async (wid) => {
+            // Fetch workspace details for memberships (only those not already in map)
+            const idsToFetch = workspaceIds.filter(id => !workspaceMap.has(id));
+
+            if (idsToFetch.length > 0) {
+                const promises = idsToFetch.map(async (wid) => {
                     const wsSnap = await getDocs(query(collection(db, "workspaces"), where("__name__", "==", wid)));
                     if (!wsSnap.empty) {
                         return { id: wsSnap.docs[0].id, ...wsSnap.docs[0].data() } as WorkspaceData;
@@ -127,8 +138,12 @@ export default function TeamPage() {
                 });
 
                 const results = await Promise.all(promises);
-                workspacesList = results.filter(Boolean) as WorkspaceData[];
+                for (const ws of results) {
+                    if (ws) workspaceMap.set(ws.id, ws);
+                }
             }
+
+            workspacesList = Array.from(workspaceMap.values());
         }
 
         setWorkspaces(workspacesList);
