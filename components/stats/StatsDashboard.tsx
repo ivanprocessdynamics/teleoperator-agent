@@ -650,6 +650,25 @@ export function StatsDashboard(props: StatsDashboardProps) {
                             <DropdownMenuLabel>Campañas {agentId ? 'del Agente' : 'Salientes'}</DropdownMenuLabel>
 
                             <DropdownMenuCheckboxItem
+                                checked={
+                                    uniqueCampaigns.length > 0 &&
+                                    (uniqueCampaigns.every(id => selectedCampaigns.includes(id)) && selectedCampaigns.includes('testing_env'))
+                                }
+                                onCheckedChange={(checked) => {
+                                    if (checked) {
+                                        setSelectedCampaigns([...uniqueCampaigns, 'testing_env']);
+                                        if (!agentId && agentTypeFilter === 'inbound') setAgentTypeFilter('all');
+                                    } else {
+                                        setSelectedCampaigns([]);
+                                    }
+                                }}
+                                className="font-semibold"
+                            >
+                                Seleccionar todas
+                            </DropdownMenuCheckboxItem>
+                            <DropdownMenuSeparator />
+
+                            <DropdownMenuCheckboxItem
                                 checked={selectedCampaigns.includes('testing_env')}
                                 onCheckedChange={(checked) => {
                                     setSelectedCampaigns(prev =>
@@ -657,7 +676,7 @@ export function StatsDashboard(props: StatsDashboardProps) {
                                     );
                                     if (checked && !agentId && agentTypeFilter === 'inbound') setAgentTypeFilter('all');
                                 }}
-                                className="text-amber-600 dark:text-amber-400 font-medium"
+                                className="text-amber-600 dark:text-amber-400 font-medium truncate max-w-[250px]"
                             >
                                 Entorno de Pruebas
                             </DropdownMenuCheckboxItem>
@@ -676,6 +695,7 @@ export function StatsDashboard(props: StatsDashboardProps) {
                                             if (agentTypeFilter === 'inbound') setAgentTypeFilter('all');
                                         }
                                     }}
+                                    className="truncate max-w-[250px]"
                                 >
                                     {campaignMap[cid] || "Campaña desconocida"}
                                 </DropdownMenuCheckboxItem>
