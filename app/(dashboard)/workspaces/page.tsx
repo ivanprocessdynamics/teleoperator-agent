@@ -19,28 +19,45 @@ export default function WorkspacesPage() {
     useEffect(() => {
         if (!userData?.uid) return;
 
-        const q = query(
-            collection(db, "workspaces"),
-            where("owner_uid", "==", userData.uid)
-        );
+        // Superadmin sees ALL workspaces, others see only owned
+        let unsubscribe: () => void;
 
-        const unsubscribe = onSnapshot(q, (snapshot) => {
-            const spaces = snapshot.docs.map(doc => ({
-                id: doc.id,
-                ...doc.data()
-            }));
+        if (userData.role === 'superadmin') {
+            // Superadmin: get all workspaces
+            unsubscribe = onSnapshot(collection(db, "workspaces"), (snapshot) => {
+                const spaces = snapshot.docs.map(doc => ({
+                    id: doc.id,
+                    ...doc.data()
+                }));
+                spaces.sort((a: any, b: any) => (b.created_at?.seconds || 0) - (a.created_at?.seconds || 0));
+                setWorkspaces(spaces);
+                setIsLoadingData(false);
 
-            // Sort client-side by creation time descending
-            spaces.sort((a: any, b: any) => (b.created_at?.seconds || 0) - (a.created_at?.seconds || 0));
+                if (spaces.length > 0) {
+                    router.push(`/workspaces/${spaces[0].id}`);
+                }
+            });
+        } else {
+            // Regular users: get only workspaces they own
+            const q = query(
+                collection(db, "workspaces"),
+                where("owner_uid", "==", userData.uid)
+            );
 
-            setWorkspaces(spaces);
-            setIsLoadingData(false);
+            unsubscribe = onSnapshot(q, (snapshot) => {
+                const spaces = snapshot.docs.map(doc => ({
+                    id: doc.id,
+                    ...doc.data()
+                }));
+                spaces.sort((a: any, b: any) => (b.created_at?.seconds || 0) - (a.created_at?.seconds || 0));
+                setWorkspaces(spaces);
+                setIsLoadingData(false);
 
-            // Auto-redirect to the first workspace if available
-            if (spaces.length > 0) {
-                router.push(`/workspaces/${spaces[0].id}`);
-            }
-        });
+                if (spaces.length > 0) {
+                    router.push(`/workspaces/${spaces[0].id}`);
+                }
+            });
+        }
 
         return () => unsubscribe();
     }, [userData, router]);
