@@ -677,33 +677,34 @@ export function CallHistoryTable({ agentId: initialAgentId, subworkspaceId, work
                                                         );
                                                     })()}
                                                 </div>
-                                                    // Render badges for all custom fields found in the data
-                                                const customData = call.analysis?.custom_analysis_data;
+                                                {/* Render badges for all custom fields found in the data */}
+                                                {(() => {
+                                                    const customData = call.analysis?.custom_analysis_data;
                                                     if (Array.isArray(customData) && customData.length > 0) {
                                                         const visibleMetrics = customData.filter((d: any) =>
-                                                // Filter out internal or summary text fields to only show "metrics"
-                                                d.name !== 'resumen_espanol' &&
-                                                d.name !== 'summary' &&
-                                                d.value !== null &&
-                                                d.value !== undefined &&
-                                                d.value !== ""
-                                                );
+                                                            // Filter out internal or summary text fields to only show "metrics"
+                                                            d.name !== 'resumen_espanol' &&
+                                                            d.name !== 'summary' &&
+                                                            d.value !== null &&
+                                                            d.value !== undefined &&
+                                                            d.value !== ""
+                                                        );
 
                                                         if (visibleMetrics.length > 0) {
                                                             return (
-                                                <div className="flex gap-2 mt-2 flex-wrap">
-                                                    {visibleMetrics.map((d: any, i: number) => (
-                                                        <Badge
-                                                            key={i}
-                                                            variant="secondary"
-                                                            className="rounded-md font-medium text-[10px] px-1.5 py-0.5 bg-purple-50 text-purple-700 border border-purple-100 dark:bg-purple-900/20 dark:text-purple-300 dark:border-purple-800"
-                                                        >
-                                                            <span className="opacity-70 mr-1.5 uppercase tracking-wide font-bold">{d.name}:</span>
-                                                            <span className="truncate max-w-[200px]">{String(d.value)}</span>
-                                                        </Badge>
-                                                    ))}
-                                                </div>
-                                                );
+                                                                <div className="flex gap-2 mt-2 flex-wrap">
+                                                                    {visibleMetrics.map((d: any, i: number) => (
+                                                                        <Badge
+                                                                            key={i}
+                                                                            variant="secondary"
+                                                                            className="rounded-md font-medium text-[10px] px-1.5 py-0.5 bg-purple-50 text-purple-700 border border-purple-100 dark:bg-purple-900/20 dark:text-purple-300 dark:border-purple-800"
+                                                                        >
+                                                                            <span className="opacity-70 mr-1.5 uppercase tracking-wide font-bold">{d.name}:</span>
+                                                                            <span className="truncate max-w-[200px]">{String(d.value)}</span>
+                                                                        </Badge>
+                                                                    ))}
+                                                                </div>
+                                                            );
                                                         }
                                                     }
                                                 })()}
