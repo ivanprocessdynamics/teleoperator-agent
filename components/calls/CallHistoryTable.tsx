@@ -292,38 +292,6 @@ export function CallHistoryTable({ agentId: initialAgentId, workspaceId }: CallH
         fetchConfig();
     }, [initialAgentId]);
 
-    // Auto-discover columns from actual data (Fix for missing config/Global View)
-    useEffect(() => {
-        if (calls.length === 0) return;
-
-        const discovered = new Set<string>();
-        calls.forEach(call => {
-            if (call.analysis?.custom_analysis_data && Array.isArray(call.analysis.custom_analysis_data)) {
-                call.analysis.custom_analysis_data.forEach((d: any) => {
-                    if (d.name) discovered.add(d.name);
-                });
-            }
-        });
-
-        if (discovered.size > 0) {
-            setCustomFields(prev => {
-                const existingNames = new Set(prev.map(f => f.name));
-                const newFields = [...prev];
-                let changed = false;
-
-                discovered.forEach(name => {
-                    if (!existingNames.has(name)) { // Avoid duplicates
-                        // Check if we have a "Detected" version already? No, existingNames covers it.
-                        newFields.push({ id: name, name: name, description: 'Detected from data', type: 'text' });
-                        changed = true;
-                    }
-                });
-
-                return changed ? newFields : prev;
-            });
-        }
-    }, [calls]);
-
     // Fetch Agent Info for Filtering
     useEffect(() => {
         const unsub = onSnapshot(collection(db, "subworkspaces"), (snap) => {
@@ -656,12 +624,7 @@ export function CallHistoryTable({ agentId: initialAgentId, workspaceId }: CallH
                                             </div>
                                         </TableCell>
                                         {customFields.map(f => {
-                                            const customData = call.analysis?.custom_analysis_data;
-                                            // Safely find the item, ensuring customData is actually an array
-                                            const item = (Array.isArray(customData))
-                                                ? customData.find((d: any) => d.name === f.name || d.name === f.description)
-                                                : null;
-
+                                            const item = call.analysis?.custom_analysis_data?.find((d: any) => d.name === f.name || d.name === f.description); // Fallback logic
                                             return (
                                                 <TableCell key={f.id}>
                                                     <span className="text-sm text-gray-700 dark:text-gray-300">
