@@ -26,7 +26,7 @@ import { doc, setDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { toast } from "sonner";
 
-export function InviteUserModal() {
+export function InviteUserModal({ workspaceId }: { workspaceId?: string }) {
     const { userData } = useAuth();
     const [open, setOpen] = useState(false);
     const [email, setEmail] = useState("");
@@ -53,6 +53,7 @@ export function InviteUserModal() {
             await setDoc(doc(db, "invites", email.toLowerCase().trim()), {
                 email: email.toLowerCase().trim(),
                 role,
+                workspaceId: workspaceId || null,
                 authorUid: userData?.uid,
                 createdAt: new Date(),
                 status: 'pending'
