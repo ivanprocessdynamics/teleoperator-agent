@@ -584,13 +584,15 @@ export function StatsDashboard(props: StatsDashboardProps) {
                                     <span className="truncate">
                                         {selectedCampaigns.length > 0
                                             ? `${selectedCampaigns.length} Campañas`
-                                            : selectedAgentIds.length > 0
-                                                ? `${selectedAgentIds.length} Agentes`
-                                                : agentTypeFilter === 'all'
-                                                    ? "Todas las llamadas"
-                                                    : agentTypeFilter === 'inbound'
-                                                        ? "Todas las entrantes"
-                                                        : "Todas las salientes"
+                                            : agentId && agentMap[agentId]
+                                                ? `Agente: ${agentMap[agentId].name}`
+                                                : selectedAgentIds.length > 0
+                                                    ? `${selectedAgentIds.length} Agentes`
+                                                    : agentTypeFilter === 'all'
+                                                        ? "Todas las llamadas"
+                                                        : agentTypeFilter === 'inbound'
+                                                            ? "Todas las entrantes"
+                                                            : "Todas las salientes"
                                         }
                                     </span>
                                 </div>
@@ -598,40 +600,45 @@ export function StatsDashboard(props: StatsDashboardProps) {
                             </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent className="w-[300px] max-h-[400px] overflow-y-auto" align="end">
-                            {/* General Presets */}
-                            <DropdownMenuLabel>General</DropdownMenuLabel>
-                            <DropdownMenuItem onClick={() => {
-                                setAgentTypeFilter('all');
-                                setSelectedCampaigns([]);
-                                setSelectedAgentIds([]);
-                            }}>
-                                <span className={agentTypeFilter === 'all' && selectedCampaigns.length === 0 && selectedAgentIds.length === 0 ? "font-bold text-blue-600" : ""}>
-                                    Todas las llamadas
-                                </span>
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => {
-                                setAgentTypeFilter('inbound');
-                                setSelectedCampaigns([]);
-                                setSelectedAgentIds([]);
-                            }}>
-                                <span className={agentTypeFilter === 'inbound' && selectedCampaigns.length === 0 && selectedAgentIds.length === 0 ? "font-bold text-blue-600" : ""}>
-                                    Todas las entrantes
-                                </span>
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => {
-                                setAgentTypeFilter('outbound');
-                                setSelectedCampaigns([]);
-                                setSelectedAgentIds([]);
-                            }}>
-                                <span className={agentTypeFilter === 'outbound' && selectedCampaigns.length === 0 && selectedAgentIds.length === 0 ? "font-bold text-blue-600" : ""}>
-                                    Todas las salientes
-                                </span>
-                            </DropdownMenuItem>
 
-                            <DropdownMenuSeparator />
+                            {/* General Presets - Hide if in Agent Context */}
+                            {!agentId && (
+                                <>
+                                    <DropdownMenuLabel>General</DropdownMenuLabel>
+                                    <DropdownMenuItem onClick={() => {
+                                        setAgentTypeFilter('all');
+                                        setSelectedCampaigns([]);
+                                        setSelectedAgentIds([]);
+                                    }}>
+                                        <span className={agentTypeFilter === 'all' && selectedCampaigns.length === 0 && selectedAgentIds.length === 0 ? "font-bold text-blue-600" : ""}>
+                                            Todas las llamadas
+                                        </span>
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => {
+                                        setAgentTypeFilter('inbound');
+                                        setSelectedCampaigns([]);
+                                        setSelectedAgentIds([]);
+                                    }}>
+                                        <span className={agentTypeFilter === 'inbound' && selectedCampaigns.length === 0 && selectedAgentIds.length === 0 ? "font-bold text-blue-600" : ""}>
+                                            Todas las entrantes
+                                        </span>
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => {
+                                        setAgentTypeFilter('outbound');
+                                        setSelectedCampaigns([]);
+                                        setSelectedAgentIds([]);
+                                    }}>
+                                        <span className={agentTypeFilter === 'outbound' && selectedCampaigns.length === 0 && selectedAgentIds.length === 0 ? "font-bold text-blue-600" : ""}>
+                                            Todas las salientes
+                                        </span>
+                                    </DropdownMenuItem>
+                                    <DropdownMenuSeparator />
+                                </>
+                            )}
+
 
                             {/* Campaigns */}
-                            <DropdownMenuLabel>Campañas Salientes</DropdownMenuLabel>
+                            <DropdownMenuLabel>Campañas {agentId ? 'del Agente' : 'Salientes'}</DropdownMenuLabel>
                             {uniqueCampaigns.map(cid => (
                                 <DropdownMenuCheckboxItem
                                     key={cid}
@@ -640,10 +647,9 @@ export function StatsDashboard(props: StatsDashboardProps) {
                                         setSelectedCampaigns(prev =>
                                             checked ? [...prev, cid] : prev.filter(id => id !== cid)
                                         );
-                                        // If selecting campaigns, implicitly switch to outbound context or just keep as 'all' ? 
-                                        // User logic: Campaigns are typically outbound.
-                                        // If we are adding a campaign, we probably want to ensure we aren't filtering to 'inbound' only.
-                                        if (checked) {
+                                        // If selecting campaigns and NOT in agent context, implicitly switch logic if needed.
+                                        // In Agent context, we just filter the agent's calls.
+                                        if (checked && !agentId) {
                                             if (agentTypeFilter === 'inbound') setAgentTypeFilter('all');
                                         }
                                     }}
@@ -653,28 +659,31 @@ export function StatsDashboard(props: StatsDashboardProps) {
                             ))}
                             {uniqueCampaigns.length === 0 && <div className="px-2 py-1 text-xs text-gray-500 italic">No hay campañas disponibles</div>}
 
-                            <DropdownMenuSeparator />
-
-                            {/* Inbound Agents */}
-                            <DropdownMenuLabel>Entrantes</DropdownMenuLabel>
-                            {availableAgents.filter(a => a.type === 'inbound').map(a => (
-                                <DropdownMenuCheckboxItem
-                                    key={a.id}
-                                    checked={selectedAgentIds.includes(a.id)}
-                                    onCheckedChange={(checked) => {
-                                        setSelectedAgentIds(prev =>
-                                            checked ? [...prev, a.id] : prev.filter(id => id !== a.id)
-                                        );
-                                        if (checked) {
-                                            if (agentTypeFilter === 'outbound') setAgentTypeFilter('all');
-                                        }
-                                    }}
-                                >
-                                    {a.name}
-                                </DropdownMenuCheckboxItem>
-                            ))}
-                            {availableAgents.filter(a => a.type === 'inbound').length === 0 && (
-                                <div className="px-2 py-1 text-xs text-gray-500 italic">No hay agentes entrantes</div>
+                            {/* Inbound Agents - Hide if in Agent Context */}
+                            {!agentId && (
+                                <>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuLabel>Entrantes</DropdownMenuLabel>
+                                    {availableAgents.filter(a => a.type === 'inbound').map(a => (
+                                        <DropdownMenuCheckboxItem
+                                            key={a.id}
+                                            checked={selectedAgentIds.includes(a.id)}
+                                            onCheckedChange={(checked) => {
+                                                setSelectedAgentIds(prev =>
+                                                    checked ? [...prev, a.id] : prev.filter(id => id !== a.id)
+                                                );
+                                                if (checked) {
+                                                    if (agentTypeFilter === 'outbound') setAgentTypeFilter('all');
+                                                }
+                                            }}
+                                        >
+                                            {a.name}
+                                        </DropdownMenuCheckboxItem>
+                                    ))}
+                                    {availableAgents.filter(a => a.type === 'inbound').length === 0 && (
+                                        <div className="px-2 py-1 text-xs text-gray-500 italic">No hay agentes entrantes</div>
+                                    )}
+                                </>
                             )}
                         </DropdownMenuContent>
                     </DropdownMenu>

@@ -358,10 +358,10 @@ export function CallHistoryTable({ agentId: initialAgentId }: CallHistoryTablePr
                     <Select value={selectedCampaignId} onValueChange={setSelectedCampaignId}>
                         <SelectTrigger className="w-[200px] h-9 bg-white dark:bg-gray-950 border-gray-200 dark:border-gray-800">
                             <Megaphone className="w-3.5 h-3.5 mr-2 text-gray-400" />
-                            <SelectValue placeholder="Campaña" />
+                            <SelectValue placeholder={initialAgentId ? "Filtrar por campaña" : "Campaña"} />
                         </SelectTrigger>
                         <SelectContent>
-                            <SelectItem value="all">Todas las campañas</SelectItem>
+                            <SelectItem value="all">{initialAgentId ? "Todas las campañas del agente" : "Todas las campañas"}</SelectItem>
                             <SelectItem value="testing" className="text-amber-600 dark:text-amber-400 font-medium">
                                 Entorno de Pruebas
                             </SelectItem>
