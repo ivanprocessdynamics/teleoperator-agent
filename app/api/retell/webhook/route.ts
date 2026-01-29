@@ -333,7 +333,10 @@ async function handleCallAnalyzed(callId: string, data: any) {
     // Otherwise, fall back to Subworkspace config (for Testing Environment calls).
     if (data.agent_id) {
         try {
-            console.log(`[AI Extraction] Checking for custom field config for agent ${data.agent_id}`);
+            console.log(`[AI Extraction] ========================================`);
+            console.log(`[AI Extraction] Starting extraction for agent_id: ${data.agent_id}`);
+            console.log(`[AI Extraction] Campaign ID from metadata: ${data.metadata?.campaign_id || 'NONE'}`);
+            console.log(`[AI Extraction] Transcript length: ${transcriptText?.length || 0} chars`);
 
             let customFields: any[] = [];
             let configSource = 'none';
@@ -371,15 +374,27 @@ async function handleCallAnalyzed(callId: string, data: any) {
 
             // 2. Fallback: Use Subworkspace config
             if (customFields.length === 0) {
+                console.log(`[AI Extraction] No campaign config, falling back to Subworkspace lookup...`);
+                console.log(`[AI Extraction] Searching for subworkspace with retell_agent_id = "${data.agent_id}"`);
+
                 if (adminDb) {
+                    // First, list all subworkspaces for debugging
+                    const allSubsSnapshot = await adminDb.collection("subworkspaces").get();
+                    console.log(`[AI Extraction] Total subworkspaces in DB: ${allSubsSnapshot.size}`);
+                    allSubsSnapshot.docs.forEach(d => {
+                        const subData = d.data();
+                        console.log(`[AI Extraction]   - ${d.id}: retell_agent_id="${subData.retell_agent_id}", name="${subData.name}", type="${subData.type}"`);
+                    });
+
                     const snapshot = await adminDb.collection("subworkspaces").where("retell_agent_id", "==", data.agent_id).get();
                     if (!snapshot.empty) {
                         const subSettings = snapshot.docs[0].data();
                         customFields = subSettings?.analysis_config?.custom_fields || [];
                         configSource = `subworkspace:${snapshot.docs[0].id}`;
-                        console.log(`[AI Extraction] Loaded ${customFields.length} custom fields from Subworkspace (Admin).`);
+                        console.log(`[AI Extraction] FOUND! Loaded ${customFields.length} custom fields from Subworkspace (Admin).`);
+                        console.log(`[AI Extraction] Custom fields: ${JSON.stringify(customFields.map((f: any) => f.name))}`);
                     } else {
-                        console.log(`[AI Extraction] No subworkspace found for agent ${data.agent_id} (Admin)`);
+                        console.log(`[AI Extraction] NO MATCH FOUND for agent ${data.agent_id} (Admin)`);
                     }
                 } else {
                     // Fallback to Client SDK
