@@ -10,6 +10,7 @@ export default function GlobalStatsPage() {
     const { userData } = useAuth();
     const [subworkspaceId, setSubworkspaceId] = useState<string>("");
     const [currentWorkspaceId, setCurrentWorkspaceId] = useState<string>("");
+    const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
         // Check localStorage for selected workspace
@@ -42,6 +43,7 @@ export default function GlobalStatsPage() {
     useEffect(() => {
         const fetchContext = async () => {
             if (!userData?.uid) return;
+            setIsLoading(true);
 
             // Use the selected workspace or find user's first workspace
             let targetWorkspaceId = currentWorkspaceId;
@@ -83,25 +85,30 @@ export default function GlobalStatsPage() {
                 }
             }
 
-            if (!targetWorkspaceId) return;
-
-            try {
-                // Get first subworkspace from this workspace
-                const q = query(
-                    collection(db, "subworkspaces"),
-                    where("workspace_id", "==", targetWorkspaceId),
-                    limit(1)
-                );
-                const snap = await getDocs(q);
-                if (!snap.empty) {
-                    setSubworkspaceId(snap.docs[0].id);
+            if (targetWorkspaceId) {
+                try {
+                    // Get first subworkspace from this workspace
+                    const q = query(
+                        collection(db, "subworkspaces"),
+                        where("workspace_id", "==", targetWorkspaceId),
+                        limit(1)
+                    );
+                    const snap = await getDocs(q);
+                    if (!snap.empty) {
+                        setSubworkspaceId(snap.docs[0].id);
+                    }
+                } catch (err) {
+                    console.error("Error fetching global context:", err);
                 }
-            } catch (err) {
-                console.error("Error fetching global context:", err);
             }
+            setIsLoading(false);
         };
         fetchContext();
     }, [userData, currentWorkspaceId]);
+
+    if (isLoading) {
+        return <div className="p-6 flex justify-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 dark:border-white"></div></div>;
+    }
 
     return (
         <div className="p-6 space-y-6">
