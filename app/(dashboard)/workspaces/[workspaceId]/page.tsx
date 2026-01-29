@@ -4,9 +4,10 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { collection, query, where, getDocs, doc, getDoc, updateDoc, deleteDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { useAuth } from "@/contexts/AuthContext";
 import { CreateSubworkspaceModal } from "@/components/CreateSubworkspaceModal";
 import { Button } from "@/components/ui/button";
-import { Mic, Users, ArrowRight, Pencil, Check, X, Trash2, PhoneIncoming } from "lucide-react";
+import { Mic, Users, ArrowRight, Pencil, Check, X, Trash2, PhoneIncoming, ShieldAlert } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import Link from "next/link";
 import { SkeletonPage } from "@/components/ui/skeleton";
@@ -41,8 +42,10 @@ const COLORS = [
 export default function WorkspacePage() {
     const params = useParams();
     const workspaceId = params.workspaceId as string;
+    const { userData, loading: authLoading } = useAuth();
     const [subworkspaces, setSubworkspaces] = useState<Subworkspace[]>([]);
     const [loading, setLoading] = useState(true);
+    const [hasAccess, setHasAccess] = useState<boolean | null>(null); // null = checking, true = has access, false = no access
     const [workspaceName, setWorkspaceName] = useState("");
     const [isEditingName, setIsEditingName] = useState(false);
     const [tempName, setTempName] = useState("");
@@ -116,9 +119,48 @@ export default function WorkspacePage() {
         }
     };
 
+    // Access control check
+    useEffect(() => {
+        async function checkAccess() {
+            if (!workspaceId || !userData?.uid) return;
+
+            try {
+                // Superadmin has access to everything
+                if (userData.role === 'superadmin') {
+                    setHasAccess(true);
+                    return;
+                }
+
+                // Check if user is workspace owner
+                const wsRef = doc(db, "workspaces", workspaceId);
+                const wsSnap = await getDoc(wsRef);
+                if (wsSnap.exists() && wsSnap.data().owner_uid === userData.uid) {
+                    setHasAccess(true);
+                    return;
+                }
+
+                // Check if user is a member of this workspace
+                const memberRef = doc(db, "workspaces", workspaceId, "members", userData.uid);
+                const memberSnap = await getDoc(memberRef);
+                if (memberSnap.exists()) {
+                    setHasAccess(true);
+                    return;
+                }
+
+                // No access
+                setHasAccess(false);
+            } catch (error) {
+                console.error("Error checking access:", error);
+                setHasAccess(false);
+            }
+        }
+
+        checkAccess();
+    }, [workspaceId, userData]);
+
     useEffect(() => {
         async function fetchData() {
-            if (!workspaceId) return;
+            if (!workspaceId || hasAccess !== true) return;
 
             try {
                 // Fetch Workspace Name
@@ -169,7 +211,35 @@ export default function WorkspacePage() {
         }
 
         fetchData();
-    }, [workspaceId]);
+    }, [workspaceId, hasAccess]);
+
+    // Show loading while checking auth or access
+    if (authLoading || hasAccess === null) return <SkeletonPage />;
+
+    // Access denied - show unauthorized message
+    if (hasAccess === false) {
+        return (
+            <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
+                <div className="flex items-center justify-center h-16 w-16 rounded-full bg-red-100 dark:bg-red-900/30">
+                    <ShieldAlert className="h-8 w-8 text-red-600 dark:text-red-400" />
+                </div>
+                <h2 className="text-xl font-bold text-gray-900 dark:text-white">
+                    Acceso Denegado
+                </h2>
+                <p className="text-gray-500 dark:text-gray-400 text-center max-w-md">
+                    No tienes permiso para acceder a este workspace.
+                    Contacta con el administrador si crees que deberías tener acceso.
+                </p>
+                <Button
+                    onClick={() => router.push('/workspaces')}
+                    variant="outline"
+                    className="mt-4"
+                >
+                    Volver a Workspaces
+                </Button>
+            </div>
+        );
+    }
 
     if (loading) return <SkeletonPage />;
 
