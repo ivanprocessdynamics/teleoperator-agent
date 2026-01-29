@@ -28,7 +28,7 @@ async function checkConfig() {
         console.log(`Config found: ${!!data.analysis_config}`);
         if (data.analysis_config) {
             console.log(`Custom Fields: ${data.analysis_config.custom_fields?.length || 0}`);
-            data.analysis_config.custom_fields?.forEach(f => {
+            data.analysis_config.custom_fields?.forEach((f: any) => {
                 console.log(` - ${f.name} (Archived: ${f.isArchived})`);
             });
         }
