@@ -201,9 +201,10 @@ export function CallHistoryTable({ agentId: initialAgentId }: CallHistoryTablePr
 
     // Derived Campaign IDs
     useEffect(() => {
-        const cIds = Array.from(new Set(filteredCalls.map(c => c.metadata?.campaign_id || c.agent_id).filter(Boolean))) as string[];
+        // Use 'calls' (full list) instead of 'filteredCalls' so the dropdown options don't disappear when filtering
+        const cIds = Array.from(new Set(calls.map(c => c.metadata?.campaign_id || c.agent_id).filter(Boolean))) as string[];
         setUniqueCampaignIds(cIds);
-    }, [filteredCalls]);
+    }, [calls]);
 
     // Client-side Filtering
     useEffect(() => {

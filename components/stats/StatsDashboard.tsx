@@ -295,8 +295,17 @@ export function StatsDashboard(props: StatsDashboardProps) {
         const filteredCalls = rawCalls.filter(c => {
             // 1. Campaign Filter
             if (selectedCampaigns.length > 0) {
-                // strict check: must be in the list
-                if (!c.metadata?.campaign_id || !selectedCampaigns.includes(c.metadata?.campaign_id)) return false;
+                const isTesting = c.metadata?.type === 'testing' || (!c.metadata?.campaign_id && !campaignMap[c.agent_id]);
+                const showTesting = selectedCampaigns.includes('testing_env');
+                const showSpecific = c.metadata?.campaign_id && selectedCampaigns.includes(c.metadata?.campaign_id);
+
+                if (showTesting && isTesting) {
+                    // Match testing calls
+                } else if (showSpecific) {
+                    // Match specific campaign
+                } else {
+                    return false;
+                }
             }
 
             // 2. Agent Type Filter
@@ -639,6 +648,20 @@ export function StatsDashboard(props: StatsDashboardProps) {
 
                             {/* Campaigns */}
                             <DropdownMenuLabel>Campañas {agentId ? 'del Agente' : 'Salientes'}</DropdownMenuLabel>
+
+                            <DropdownMenuCheckboxItem
+                                checked={selectedCampaigns.includes('testing_env')}
+                                onCheckedChange={(checked) => {
+                                    setSelectedCampaigns(prev =>
+                                        checked ? [...prev, 'testing_env'] : prev.filter(id => id !== 'testing_env')
+                                    );
+                                    if (checked && !agentId && agentTypeFilter === 'inbound') setAgentTypeFilter('all');
+                                }}
+                                className="text-amber-600 dark:text-amber-400 font-medium"
+                            >
+                                Entorno de Pruebas
+                            </DropdownMenuCheckboxItem>
+
                             {uniqueCampaigns.map(cid => (
                                 <DropdownMenuCheckboxItem
                                     key={cid}
