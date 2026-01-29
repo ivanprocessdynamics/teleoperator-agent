@@ -12,6 +12,7 @@ import { CallHistoryTable } from "@/components/calls/CallHistoryTable";
 import { StatsDashboard } from "@/components/stats/StatsDashboard";
 import { CampaignPrompt } from "@/components/campaigns/CampaignPrompt";
 import { CampaignAnalysis } from "@/components/campaigns/CampaignAnalysis";
+import { ConnectPhoneNumberModal } from "@/components/inbound/PhoneNumberConnectModal";
 
 interface InboundAgentViewProps {
     subworkspaceId: string;
@@ -59,6 +60,11 @@ export function InboundAgentView({ subworkspaceId, agentId }: InboundAgentViewPr
 
     return (
         <div className="flex flex-col gap-6">
+            <div className="flex justify-between items-center">
+                <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Configuración del Agente</h1>
+                {agentId && <ConnectPhoneNumberModal agentId={agentId} />}
+            </div>
+
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
                 <TabsList className="grid w-full max-w-[800px] grid-cols-4 bg-gray-100 dark:bg-gray-800 p-1 rounded-lg">
                     <TabsTrigger

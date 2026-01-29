@@ -361,7 +361,11 @@ export function CallHistoryTable({ agentId: initialAgentId }: CallHistoryTablePr
                             <SelectValue placeholder={initialAgentId ? "Filtrar por campaña" : "Campaña"} />
                         </SelectTrigger>
                         <SelectContent>
-                            <SelectItem value="all">{initialAgentId ? "Todas las campañas del agente" : "Todas las campañas"}</SelectItem>
+                            <SelectItem value="all">
+                                {initialAgentId
+                                    ? (agentMap[initialAgentId]?.type === 'inbound' ? "Agente en producción" : "Todas las campañas del agente")
+                                    : "Todas las campañas"}
+                            </SelectItem>
                             <SelectItem value="testing" className="text-amber-600 dark:text-amber-400 font-medium">
                                 Entorno de Pruebas
                             </SelectItem>
