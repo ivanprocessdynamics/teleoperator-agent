@@ -6,7 +6,7 @@ import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, L
 import { db } from "@/lib/firebase";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { ChatTranscript } from "@/components/calls/ChatTranscript";
-import { Loader2, TrendingUp, Clock, Phone, ThumbsUp, Activity, RefreshCcw, EyeOff, Eye, Archive, Trash2, ArrowRight, MessageSquare, ExternalLink, Pencil, Users, Filter } from "lucide-react";
+import { Loader2, TrendingUp, Clock, Phone, ThumbsUp, Activity, RefreshCcw, EyeOff, Eye, Archive, Trash2, ArrowRight, MessageSquare, ExternalLink, Pencil, Users, Filter, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup, SelectLabel } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
@@ -647,58 +647,63 @@ export function StatsDashboard(props: StatsDashboardProps) {
 
 
                             {/* Campaigns */}
-                            <DropdownMenuLabel>Campañas {agentId ? 'del Agente' : 'Salientes'}</DropdownMenuLabel>
+                            <DropdownMenuItem
+                                onSelect={(e) => {
+                                    e.preventDefault();
+                                    const allSelected = uniqueCampaigns.length > 0 &&
+                                        (uniqueCampaigns.every(id => selectedCampaigns.includes(id)) && selectedCampaigns.includes('testing_env'));
 
-                            <DropdownMenuCheckboxItem
-                                checked={
-                                    uniqueCampaigns.length > 0 &&
-                                    (uniqueCampaigns.every(id => selectedCampaigns.includes(id)) && selectedCampaigns.includes('testing_env'))
-                                }
-                                onCheckedChange={(checked) => {
-                                    if (checked) {
+                                    if (allSelected) {
+                                        setSelectedCampaigns([]);
+                                    } else {
                                         setSelectedCampaigns([...uniqueCampaigns, 'testing_env']);
                                         if (!agentId && agentTypeFilter === 'inbound') setAgentTypeFilter('all');
-                                    } else {
-                                        setSelectedCampaigns([]);
                                     }
                                 }}
-                                className="font-semibold"
+                                className="flex justify-between items-center font-semibold cursor-pointer"
                             >
-                                Seleccionar todas
-                            </DropdownMenuCheckboxItem>
+                                <span>Seleccionar todas</span>
+                                {(uniqueCampaigns.length > 0 &&
+                                    uniqueCampaigns.every(id => selectedCampaigns.includes(id)) &&
+                                    selectedCampaigns.includes('testing_env')) && (
+                                        <Check className="h-4 w-4 ml-2" />
+                                    )}
+                            </DropdownMenuItem>
                             <DropdownMenuSeparator />
 
-                            <DropdownMenuCheckboxItem
-                                checked={selectedCampaigns.includes('testing_env')}
-                                onCheckedChange={(checked) => {
+                            <DropdownMenuItem
+                                onSelect={(e) => {
+                                    e.preventDefault();
+                                    const isSelected = selectedCampaigns.includes('testing_env');
                                     setSelectedCampaigns(prev =>
-                                        checked ? [...prev, 'testing_env'] : prev.filter(id => id !== 'testing_env')
+                                        isSelected ? prev.filter(id => id !== 'testing_env') : [...prev, 'testing_env']
                                     );
-                                    if (checked && !agentId && agentTypeFilter === 'inbound') setAgentTypeFilter('all');
+                                    if (!isSelected && !agentId && agentTypeFilter === 'inbound') setAgentTypeFilter('all');
                                 }}
-                                className="text-amber-600 dark:text-amber-400 font-medium truncate max-w-[250px]"
+                                className="flex justify-between items-center text-amber-600 dark:text-amber-400 font-medium cursor-pointer"
                             >
-                                Entorno de Pruebas
-                            </DropdownMenuCheckboxItem>
+                                <span className="truncate max-w-[220px]">Entorno de Pruebas</span>
+                                {selectedCampaigns.includes('testing_env') && <Check className="h-4 w-4 ml-2" />}
+                            </DropdownMenuItem>
 
                             {uniqueCampaigns.map(cid => (
-                                <DropdownMenuCheckboxItem
+                                <DropdownMenuItem
                                     key={cid}
-                                    checked={selectedCampaigns.includes(cid)}
-                                    onCheckedChange={(checked) => {
+                                    onSelect={(e) => {
+                                        e.preventDefault();
+                                        const isSelected = selectedCampaigns.includes(cid);
                                         setSelectedCampaigns(prev =>
-                                            checked ? [...prev, cid] : prev.filter(id => id !== cid)
+                                            isSelected ? prev.filter(id => id !== cid) : [...prev, cid]
                                         );
-                                        // If selecting campaigns and NOT in agent context, implicitly switch logic if needed.
-                                        // In Agent context, we just filter the agent's calls.
-                                        if (checked && !agentId) {
+                                        if (!isSelected && !agentId) {
                                             if (agentTypeFilter === 'inbound') setAgentTypeFilter('all');
                                         }
                                     }}
-                                    className="truncate max-w-[250px]"
+                                    className="flex justify-between items-center cursor-pointer"
                                 >
-                                    {campaignMap[cid] || "Campaña desconocida"}
-                                </DropdownMenuCheckboxItem>
+                                    <span className="truncate max-w-[220px]">{campaignMap[cid] || "Campaña desconocida"}</span>
+                                    {selectedCampaigns.includes(cid) && <Check className="h-4 w-4 ml-2" />}
+                                </DropdownMenuItem>
                             ))}
                             {uniqueCampaigns.length === 0 && <div className="px-2 py-1 text-xs text-gray-500 italic">No hay campañas disponibles</div>}
 
