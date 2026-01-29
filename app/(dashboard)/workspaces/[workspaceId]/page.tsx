@@ -134,11 +134,33 @@ export default function WorkspacePage() {
                     where("workspace_id", "==", workspaceId)
                 );
                 const querySnapshot = await getDocs(q);
-                const subs: Subworkspace[] = [];
+                const subsData: Subworkspace[] = [];
                 querySnapshot.forEach((doc) => {
-                    subs.push({ id: doc.id, ...doc.data() } as Subworkspace);
+                    subsData.push({ id: doc.id, ...doc.data() } as Subworkspace);
                 });
-                setSubworkspaces(subs);
+
+                // Fetch Phone Numbers from Retell
+                // We do this to know WHICH agent is connected to WHICH number in real-time
+                const res = await fetch("/api/retell/get-phone-numbers");
+                let phoneMap: Record<string, string> = {};
+
+                if (res.ok) {
+                    const numbers: { phone_number: string, inbound_agent_id?: string }[] = await res.json();
+                    numbers.forEach(n => {
+                        if (n.inbound_agent_id) {
+                            phoneMap[n.inbound_agent_id] = n.phone_number;
+                        }
+                    });
+                }
+
+                // Merge phone info into subworkspaces
+                const subsWithPhones = subsData.map(sub => ({
+                    ...sub,
+                    phone_number: sub.retell_agent_id ? phoneMap[sub.retell_agent_id] : undefined
+                }));
+
+                setSubworkspaces(subsWithPhones);
+
             } catch (error) {
                 console.error("Error fetching data:", error);
             } finally {

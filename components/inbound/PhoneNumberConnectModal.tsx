@@ -33,7 +33,7 @@ export function ConnectPhoneNumberModal({ agentId, trigger }: ConnectPhoneNumber
     const [open, setOpen] = useState(false);
     const [loading, setLoading] = useState(false);
     const [phoneNumbers, setPhoneNumbers] = useState<PhoneNumber[]>([]);
-    const [agentNames, setAgentNames] = useState<Record<string, string>>({});
+    const [agentNames, setAgentNames] = useState<Record<string, { name: string, type: string }>>({});
     const [selectedNumbers, setSelectedNumbers] = useState<string[]>([]);
     const [processing, setProcessing] = useState(false);
 
@@ -54,11 +54,14 @@ export function ConnectPhoneNumberModal({ agentId, trigger }: ConnectPhoneNumber
 
             // 2. Fetch all subworkspaces to map Agent IDs to Names
             const subSnap = await getDocs(collection(db, "subworkspaces"));
-            const nameMap: Record<string, string> = {};
+            const nameMap: Record<string, { name: string, type: string }> = {};
             subSnap.forEach(doc => {
                 const d = doc.data();
                 if (d.retell_agent_id) {
-                    nameMap[d.retell_agent_id] = d.name;
+                    nameMap[d.retell_agent_id] = {
+                        name: d.name,
+                        type: d.type || 'outbound' // Default to outbound if undefined
+                    };
                 }
             });
             setAgentNames(nameMap);
@@ -157,8 +160,14 @@ export function ConnectPhoneNumberModal({ agentId, trigger }: ConnectPhoneNumber
                         phoneNumbers.map((p) => {
                             const isSelected = selectedNumbers.includes(p.phone_number);
                             const currentOwnerId = p.inbound_agent_id;
-                            const currentOwnerName = currentOwnerId ? agentNames[currentOwnerId] : null;
-                            const isOwnedByOther = currentOwnerId && currentOwnerId !== agentId;
+                            const currentOwnerData = currentOwnerId ? agentNames[currentOwnerId] : null;
+                            const currentOwnerName = currentOwnerData?.name;
+                            const currentOwnerType = currentOwnerData?.type;
+
+                            // Only consider it "owned by other" if the other agent is ALSO an INBOUND agent.
+                            const isOwnedByOther = currentOwnerId &&
+                                currentOwnerId !== agentId &&
+                                currentOwnerType === 'inbound';
 
                             return (
                                 <div
