@@ -216,7 +216,36 @@ export function StatsDashboard(props: StatsDashboardProps) {
 
             // If a specific workspaceId is provided, use only that
             if (props.workspaceId) {
-                wsIds = [props.workspaceId];
+                // SECURITY CHECK: Verify user access to this workspace
+                try {
+                    const wsRef = doc(db, "workspaces", props.workspaceId);
+                    const wsSnap = await getDoc(wsRef);
+                    let hasAccess = false;
+
+                    if (wsSnap.exists()) {
+                        if (wsSnap.data().owner_uid === userData.uid) {
+                            hasAccess = true;
+                        } else {
+                            // Check membership
+                            const memRef = doc(db, "workspaces", props.workspaceId, "members", userData.uid);
+                            const memSnap = await getDoc(memRef);
+                            if (memSnap.exists()) {
+                                hasAccess = true;
+                            }
+                        }
+                    }
+
+                    if (hasAccess) {
+                        wsIds = [props.workspaceId];
+                    } else {
+                        console.warn("Access denied to workspace:", props.workspaceId);
+                        // If access denied, do not fetch anything
+                        wsIds = [];
+                    }
+                } catch (err) {
+                    console.error("Error verifying workspace access:", err);
+                    wsIds = [];
+                }
             } else {
                 // Otherwise, get user's owned workspaces
                 const wsQ = query(collection(db, "workspaces"), where("owner_uid", "==", userData.uid));

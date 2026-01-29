@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { collection, query, where, orderBy, onSnapshot, limit, Timestamp, getDocs } from "firebase/firestore";
+import { collection, query, where, orderBy, onSnapshot, limit, Timestamp, getDocs, doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -95,7 +95,36 @@ export function CallHistoryTable({ agentId: initialAgentId, workspaceId }: CallH
 
             // If a specific workspaceId is provided, use only that
             if (workspaceId) {
-                wsIds = [workspaceId];
+                // SECURITY CHECK: Verify user access to this workspace
+                try {
+                    const wsRef = doc(db, "workspaces", workspaceId);
+                    const wsSnap = await getDoc(wsRef);
+                    let hasAccess = false;
+
+                    if (wsSnap.exists()) {
+                        if (wsSnap.data().owner_uid === userData.uid) {
+                            hasAccess = true;
+                        } else {
+                            // Check membership
+                            const memRef = doc(db, "workspaces", workspaceId, "members", userData.uid);
+                            const memSnap = await getDoc(memRef);
+                            if (memSnap.exists()) {
+                                hasAccess = true;
+                            }
+                        }
+                    }
+
+                    if (hasAccess) {
+                        wsIds = [workspaceId];
+                    } else {
+                        console.warn("Access denied to workspace:", workspaceId);
+                        // If access denied, do not fetch anything
+                        wsIds = [];
+                    }
+                } catch (err) {
+                    console.error("Error verifying workspace access:", err);
+                    wsIds = [];
+                }
             } else {
                 // Otherwise, get user's owned workspaces
                 const wsQ = query(collection(db, "workspaces"), where("owner_uid", "==", userData.uid));
