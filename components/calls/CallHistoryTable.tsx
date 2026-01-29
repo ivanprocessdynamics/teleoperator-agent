@@ -54,11 +54,12 @@ interface CallRecord {
 
 interface CallHistoryTableProps {
     agentId?: string;
+    workspaceId?: string; // Filter calls by specific workspace
 }
 
 import { useAuth } from "@/contexts/AuthContext";
 
-export function CallHistoryTable({ agentId: initialAgentId }: CallHistoryTableProps) {
+export function CallHistoryTable({ agentId: initialAgentId, workspaceId }: CallHistoryTableProps) {
     const { userData } = useAuth(); // Access current user scope
     const [calls, setCalls] = useState<CallRecord[]>([]);
     const [filteredCalls, setFilteredCalls] = useState<CallRecord[]>([]);
@@ -89,10 +90,18 @@ export function CallHistoryTable({ agentId: initialAgentId }: CallHistoryTablePr
         if (!userData?.uid) return;
 
         const fetchScopedData = async () => {
-            // 1. Get User's Workspaces
-            const wsQ = query(collection(db, "workspaces"), where("owner_uid", "==", userData.uid));
-            const wsSnap = await getDocs(wsQ);
-            const wsIds = wsSnap.docs.map(d => d.id);
+            // 1. Get Workspace IDs to filter by
+            let wsIds: string[] = [];
+
+            // If a specific workspaceId is provided, use only that
+            if (workspaceId) {
+                wsIds = [workspaceId];
+            } else {
+                // Otherwise, get user's owned workspaces
+                const wsQ = query(collection(db, "workspaces"), where("owner_uid", "==", userData.uid));
+                const wsSnap = await getDocs(wsQ);
+                wsIds = wsSnap.docs.map(d => d.id);
+            }
 
             if (wsIds.length === 0) {
                 setAvailableAgents([]);
@@ -161,7 +170,7 @@ export function CallHistoryTable({ agentId: initialAgentId }: CallHistoryTablePr
 
         const cleanup = fetchScopedData();
         return () => { cleanup.then(unsub => unsub && unsub()); };
-    }, [initialAgentId, userData]); // Added userData dependency
+    }, [initialAgentId, userData, workspaceId]); // Added workspaceId dependency
 
     useEffect(() => {
         setError(null);

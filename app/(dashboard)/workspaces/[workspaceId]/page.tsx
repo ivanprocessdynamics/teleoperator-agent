@@ -168,6 +168,8 @@ export default function WorkspacePage() {
                 const wsSnap = await getDoc(wsRef);
                 if (wsSnap.exists()) {
                     setWorkspaceName(wsSnap.data().name);
+                    // Save to localStorage for global stats/history pages
+                    localStorage.setItem("selectedWorkspaceId", workspaceId);
                 }
 
                 // Fetch Subworkspaces

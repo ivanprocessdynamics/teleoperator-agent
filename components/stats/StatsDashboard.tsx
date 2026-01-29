@@ -112,6 +112,7 @@ function EnumPieChart({ data, name }: { data: any, name: string }) {
 interface StatsDashboardProps {
     agentId?: string;
     subworkspaceId?: string;
+    workspaceId?: string; // Filter stats by specific workspace
 }
 
 
@@ -166,10 +167,18 @@ export function StatsDashboard(props: StatsDashboardProps) {
         if (!userData?.uid) return;
 
         const fetchScopedData = async () => {
-            // 1. Get User's Workspaces
-            const wsQ = query(collection(db, "workspaces"), where("owner_uid", "==", userData.uid));
-            const wsSnap = await getDocs(wsQ);
-            const wsIds = wsSnap.docs.map(d => d.id);
+            // 1. Get Workspace IDs to filter by
+            let wsIds: string[] = [];
+
+            // If a specific workspaceId is provided, use only that
+            if (props.workspaceId) {
+                wsIds = [props.workspaceId];
+            } else {
+                // Otherwise, get user's owned workspaces
+                const wsQ = query(collection(db, "workspaces"), where("owner_uid", "==", userData.uid));
+                const wsSnap = await getDocs(wsQ);
+                wsIds = wsSnap.docs.map(d => d.id);
+            }
 
             // If no workspaces, no agents to show
             if (wsIds.length === 0) {
@@ -228,7 +237,7 @@ export function StatsDashboard(props: StatsDashboardProps) {
 
         const cleanup = fetchScopedData();
         return () => { cleanup.then(unsub => unsub && unsub()); };
-    }, [agentId, userData]);
+    }, [agentId, userData, props.workspaceId]);
 
     // 2. Fetch Data (Calls + Config)
     const fetchStats = async () => {

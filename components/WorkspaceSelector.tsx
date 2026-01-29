@@ -135,6 +135,8 @@ export function WorkspaceSelector() {
     }, [currentWorkspaceId, workspaces]);
 
     const handleSelectWorkspace = (workspace: Workspace) => {
+        // Save to localStorage for other pages (global-stats, historial)
+        localStorage.setItem("selectedWorkspaceId", workspace.id);
         router.push(`/workspaces/${workspace.id}`);
     };
 
