@@ -31,7 +31,10 @@ interface MemberData {
     role: "admin" | "member";
     joined_at: any;
     isOwner?: boolean; // Mark if this is the workspace owner
+    isSuperadmin?: boolean; // Mark if this is a global superadmin
 }
+
+const SUPER_ADMIN_EMAIL = "cezarvalentinivan@gmail.com";
 
 interface WorkspaceData {
     id: string;
@@ -86,18 +89,47 @@ export default function TeamDetailPage() {
 
                 if (ownerUserSnap.exists()) {
                     const ownerData = ownerUserSnap.data();
+                    const isSuperadmin = ownerData.email?.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase() || ownerData.role === 'superadmin';
                     membersList.unshift({
                         uid: ownerUid,
                         email: ownerData.email || "Owner",
-                        role: "admin", // Owner is always admin
+                        role: "admin",
                         joined_at: wsSnap.data().created_at || null,
-                        isOwner: true // Mark as owner for special display
-                    } as MemberData & { isOwner?: boolean });
+                        isOwner: true,
+                        isSuperadmin: isSuperadmin
+                    });
                 }
             } else if (ownerInList) {
-                // Mark existing owner entry
-                (ownerInList as MemberData & { isOwner?: boolean }).isOwner = true;
+                ownerInList.isOwner = true;
             }
+
+            // 4. Check each member for superadmin status
+            for (const member of membersList) {
+                if (member.email?.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase()) {
+                    member.isSuperadmin = true;
+                } else if (!member.isSuperadmin) {
+                    try {
+                        const userRef = doc(db, "users", member.uid);
+                        const userSnap = await getDoc(userRef);
+                        if (userSnap.exists() && userSnap.data().role === 'superadmin') {
+                            member.isSuperadmin = true;
+                        }
+                    } catch (e) {
+                        // Ignore errors
+                    }
+                }
+            }
+
+            // 5. Sort: superadmin > owner > admin > member
+            membersList.sort((a, b) => {
+                if (a.isSuperadmin && !b.isSuperadmin) return -1;
+                if (!a.isSuperadmin && b.isSuperadmin) return 1;
+                if (a.isOwner && !b.isOwner) return -1;
+                if (!a.isOwner && b.isOwner) return 1;
+                if (a.role === 'admin' && b.role !== 'admin') return -1;
+                if (a.role !== 'admin' && b.role === 'admin') return 1;
+                return 0;
+            });
 
             setMembers(membersList);
 
@@ -206,18 +238,19 @@ export default function TeamDetailPage() {
                                 </TableCell>
                                 <TableCell>
                                     <Badge
-                                        variant={m.role === 'admin' || m.isOwner ? "default" : "secondary"}
+                                        variant={m.isSuperadmin || m.isOwner || m.role === 'admin' ? "default" : "secondary"}
                                         className={
-                                            m.isOwner ? "bg-amber-100 text-amber-700 hover:bg-amber-200 dark:bg-amber-900/30 dark:text-amber-300" :
-                                                m.role === 'admin' ? "bg-purple-100 text-purple-700 hover:bg-purple-200 dark:bg-purple-900/30 dark:text-purple-300" :
-                                                    "bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300"
+                                            m.isSuperadmin ? "bg-red-100 text-red-700 hover:bg-red-200 dark:bg-red-900/30 dark:text-red-300" :
+                                                m.isOwner ? "bg-amber-100 text-amber-700 hover:bg-amber-200 dark:bg-amber-900/30 dark:text-amber-300" :
+                                                    m.role === 'admin' ? "bg-purple-100 text-purple-700 hover:bg-purple-200 dark:bg-purple-900/30 dark:text-purple-300" :
+                                                        "bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300"
                                         }
                                     >
-                                        {m.isOwner ? 'Propietario' : m.role === 'admin' ? 'Admin' : 'Miembro'}
+                                        {m.isSuperadmin ? 'Super Admin' : m.isOwner ? 'Propietario' : m.role === 'admin' ? 'Admin' : 'Miembro'}
                                     </Badge>
                                 </TableCell>
                                 <TableCell className="text-right">
-                                    {canManage && (
+                                    {canManage && !m.isSuperadmin && !m.isOwner && (
                                         <DropdownMenu>
                                             <DropdownMenuTrigger asChild>
                                                 <Button variant="ghost" size="icon" className="h-8 w-8">
