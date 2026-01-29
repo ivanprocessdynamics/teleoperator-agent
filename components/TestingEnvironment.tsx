@@ -249,7 +249,7 @@ export function TestingEnvironment({ subworkspaceId, orbOnly }: TestingEnvironme
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
                             agent_id: retellAgentId,
-                            prompt: "ensure-dynamic-prompt-config" // Dummy value triggers {{campaign_prompt}} config
+                            prompt: latestPrompt
                         })
                     });
                 } catch (syncErr) {
