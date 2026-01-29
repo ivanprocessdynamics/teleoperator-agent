@@ -99,6 +99,11 @@ export function useCampaignExecutor({
                 console.log("Campaign complete - all calls finished");
                 isRunningRef.current = false;
                 setState(prev => ({ ...prev, isRunning: false }));
+
+                // Mark campaign as completed in Firestore
+                updateDoc(doc(db, "campaigns", campaignId), {
+                    status: 'completed'
+                }).catch(err => console.error("Error marking campaign complete:", err));
             }
         }
     }, [rows, phoneColumnId]);
@@ -273,8 +278,14 @@ export function useCampaignExecutor({
         isRunningRef.current = true;
         isPausedRef.current = false;
         setState(prev => ({ ...prev, isRunning: true, isPaused: false }));
+
+        // Mark campaign as running in Firestore
+        updateDoc(doc(db, "campaigns", campaignId), {
+            status: 'running'
+        }).catch(err => console.error("Error marking campaign running:", err));
+
         // Effect will pick up processing
-    }, []);
+    }, [campaignId]);
 
     const pause = useCallback(() => {
         isPausedRef.current = true;
