@@ -31,18 +31,18 @@ export function InviteUserModal() {
     const [open, setOpen] = useState(false);
     const [email, setEmail] = useState("");
 
-    // Default to 'visitor'
-    const [role, setRole] = useState<"admin" | "visitor">("visitor");
+    // Default to 'member'
+    const [role, setRole] = useState<"admin" | "member">("member");
     const [loading, setLoading] = useState(false);
 
     const handleOpenChange = (open: boolean) => {
         setOpen(open);
         if (!open) {
             setEmail("");
-            setRole("visitor");
+            setRole("member");
         } else {
-            // Reset to visitor when opening to be safe
-            setRole("visitor");
+            // Reset to member when opening to be safe
+            setRole("member");
         }
     };
 
@@ -61,7 +61,7 @@ export function InviteUserModal() {
             toast.success(`Invitación creada para ${email}`);
             setOpen(false);
             setEmail("");
-            setRole("visitor");
+            setRole("member");
         } catch (error) {
             console.error("Error creating invite:", error);
             toast.error("Error al crear la invitación");
@@ -97,7 +97,7 @@ export function InviteUserModal() {
                     </div>
                     <div className="grid gap-2">
                         <Label htmlFor="role">Rol</Label>
-                        <Select value={role} onValueChange={(v) => setRole(v as "admin" | "visitor")}>
+                        <Select value={role} onValueChange={(v) => setRole(v as "admin" | "member")}>
                             <SelectTrigger>
                                 <SelectValue placeholder="Selecciona un rol" />
                             </SelectTrigger>
@@ -105,7 +105,7 @@ export function InviteUserModal() {
                                 {userData?.role === 'superadmin' && (
                                     <SelectItem value="admin">Administrador</SelectItem>
                                 )}
-                                <SelectItem value="visitor">Visitante</SelectItem>
+                                <SelectItem value="member">Miembro</SelectItem>
                             </SelectContent>
                         </Select>
                     </div>
