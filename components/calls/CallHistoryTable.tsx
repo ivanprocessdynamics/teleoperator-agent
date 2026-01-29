@@ -268,29 +268,6 @@ export function CallHistoryTable({ agentId: initialAgentId, workspaceId }: CallH
     const [selectedAgentIds, setSelectedAgentIds] = useState<string[]>([]);
     const [availableAgents, setAvailableAgents] = useState<{ id: string, name: string, type: string }[]>([]);
     const [agentMap, setAgentMap] = useState<Record<string, { name: string, type: string }>>({});
-    const [customFields, setCustomFields] = useState<any[]>([]);
-
-    // Fetch Custom Fields Config (Only if agentId is present)
-    useEffect(() => {
-        if (!initialAgentId) {
-            setCustomFields([]);
-            return;
-        }
-        const fetchConfig = async () => {
-            try {
-                const q = query(collection(db, "subworkspaces"), where("retell_agent_id", "==", initialAgentId));
-                const snap = await getDocs(q);
-                if (!snap.empty) {
-                    const data = snap.docs[0].data();
-                    const fields = data.analysis_config?.custom_fields || [];
-                    setCustomFields(fields.filter((f: any) => !f.isArchived));
-                }
-            } catch (e) {
-                console.error("Error fetching agent config", e);
-            }
-        };
-        fetchConfig();
-    }, [initialAgentId]);
 
     // Fetch Agent Info for Filtering
     useEffect(() => {
@@ -566,9 +543,6 @@ export function CallHistoryTable({ agentId: initialAgentId, workspaceId }: CallH
                                 <TableHead className="w-[140px]">Campaña</TableHead>
                                 <TableHead className="w-[100px]">Duración</TableHead>
                                 <TableHead className="w-[140px]">Sentimiento</TableHead>
-                                {customFields.map(f => (
-                                    <TableHead key={f.id} className="whitespace-nowrap">{f.name}</TableHead>
-                                ))}
                                 <TableHead>Resumen de la Conversación</TableHead>
                                 <TableHead className="text-right w-[120px]">Acciones</TableHead>
                             </TableRow>
@@ -623,16 +597,6 @@ export function CallHistoryTable({ agentId: initialAgentId, workspaceId }: CallH
                                                 {sentiment.label}
                                             </div>
                                         </TableCell>
-                                        {customFields.map(f => {
-                                            const item = call.analysis?.custom_analysis_data?.find((d: any) => d.name === f.name || d.name === f.description); // Fallback logic
-                                            return (
-                                                <TableCell key={f.id}>
-                                                    <span className="text-sm text-gray-700 dark:text-gray-300">
-                                                        {item ? String(item.value) : "-"}
-                                                    </span>
-                                                </TableCell>
-                                            );
-                                        })}
                                         <TableCell>
                                             <div className="max-w-md">
                                                 <div
