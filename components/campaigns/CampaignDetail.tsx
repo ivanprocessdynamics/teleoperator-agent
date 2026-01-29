@@ -85,6 +85,23 @@ export function CampaignDetail({ campaignId, subworkspaceId, onBack }: CampaignD
     const [relaunchStartLine, setRelaunchStartLine] = useState("1");
     const [showRelaunchLineDialog, setShowRelaunchLineDialog] = useState(false);
 
+    const [phoneNumbers, setPhoneNumbers] = useState<{ phone_number: string; nickname?: string }[]>([]);
+
+    useEffect(() => {
+        async function fetchNumbers() {
+            try {
+                const res = await fetch("/api/retell/get-phone-numbers");
+                if (res.ok) {
+                    const data = await res.json();
+                    setPhoneNumbers(data);
+                }
+            } catch (error) {
+                console.error("Error fetching available numbers:", error);
+            }
+        }
+        fetchNumbers();
+    }, []);
+
     // Fetch Campaign
     useEffect(() => {
         if (!campaignId) return;
@@ -747,6 +764,7 @@ export function CampaignDetail({ campaignId, subworkspaceId, onBack }: CampaignD
                                     </h3>
 
                                     <div className="space-y-4">
+
                                         {/* From Number */}
                                         <div>
                                             <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1.5">
@@ -754,22 +772,42 @@ export function CampaignDetail({ campaignId, subworkspaceId, onBack }: CampaignD
                                             </label>
                                             <div className="flex items-center gap-2">
                                                 <Phone className="h-4 w-4 text-gray-400" />
-                                                <input
-                                                    type="text"
-                                                    placeholder="+34877450708"
-                                                    value={campaign.calling_config?.from_number || "+34877450708"}
-                                                    onChange={(e) => {
+                                                <Select
+                                                    value={campaign.calling_config?.from_number || ""}
+                                                    onValueChange={(value) => {
                                                         const newConfig: CallingConfig = {
-                                                            from_number: e.target.value,
+                                                            ...campaign.calling_config!,
+                                                            from_number: value,
                                                             concurrency_limit: campaign.calling_config?.concurrency_limit || 1,
                                                             retry_failed: campaign.calling_config?.retry_failed || false
                                                         };
                                                         debouncedSave({ calling_config: newConfig });
                                                     }}
-                                                    className="flex-1 px-3 py-2 text-sm border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                                />
+                                                >
+                                                    <SelectTrigger className="flex-1 h-9 text-sm border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500">
+                                                        <SelectValue placeholder="Seleccionar número..." />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        {phoneNumbers.length > 0 ? (
+                                                            phoneNumbers.map((phone) => (
+                                                                <SelectItem key={phone.phone_number} value={phone.phone_number}>
+                                                                    <div className="flex items-center gap-2">
+                                                                        <span>{phone.phone_number}</span>
+                                                                        {phone.nickname && (
+                                                                            <span className="text-gray-500 text-xs">({phone.nickname})</span>
+                                                                        )}
+                                                                    </div>
+                                                                </SelectItem>
+                                                            ))
+                                                        ) : (
+                                                            <div className="p-2 text-sm text-gray-500 text-center">
+                                                                No hay números disponibles
+                                                            </div>
+                                                        )}
+                                                    </SelectContent>
+                                                </Select>
                                             </div>
-                                            <p className="text-[10px] text-gray-400 mt-1">Formato E.164: +34XXXXXXXXX</p>
+                                            <p className="text-[10px] text-gray-400 mt-1">Número de Retell utilizado para realizar las llamadas.</p>
                                         </div>
 
                                         {/* Concurrency Limit */}
