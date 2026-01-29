@@ -203,7 +203,7 @@ export default function SubworkspacePage() {
                         <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-800 p-6">
                             <h2 className="text-xl font-semibold mb-4 text-gray-900 dark:text-white">Historial de Llamadas</h2>
                             {agentId ? (
-                                <CallHistoryTable agentId={agentId} />
+                                <CallHistoryTable agentId={agentId} subworkspaceId={subId} />
                             ) : (
                                 <div className="text-center py-10 text-gray-500">Cargando agente...</div>
                             )}

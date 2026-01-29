@@ -54,12 +54,13 @@ interface CallRecord {
 
 interface CallHistoryTableProps {
     agentId?: string;
+    subworkspaceId?: string; // DIRECT ID for reliable config fetching
     workspaceId?: string; // Filter calls by specific workspace
 }
 
 import { useAuth } from "@/contexts/AuthContext";
 
-export function CallHistoryTable({ agentId: initialAgentId, workspaceId }: CallHistoryTableProps) {
+export function CallHistoryTable({ agentId: initialAgentId, subworkspaceId, workspaceId }: CallHistoryTableProps) {
     const { userData } = useAuth(); // Access current user scope
     const [calls, setCalls] = useState<CallRecord[]>([]);
     const [filteredCalls, setFilteredCalls] = useState<CallRecord[]>([]);
@@ -270,18 +271,33 @@ export function CallHistoryTable({ agentId: initialAgentId, workspaceId }: CallH
     const [agentMap, setAgentMap] = useState<Record<string, { name: string, type: string }>>({});
     const [customFields, setCustomFields] = useState<any[]>([]);
 
-    // Fetch Custom Fields Config (Only if agentId is present)
+    // Fetch Custom Fields Config (Prioritize subworkspaceId, then agentId)
     useEffect(() => {
-        if (!initialAgentId) {
+        if (!initialAgentId && !subworkspaceId) {
             setCustomFields([]);
             return;
         }
         const fetchConfig = async () => {
             try {
-                const q = query(collection(db, "subworkspaces"), where("retell_agent_id", "==", initialAgentId));
-                const snap = await getDocs(q);
-                if (!snap.empty) {
-                    const data = snap.docs[0].data();
+                let data: any = null;
+
+                // Priority 1: Direct Subworkspace ID (Most reliable)
+                if (subworkspaceId) {
+                    const docSnap = await getDoc(doc(db, "subworkspaces", subworkspaceId));
+                    if (docSnap.exists()) {
+                        data = docSnap.data();
+                    }
+                }
+                // Priority 2: Query by Agent ID (Legacy)
+                else if (initialAgentId) {
+                    const q = query(collection(db, "subworkspaces"), where("retell_agent_id", "==", initialAgentId));
+                    const snap = await getDocs(q);
+                    if (!snap.empty) {
+                        data = snap.docs[0].data();
+                    }
+                }
+
+                if (data) {
                     const fields = data.analysis_config?.custom_fields || [];
                     setCustomFields(fields.filter((f: any) => !f.isArchived));
                 }
@@ -290,7 +306,7 @@ export function CallHistoryTable({ agentId: initialAgentId, workspaceId }: CallH
             }
         };
         fetchConfig();
-    }, [initialAgentId]);
+    }, [initialAgentId, subworkspaceId]);
 
     // Fetch Agent Info for Filtering
     useEffect(() => {
@@ -625,7 +641,11 @@ export function CallHistoryTable({ agentId: initialAgentId, workspaceId }: CallH
                                         </TableCell>
                                         {customFields.map(f => {
                                             const customData = Array.isArray(call.analysis?.custom_analysis_data) ? call.analysis?.custom_analysis_data : [];
-                                            const item = customData.find((d: any) => d.name === f.name || d.name === f.description); // Fallback logic
+                                            const item = customData.find((d: any) =>
+                                                d.name === f.name ||
+                                                d.name === f.description ||
+                                                d.name.toLowerCase() === f.name.toLowerCase()
+                                            ); // Improved matching logic
                                             return (
                                                 <TableCell key={f.id}>
                                                     <span className="text-sm text-gray-700 dark:text-gray-300">
