@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/firebase";
 import { adminDb } from "@/lib/firebase-admin";
-import { doc, setDoc, serverTimestamp, getDoc, query, collection, where, getDocs, updateDoc, Timestamp } from "firebase/firestore";
+import { doc, setDoc, serverTimestamp, getDoc, query, collection, where, getDocs, updateDoc, Timestamp, limit } from "firebase/firestore";
 import crypto from 'crypto';
 import OpenAI from "openai";
 
@@ -393,6 +393,36 @@ async function handleCallAnalyzed(callId: string, data: any) {
                     } else {
                         console.log(`[AI Extraction] No subworkspace found for agent ${data.agent_id} (Client)`);
                     }
+                }
+            }
+
+            // SECURITY / USABILITY: Sibling Fallback
+            if (customFields.length === 0 && configSource.startsWith('subworkspace:')) {
+                try {
+                    const qAgent = query(collection(db, "subworkspaces"), where("retell_agent_id", "==", data.agent_id));
+                    const snapAgent = await getDocs(qAgent);
+
+                    if (!snapAgent.empty) {
+                        const myWsId = snapAgent.docs[0].data().workspace_id;
+                        if (myWsId) {
+                            console.log(`[AI Extraction] Config empty for ${data.agent_id}. Checking siblings in workspace ${myWsId}...`);
+                            const qSib = query(collection(db, "subworkspaces"), where("workspace_id", "==", myWsId), limit(5));
+                            const snapSib = await getDocs(qSib);
+
+                            for (const sib of snapSib.docs) {
+                                const devFields = sib.data().analysis_config?.custom_fields || [];
+                                // Make sure we don't pick up empty ones again.
+                                if (devFields.length > 0 && sib.data().retell_agent_id !== data.agent_id) {
+                                    customFields = devFields;
+                                    configSource = `sibling:${sib.id} (fallback)`;
+                                    console.log(`[AI Extraction] Using config from sibling: ${sib.data().name}`);
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                } catch (e) {
+                    console.error("[AI Extraction] Error in sibling fallback", e);
                 }
             }
 
