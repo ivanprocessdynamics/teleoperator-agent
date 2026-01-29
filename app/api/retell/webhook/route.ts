@@ -282,10 +282,32 @@ async function handleCallEnded(callId: string, data: any) {
 
     console.log(`[call_ended] Processing ${transcriptNodes.length} transcript messages for ${callId}`);
 
+    // Resolve subworkspace_id: from metadata first, then try to find by agent_id
+    let resolvedSubworkspaceId = data.metadata?.subworkspace_id || null;
+
+    if (!resolvedSubworkspaceId && data.agent_id) {
+        // Try to find subworkspace by agent_id
+        if (adminDb) {
+            const snapshot = await adminDb.collection("subworkspaces").where("retell_agent_id", "==", data.agent_id).get();
+            if (!snapshot.empty) {
+                resolvedSubworkspaceId = snapshot.docs[0].id;
+                console.log(`[call_ended] Resolved subworkspace_id from agent_id: ${resolvedSubworkspaceId}`);
+            }
+        } else {
+            const q = query(collection(db, "subworkspaces"), where("retell_agent_id", "==", data.agent_id));
+            const snapshot = await getDocs(q);
+            if (!snapshot.empty) {
+                resolvedSubworkspaceId = snapshot.docs[0].id;
+                console.log(`[call_ended] Resolved subworkspace_id from agent_id: ${resolvedSubworkspaceId}`);
+            }
+        }
+    }
+
     // Prepare basic call record
     const docData: any = {
         id: callId,
         agent_id: data.agent_id,
+        subworkspace_id: resolvedSubworkspaceId, // Critical for stats filtering
         transcript_object: transcriptNodes, // Structured chat
         recording_url: data.recording_url || null,
         duration: data.duration_ms ? data.duration_ms / 1000 :
@@ -327,6 +349,9 @@ async function handleCallAnalyzed(callId: string, data: any) {
     } else if (data.transcript) {
         transcriptText = data.transcript;
     }
+
+    // Track resolved subworkspace for saving to call document
+    let resolvedSubworkspaceId: string | null = data.metadata?.subworkspace_id || null;
 
     // AI Extraction (Primary for Custom Fields)
     // Campaign-First approach: If call has campaign_id, use that Campaign's config.
@@ -388,6 +413,7 @@ async function handleCallAnalyzed(callId: string, data: any) {
                             const subSettings = subDoc.data();
                             customFields = subSettings?.analysis_config?.custom_fields || [];
                             configSource = `subworkspace:${metaSubworkspaceId}`;
+                            resolvedSubworkspaceId = metaSubworkspaceId;
                             console.log(`[AI Extraction] FOUND! Loaded ${customFields.length} custom fields from Subworkspace ID (Admin).`);
                             console.log(`[AI Extraction] Custom fields: ${JSON.stringify(customFields.map((f: any) => f.name))}`);
                         } else {
@@ -399,6 +425,7 @@ async function handleCallAnalyzed(callId: string, data: any) {
                             const subSettings = subDoc.data();
                             customFields = subSettings?.analysis_config?.custom_fields || [];
                             configSource = `subworkspace:${metaSubworkspaceId}`;
+                            resolvedSubworkspaceId = metaSubworkspaceId;
                             console.log(`[AI Extraction] FOUND! Loaded ${customFields.length} custom fields from Subworkspace ID (Client).`);
                         } else {
                             console.log(`[AI Extraction] Subworkspace ${metaSubworkspaceId} not found (Client)`);
@@ -416,6 +443,7 @@ async function handleCallAnalyzed(callId: string, data: any) {
                             const subSettings = snapshot.docs[0].data();
                             customFields = subSettings?.analysis_config?.custom_fields || [];
                             configSource = `subworkspace:${snapshot.docs[0].id}`;
+                            resolvedSubworkspaceId = snapshot.docs[0].id;
                             console.log(`[AI Extraction] FOUND! Loaded ${customFields.length} custom fields from Subworkspace by agent_id (Admin).`);
                             console.log(`[AI Extraction] Custom fields: ${JSON.stringify(customFields.map((f: any) => f.name))}`);
                         } else {
@@ -428,6 +456,7 @@ async function handleCallAnalyzed(callId: string, data: any) {
                             const subSettings = snapshot.docs[0].data();
                             customFields = subSettings?.analysis_config?.custom_fields || [];
                             configSource = `subworkspace:${snapshot.docs[0].id}`;
+                            resolvedSubworkspaceId = snapshot.docs[0].id;
                             console.log(`[AI Extraction] Loaded ${customFields.length} custom fields from Subworkspace by agent_id (Client).`);
                         } else {
                             console.log(`[AI Extraction] No subworkspace found for agent ${data.agent_id} (Client)`);
@@ -492,7 +521,8 @@ async function handleCallAnalyzed(callId: string, data: any) {
         analysis: analysis, // The full analysis object
         event_type: 'call_analyzed',
         post_call_analysis_done: true,
-        updated_at: serverTimestamp()
+        updated_at: serverTimestamp(),
+        ...(resolvedSubworkspaceId && { subworkspace_id: resolvedSubworkspaceId }) // Ensure subworkspace is set for stats
     };
 
     if (transcriptNodes) {
