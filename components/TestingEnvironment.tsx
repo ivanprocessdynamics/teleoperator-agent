@@ -502,6 +502,7 @@ export function TestingEnvironment({ subworkspaceId, orbOnly }: TestingEnvironme
                                 agentId={retellAgentId}
                                 prompt={getPromptWithVariables()}
                                 analysisConfig={analysisConfig}
+                                subworkspaceId={subworkspaceId}
                             />
                         </div>
                     ) : (

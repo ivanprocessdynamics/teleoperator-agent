@@ -13,6 +13,7 @@ interface VoiceOrbProps {
     prompt?: string;
     className?: string;
     analysisConfig?: AnalysisConfig;
+    subworkspaceId?: string;
 }
 
 import {
@@ -25,7 +26,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 
-export function VoiceOrb({ agentId, prompt, className = "", analysisConfig }: VoiceOrbProps) {
+export function VoiceOrb({ agentId, prompt, className = "", analysisConfig, subworkspaceId }: VoiceOrbProps) {
     const [state, setState] = useState<OrbState>("idle");
     const [timer, setTimer] = useState(0);
     const [showPermissionDialog, setShowPermissionDialog] = useState(false);
@@ -107,7 +108,8 @@ export function VoiceOrb({ agentId, prompt, className = "", analysisConfig }: Vo
                 body: JSON.stringify({
                     agent_id: agentId,
                     prompt: prompt,
-                    analysis_config: analysisConfig
+                    analysis_config: analysisConfig,
+                    subworkspace_id: subworkspaceId
                 }),
             });
 
@@ -132,7 +134,7 @@ export function VoiceOrb({ agentId, prompt, className = "", analysisConfig }: Vo
             setState("idle");
             isCallingRef.current = false;
         }
-    }, [agentId, prompt, analysisConfig]);
+    }, [agentId, prompt, analysisConfig, subworkspaceId]);
 
     const handleClick = async () => {
         if (webClientRef.current && state === "listening") {
