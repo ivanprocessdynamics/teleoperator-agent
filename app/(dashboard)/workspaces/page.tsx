@@ -11,17 +11,17 @@ import { useRouter } from "next/navigation";
 import { SkeletonPage } from "@/components/ui/skeleton";
 
 export default function WorkspacesPage() {
-    const { user, loading } = useAuth();
+    const { user, userData, loading } = useAuth();
     const router = useRouter();
     const [workspaces, setWorkspaces] = useState<any[]>([]);
     const [isLoadingData, setIsLoadingData] = useState(true);
 
     useEffect(() => {
-        if (!user) return;
+        if (!userData?.uid) return;
 
         const q = query(
             collection(db, "workspaces"),
-            where("owner_uid", "==", user.uid)
+            where("owner_uid", "==", userData.uid)
         );
 
         const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -43,7 +43,7 @@ export default function WorkspacesPage() {
         });
 
         return () => unsubscribe();
-    }, [user, router]);
+    }, [userData, router]);
 
     if (loading || isLoadingData) {
         return <SkeletonPage />;

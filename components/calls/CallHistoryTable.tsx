@@ -56,7 +56,10 @@ interface CallHistoryTableProps {
     agentId?: string;
 }
 
+import { useAuth } from "@/contexts/AuthContext";
+
 export function CallHistoryTable({ agentId: initialAgentId }: CallHistoryTableProps) {
+    const { userData } = useAuth(); // Access current user scope
     const [calls, setCalls] = useState<CallRecord[]>([]);
     const [filteredCalls, setFilteredCalls] = useState<CallRecord[]>([]);
     const [loading, setLoading] = useState(true);
@@ -79,46 +82,86 @@ export function CallHistoryTable({ agentId: initialAgentId }: CallHistoryTablePr
     const [pickerEnd, setPickerEnd] = useState<Date | null>(null);
 
     // 1. Fetch Campaigns and Agents for mapping names (Real-time)
+    const [allowedAgentIds, setAllowedAgentIds] = useState<Set<string>>(new Set());
+
+    // 1. Fetch Agents and Campaigns (Scoped to User)
     useEffect(() => {
-        // Fetch Agents first (Subworkspaces)
-        const unsubAgents = onSnapshot(collection(db, "subworkspaces"), (agentSnap) => {
-            const agentMap: Record<string, string> = {};
-            agentSnap.docs.forEach(d => {
-                const ad = d.data();
-                if (ad.retell_agent_id) {
-                    agentMap[ad.retell_agent_id] = ad.name || "Agente sin nombre";
-                }
-            });
+        if (!userData?.uid) return;
 
-            // Fetch Campaigns
-            const unsubCampaigns = onSnapshot(collection(db, "campaigns"), (campSnap) => {
-                const map: Record<string, string> = {};
-                campSnap.docs.forEach(doc => {
-                    const data = doc.data();
-                    const campName = data.name || "Campaña sin nombre";
+        const fetchScopedData = async () => {
+            // 1. Get User's Workspaces
+            const wsQ = query(collection(db, "workspaces"), where("owner_uid", "==", userData.uid));
+            const wsSnap = await getDocs(wsQ);
+            const wsIds = wsSnap.docs.map(d => d.id);
 
-                    // If we are in Global Mode (no specific initialAgentId prop), append Agent Name
-                    let finalName = campName;
-                    if (!initialAgentId && data.retell_agent_id && agentMap[data.retell_agent_id]) {
-                        finalName = `${campName} (${agentMap[data.retell_agent_id]})`;
-                    } else if (!initialAgentId && data.agent_id && agentMap[data.agent_id]) {
-                        // Fallback for older schema using agent_id
-                        finalName = `${campName} (${agentMap[data.agent_id]})`;
-                    }
+            if (wsIds.length === 0) {
+                setAvailableAgents([]);
+                setAllowedAgentIds(new Set());
+                return;
+            }
 
-                    map[doc.id] = finalName;
-                    if (data.vapi_agent_id) {
-                        map[data.vapi_agent_id] = finalName;
+            // 2. Listen to Subworkspaces (Agents) for these workspaces
+            // Firestore 'in' limitation: max 10. If > 10, strictly we should chunk. 
+            // For now, if > 10, we might fallback or just fetch all and filter in memory (less secure but works for UI).
+            // Let's safe-guard: fetch all subworkspaces and filter in memory by workspace_id
+
+            const unsubAgents = onSnapshot(collection(db, "subworkspaces"), (agentSnap) => {
+                const agentMapLocal: Record<string, string> = {};
+                const list: { id: string, name: string, type: string }[] = [];
+                const allowed = new Set<string>();
+
+                agentSnap.docs.forEach(d => {
+                    const ad = d.data();
+                    // FILTER: Only include if workspace_id is in user's workspaces
+                    if (wsIds.includes(ad.workspace_id) && ad.retell_agent_id) {
+                        agentMapLocal[ad.retell_agent_id] = ad.name || "Agente sin nombre";
+                        const info = {
+                            id: ad.retell_agent_id,
+                            name: ad.name || "Agente",
+                            type: ad.type || 'outbound'
+                        };
+                        list.push(info);
+                        allowed.add(ad.retell_agent_id);
                     }
                 });
-                setCampaignMap(map);
-            }, (err) => console.error("Error fetching campaigns:", err));
 
-            return () => unsubCampaigns();
-        }, (err) => console.error("Error fetching agents:", err));
+                setAvailableAgents(list);
+                setAgentMap(prev => { // Need to merge types carefully, but here we just reconstructed the list
+                    const newMap: Record<string, { name: string, type: string }> = {};
+                    list.forEach(i => newMap[i.id] = i);
+                    return newMap;
+                });
+                setAllowedAgentIds(allowed);
 
-        return () => unsubAgents();
-    }, [initialAgentId]);
+                // 3. Campaigns (Fetch all, map names. UI only shows relevant ones anyway usually, or we can filter)
+                // Keeping campaigns global for name mapping is usually okay as long as data is hidden.
+                const unsubCampaigns = onSnapshot(collection(db, "campaigns"), (campSnap) => {
+                    const map: Record<string, string> = {};
+                    campSnap.docs.forEach(doc => {
+                        const data = doc.data();
+                        const campName = data.name || "Campaña sin nombre";
+
+                        let finalName = campName;
+                        // Use local map
+                        if (!initialAgentId && data.retell_agent_id && agentMapLocal[data.retell_agent_id]) {
+                            finalName = `${campName} (${agentMapLocal[data.retell_agent_id]})`;
+                        }
+
+                        map[doc.id] = finalName;
+                        if (data.vapi_agent_id) map[data.vapi_agent_id] = finalName;
+                    });
+                    setCampaignMap(map);
+                });
+
+                return () => unsubCampaigns();
+            });
+
+            return () => unsubAgents();
+        };
+
+        const cleanup = fetchScopedData();
+        return () => { cleanup.then(unsub => unsub && unsub()); };
+    }, [initialAgentId, userData]); // Added userData dependency
 
     useEffect(() => {
         setError(null);
@@ -158,7 +201,19 @@ export function CallHistoryTable({ agentId: initialAgentId }: CallHistoryTablePr
         const q = query(collection(db, "calls"), ...constraints);
 
         const unsub = onSnapshot(q, (snapshot) => {
-            const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as CallRecord));
+            let data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as CallRecord));
+
+            // SECURITY FILTER: If Global View (!initialAgentId), filter by owned agents
+            if (!initialAgentId) {
+                if (allowedAgentIds.size === 0) {
+                    // If we have no agents, or are still loading them, we shouldn't show global calls.
+                    // Ideally we distinguish 'loading' from 'empty', but for safety, show empty.
+                    data = [];
+                } else {
+                    data = data.filter(c => allowedAgentIds.has(c.agent_id));
+                }
+            }
+
             setCalls(data);
             setLoading(false);
         }, (err) => {
@@ -168,7 +223,7 @@ export function CallHistoryTable({ agentId: initialAgentId }: CallHistoryTablePr
         });
 
         return () => unsub();
-    }, [interval, pickerStart, pickerEnd, refreshTrigger, initialAgentId]);
+    }, [interval, pickerStart, pickerEnd, refreshTrigger, initialAgentId, allowedAgentIds]);
 
     // NEW STATE FOR FILTERS
     const [agentTypeFilter, setAgentTypeFilter] = useState<'all' | 'inbound' | 'outbound'>('all');
