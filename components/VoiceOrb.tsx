@@ -127,7 +127,8 @@ export function VoiceOrb({ agentId, prompt, className = "", analysisConfig }: Vo
             console.log("📞 startCall completed");
         } catch (err) {
             console.error("❌ Error starting Retell call:", err);
-            alert("Error al iniciar la llamada: comprueba tu conexión.");
+            // Show custom dialog if it looks like a permission/connection issue
+            setShowPermissionDialog(true);
             setState("idle");
             isCallingRef.current = false;
         }
@@ -139,25 +140,12 @@ export function VoiceOrb({ agentId, prompt, className = "", analysisConfig }: Vo
             isCallingRef.current = false;
             setState("idle");
         } else if (state === "idle") {
-            // Check permissions first
-            const hasPermission = await checkMicPermission();
-            if (hasPermission) {
-                startRetellCall();
-            } else {
-                setShowPermissionDialog(true);
-            }
+            // Direct Start (One button flow)
+            startRetellCall();
         }
     };
 
-    const handlePermissionGranted = async () => {
-        const granted = await requestMicPermission();
-        if (granted) {
-            setShowPermissionDialog(false);
-            startRetellCall();
-        } else {
-            alert("Necesitamos acceso al micrófono para que puedas hablar con el agente.");
-        }
-    };
+    // Helper functions removed as flow is now direct.
 
     const formatTime = (seconds: number) => {
         const mins = Math.floor(seconds / 60);
@@ -229,20 +217,24 @@ export function VoiceOrb({ agentId, prompt, className = "", analysisConfig }: Vo
 
                         <div className="space-y-2 relative z-10">
                             <DialogTitle className="text-xl font-bold text-gray-900 dark:text-white">
-                                Permitir Acceso al Micrófono
+                                Acceso al Micrófono Bloqueado
                             </DialogTitle>
                             <DialogDescription className="text-gray-500 dark:text-gray-400 max-w-xs mx-auto">
-                                Para conversar con el agente de IA, necesitamos que permitas el acceso a tu micrófono en el siguiente paso.
+                                El navegador ha bloqueado el acceso al micrófono. <br />
+                                Haz clic en el icono de la barra de direcciones y selecciona <strong>Permitir</strong>.
                             </DialogDescription>
                         </div>
 
                         <div className="w-full pt-4 relative z-10">
                             <Button
-                                onClick={handlePermissionGranted}
+                                onClick={() => {
+                                    setShowPermissionDialog(false);
+                                    startRetellCall();
+                                }}
                                 className="w-full bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-500/30 transition-all active:scale-95"
                                 size="lg"
                             >
-                                Permitir Acceso
+                                Hecho, Reintentar
                             </Button>
                             <button
                                 onClick={() => setShowPermissionDialog(false)}
