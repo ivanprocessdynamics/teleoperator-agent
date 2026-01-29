@@ -361,6 +361,8 @@ async function handleCallAnalyzed(callId: string, data: any) {
             console.log(`[AI Extraction] ========================================`);
             console.log(`[AI Extraction] Starting extraction for agent_id: ${data.agent_id}`);
             console.log(`[AI Extraction] Campaign ID from metadata: ${data.metadata?.campaign_id || 'NONE'}`);
+            console.log(`[AI Extraction] Subworkspace ID from metadata: ${data.metadata?.subworkspace_id || 'NONE'}`);
+            console.log(`[AI Extraction] Full metadata: ${JSON.stringify(data.metadata)}`);
             console.log(`[AI Extraction] Transcript length: ${transcriptText?.length || 0} chars`);
 
             let customFields: any[] = [];
@@ -502,11 +504,25 @@ async function handleCallAnalyzed(callId: string, data: any) {
 
                     const result = JSON.parse(completion.choices[0].message.content || "{}");
 
-                    if (result.custom_analysis_data) {
-                        // Merge or Overwrite? User said "OpenAI principal", so we overwrite custom_analysis_data
-                        // but we preserve other analysis fields (sentiment, summary) that came from Retell if not configured otherwise.
-                        analysis.custom_analysis_data = result.custom_analysis_data;
-                        console.log(`[AI Extraction] Successfully generated ${result.custom_analysis_data.length} data points.`);
+                    if (result.custom_analysis_data && Array.isArray(result.custom_analysis_data) && result.custom_analysis_data.length > 0) {
+                        // Safe Merge Strategy:
+                        // Don't just overwrite, merge with existing data (e.g. from Retell native analysis)
+                        let mergedData = [...(analysis.custom_analysis_data || [])];
+
+                        result.custom_analysis_data.forEach((newItem: any) => {
+                            const paramsIndex = mergedData.findIndex((existing: any) => existing.name === newItem.name);
+                            if (paramsIndex >= 0) {
+                                // Overwrite if new value is present
+                                mergedData[paramsIndex] = newItem;
+                            } else {
+                                mergedData.push(newItem);
+                            }
+                        });
+
+                        analysis.custom_analysis_data = mergedData;
+                        console.log(`[AI Extraction] Successfully generated/merged ${result.custom_analysis_data.length} data points.`);
+                    } else {
+                        console.log(`[AI Extraction] OpenAI returned empty/invalid custom_analysis_data, preserving existing data.`);
                     }
                 }
             } else {
