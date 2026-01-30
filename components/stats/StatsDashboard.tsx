@@ -114,6 +114,7 @@ interface StatsDashboardProps {
     subworkspaceId?: string;
     workspaceId?: string; // Filter stats by specific workspace
     showWorkspaceSelector?: boolean;
+    initialCampaignId?: string;
 }
 
 
@@ -132,7 +133,7 @@ export function StatsDashboard(props: StatsDashboardProps) {
     const [hiddenStandard, setHiddenStandard] = useState<string[]>([]);
     const [ignoredFields, setIgnoredFields] = useState<string[]>([]);
     const [period, setPeriod] = useState("7d");
-    const [selectedCampaigns, setSelectedCampaigns] = useState<string[]>([]); // Multi-select
+    const [selectedCampaigns, setSelectedCampaigns] = useState<string[]>(props.initialCampaignId ? [props.initialCampaignId] : []); // Multi-select
     const [uniqueCampaigns, setUniqueCampaigns] = useState<string[]>([]);
 
     // NEW FILTERS

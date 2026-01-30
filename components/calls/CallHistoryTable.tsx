@@ -56,11 +56,12 @@ interface CallHistoryTableProps {
     agentId?: string;
     subworkspaceId?: string; // DIRECT ID for reliable config fetching
     workspaceId?: string; // Filter calls by specific workspace
+    initialCampaignId?: string;
 }
 
 import { useAuth } from "@/contexts/AuthContext";
 
-export function CallHistoryTable({ agentId: initialAgentId, subworkspaceId, workspaceId }: CallHistoryTableProps) {
+export function CallHistoryTable({ agentId: initialAgentId, subworkspaceId, workspaceId, initialCampaignId }: CallHistoryTableProps) {
     const { userData } = useAuth(); // Access current user scope
     const [calls, setCalls] = useState<CallRecord[]>([]);
     const [filteredCalls, setFilteredCalls] = useState<CallRecord[]>([]);
@@ -71,7 +72,7 @@ export function CallHistoryTable({ agentId: initialAgentId, subworkspaceId, work
     const [campaignMap, setCampaignMap] = useState<Record<string, string>>({});
 
     // Filters
-    const [selectedCampaignId, setSelectedCampaignId] = useState<string>("all");
+    const [selectedCampaignId, setSelectedCampaignId] = useState<string>(initialCampaignId || "all");
 
     // Aggregated Filter Data
     const [uniqueCampaignIds, setUniqueCampaignIds] = useState<string[]>([]);

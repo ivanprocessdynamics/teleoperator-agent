@@ -16,6 +16,7 @@ import { ConnectPhoneNumberModal } from "@/components/inbound/PhoneNumberConnect
 import { AgentToolsConfig } from "@/components/tools/AgentToolsConfig";
 import { AgentTool } from "@/types/tools";
 import { DataResetButton } from "@/components/common/DataResetButton";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface InboundAgentViewProps {
     subworkspaceId: string;
@@ -27,6 +28,7 @@ export function InboundAgentView({ subworkspaceId, agentId }: InboundAgentViewPr
     const [promptData, setPromptData] = useState({ prompt: "" });
     const [analysisConfig, setAnalysisConfig] = useState<any>({ custom_fields: [] });
     const [tools, setTools] = useState<AgentTool[]>([]);
+    const { userData } = useAuth();
 
     // Fetch Data
     useEffect(() => {
@@ -213,17 +215,7 @@ export function InboundAgentView({ subworkspaceId, agentId }: InboundAgentViewPr
                             </div>
 
                             {/* DANGER ZONE */}
-                            <div className="bg-red-50 dark:bg-red-900/10 rounded-lg shadow-sm border border-red-100 dark:border-red-900/30 flex flex-col shrink-0">
-                                <div className="p-4 border-b border-red-100 dark:border-red-900/30 sticky top-0 bg-red-50 dark:bg-red-900/10 z-10 rounded-t-lg">
-                                    <h3 className="font-semibold text-red-900 dark:text-red-200">Zona de Peligro</h3>
-                                </div>
-                                <div className="p-4 flex items-center justify-between">
-                                    <p className="text-sm text-red-700 dark:text-red-300 mr-4">
-                                        Eliminar todo el historial de llamadas y estadísticas de este agente.
-                                    </p>
-                                    <DataResetButton type="subworkspace" id={subworkspaceId} />
-                                </div>
-                            </div>
+                            {/* DANGER ZONE REMOVED FROM HERE */}
                         </div>
 
                         {/* RIGHT COLUMN: Testing Environment */}
@@ -263,7 +255,12 @@ export function InboundAgentView({ subworkspaceId, agentId }: InboundAgentViewPr
                 {/* HISTORY TAB */}
                 <TabsContent value="history" forceMount className="mt-6 data-[state=inactive]:hidden">
                     <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-800 p-6">
-                        <h2 className="text-xl font-semibold mb-4 text-gray-900 dark:text-white">Historial de Llamadas</h2>
+                        <div className="flex justify-between items-center mb-4">
+                            <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Historial de Llamadas</h2>
+                            {userData?.role === 'superadmin' && (
+                                <DataResetButton type="subworkspace" id={subworkspaceId} variant="outline" className="text-red-600 hover:text-red-700 hover:bg-red-50" />
+                            )}
+                        </div>
                         {agentId ? (
                             <CallHistoryTable agentId={agentId} />
                         ) : (
@@ -275,6 +272,11 @@ export function InboundAgentView({ subworkspaceId, agentId }: InboundAgentViewPr
                 {/* STATS TAB */}
                 <TabsContent value="stats" forceMount className="mt-6 data-[state=inactive]:hidden">
                     <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-800 p-6">
+                        <div className="flex justify-end mb-4">
+                            {userData?.role === 'superadmin' && (
+                                <DataResetButton type="subworkspace" id={subworkspaceId} variant="outline" className="text-red-600 hover:text-red-700 hover:bg-red-50" />
+                            )}
+                        </div>
                         {agentId ? (
                             <StatsDashboard agentId={agentId} subworkspaceId={subworkspaceId} />
                         ) : (
