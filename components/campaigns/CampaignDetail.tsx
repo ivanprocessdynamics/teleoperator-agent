@@ -6,7 +6,7 @@ import { doc, onSnapshot, updateDoc, getDoc, arrayUnion, arrayRemove, collection
 import { db } from "@/lib/firebase";
 import { Campaign, CampaignColumn, AnalysisConfig, AnalysisField, CallingConfig } from "@/types/campaign";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Play, Save, Check, Loader2, FileText, Phone, Users, Target, Zap, Star, MessageCircle, Mail, Pause, Square, Settings, Activity, Globe, Database } from "lucide-react";
+import { ArrowLeft, Play, Save, Check, Loader2, FileText, Phone, Users, Target, Zap, Star, MessageCircle, Mail, Pause, Square, Settings, Activity, Globe, Database, BookOpen } from "lucide-react";
 import { CampaignTable } from "./CampaignTable";
 import { CampaignPrompt } from "./CampaignPrompt";
 import { CampaignAnalysis } from "./CampaignAnalysis";
@@ -738,23 +738,35 @@ export function CampaignDetail({ campaignId, subworkspaceId, onBack }: CampaignD
                 {/* Right: Prompt Editor & Analysis (5 cols) - Sticky */}
                 <div className="col-span-12 lg:col-span-5 h-full overflow-y-auto pr-2">
                     <Tabs defaultValue="prompt" className="w-full">
-                        <TabsList className="grid w-full grid-cols-4 mb-4 bg-gray-100 dark:bg-gray-800">
+                        <TabsList className="grid w-full grid-cols-5 mb-4 bg-gray-100 dark:bg-gray-800">
                             <TabsTrigger value="prompt">Prompt</TabsTrigger>
                             <TabsTrigger value="tools" className="gap-2"><Database className="h-3.5 w-3.5" />Herramientas</TabsTrigger>
+                            <TabsTrigger value="knowledge" className="gap-2"><BookOpen className="h-3.5 w-3.5" />Conocimiento</TabsTrigger>
                             <TabsTrigger value="analysis">Análisis & IA</TabsTrigger>
                             <TabsTrigger value="calling"><Phone className="h-3.5 w-3.5 mr-1.5" />Llamadas</TabsTrigger>
                         </TabsList>
 
                         <TabsContent value="tools">
-                            <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-5">
-                                <AgentToolsConfig
-                                    tools={campaign?.tools || []}
-                                    onSaveTools={handleUpdateTools}
-                                    onSync={() => {
-                                        // For campaigns, syncing prompt also syncs tools because update-agent handles it all
-                                        return handleSyncPrompt(campaign?.prompt_template || "");
-                                    }}
-                                />
+                            <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-10 flex flex-col items-center justify-center text-center min-h-[300px]">
+                                <div className="p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-full mb-4">
+                                    <Database className="h-8 w-8 text-yellow-600 dark:text-yellow-400" />
+                                </div>
+                                <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">Herramientas y APIs</h3>
+                                <p className="text-gray-500 max-w-sm">
+                                    Todavía no funciona, estoy en ello.
+                                </p>
+                            </div>
+                        </TabsContent>
+
+                        <TabsContent value="knowledge">
+                            <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-10 flex flex-col items-center justify-center text-center min-h-[300px]">
+                                <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-full mb-4">
+                                    <BookOpen className="h-8 w-8 text-purple-600 dark:text-purple-400" />
+                                </div>
+                                <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">Base de Conocimiento</h3>
+                                <p className="text-gray-500 max-w-sm">
+                                    Todavía no funciona, estoy en ello.
+                                </p>
                             </div>
                         </TabsContent>
 
