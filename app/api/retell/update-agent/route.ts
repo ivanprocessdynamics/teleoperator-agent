@@ -157,8 +157,13 @@ export async function POST(req: Request) {
                     }
                 }
 
-                console.log("Updating agent analysis config...");
+                console.log("Updating agent analysis config and Webhook URL...");
+                const host = req.headers.get("host");
+                const protocol = host?.includes("localhost") ? "http" : "https";
+                const webhookUrl = `${protocol}://${host}/api/retell/webhook`;
+
                 await retell.agent.update(agent_id, {
+                    webhook_url: webhookUrl,
                     post_call_analysis_data: {
                         post_call_summary: analysis_config.standard_fields?.summary || false,
                         post_call_sentiment: analysis_config.standard_fields?.sentiment || false,
@@ -166,6 +171,7 @@ export async function POST(req: Request) {
                     } as any
                 });
                 updates.analysis_updated = true;
+                updates.webhook_updated = true;
             } catch (analysisErr: any) {
                 console.error("Analysis update FAILED:", analysisErr);
                 updates.analysis_error = `Analysis Error: ${analysisErr.message}`;

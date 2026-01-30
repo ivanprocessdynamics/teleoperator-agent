@@ -4,6 +4,7 @@ import { adminDb } from "@/lib/firebase-admin";
 import { doc, setDoc, serverTimestamp, getDoc, query, collection, where, getDocs, updateDoc, Timestamp } from "firebase/firestore";
 import crypto from 'crypto';
 import OpenAI from "openai";
+import { executeToolCall } from "@/lib/tools-execution";
 
 // Helper to normalize roles to 'user' | 'agent'
 function normalizeRole(role: string): "user" | "agent" {
@@ -251,6 +252,19 @@ export async function POST(req: Request) {
             console.log(`[Webhook] Call started event received for ${callId}`);
             // Update Campaign Row Status to 'calling'
             rowUpdateResult = await updateCampaignRowStatus(callId, callData, 'started');
+        }
+        // HANDLER FOR TOOL CALLS (Server-Side Function Calling)
+        else if (body.interaction_type === "tool_call" || event === "tool_call_invocation") {
+            console.log(`[Webhook] Tool Call detected for ${callId}`);
+            const toolCall = body.tool_call || body; // Retell structure varies slightly by version
+            const response = await executeToolCall({
+                agent_id: body.agent_id || callData?.agent_id,
+                name: toolCall.name,
+                args: toolCall.arguments || {}, // Usually parsed JSON object
+                call_id: callId
+            });
+            // Return result to Retell immediately
+            return NextResponse.json(response);
         }
 
         return NextResponse.json({ received: true, row_update: rowUpdateResult }, { status: 200 });
