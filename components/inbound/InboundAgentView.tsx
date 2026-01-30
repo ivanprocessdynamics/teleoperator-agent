@@ -35,7 +35,21 @@ export function InboundAgentView({ subworkspaceId, agentId }: InboundAgentViewPr
             }
         });
         return () => unsub();
+        return () => unsub();
     }, [subworkspaceId]);
+
+    // Self-healing: Ensure retell_agent_id is synced to the subworkspace document
+    // This is critical for the webhook to find the subworkspace by agent_id
+    useEffect(() => {
+        if (!agentId || !subworkspaceId) return;
+
+        // We only update if it's missing or different to avoid infinite loops, 
+        // but we need to check the current value first. 
+        // Only safe way without extra reads is to do it once on mount or when agentId changes.
+        updateDoc(doc(db, "subworkspaces", subworkspaceId), {
+            retell_agent_id: agentId
+        }).catch(err => console.error("Error syncing agent ID:", err));
+    }, [subworkspaceId, agentId]);
 
     const handleSavePrompt = async (newPrompt: string) => {
         try {

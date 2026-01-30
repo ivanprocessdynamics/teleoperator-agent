@@ -616,13 +616,17 @@ export function CallHistoryTable({ agentId: initialAgentId, subworkspaceId, work
                                             </div>
                                         </TableCell>
                                         <TableCell>
-                                            {campaignName ? (
+                                            {call.metadata?.type === 'testing' ? (
+                                                <Badge variant="outline" className="font-medium text-xs border-amber-200 text-amber-700 bg-amber-50 dark:bg-amber-900/20 dark:text-amber-300 dark:border-amber-800">
+                                                    Web / Test
+                                                </Badge>
+                                            ) : campaignName ? (
                                                 <Badge variant="outline" className="font-medium text-xs border-blue-200 text-blue-700 bg-blue-50 dark:bg-blue-900/20 dark:text-blue-300 dark:border-blue-800">
                                                     {campaignName}
                                                 </Badge>
                                             ) : (
-                                                <Badge variant="outline" className="font-mono text-[10px] text-gray-400 border-dashed">
-                                                    Prueba / Manual
+                                                <Badge variant="outline" className="font-medium text-xs text-gray-500 border-gray-200 bg-gray-50 dark:bg-gray-800 dark:text-gray-400">
+                                                    {agentMap[call.agent_id]?.name || "Desconocido"}
                                                 </Badge>
                                             )}
                                         </TableCell>
