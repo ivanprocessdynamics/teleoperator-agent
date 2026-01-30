@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { doc, getDoc, updateDoc, arrayUnion } from "firebase/firestore";
+import { doc, getDoc, updateDoc, arrayUnion, query, collection, where, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { VoiceOrb } from "@/components/VoiceOrb";
 import { CampaignAnalysis } from "@/components/campaigns/CampaignAnalysis";
@@ -38,6 +38,10 @@ export function TestingEnvironment({ subworkspaceId, orbOnly }: TestingEnvironme
 
     // Global Fields State
     const [globalFields, setGlobalFields] = useState<AnalysisField[]>([]);
+
+    // Campaign Context State
+    const [campaigns, setCampaigns] = useState<{ id: string; name: string }[]>([]);
+    const [selectedCampaignId, setSelectedCampaignId] = useState<string | null>(null);
 
     // Ref to hold immediate value (for Activar button and avoiding stale closures)
     const promptRef = useRef("");
@@ -111,6 +115,23 @@ export function TestingEnvironment({ subworkspaceId, orbOnly }: TestingEnvironme
         }
 
         loadData();
+        loadData();
+    }, [subworkspaceId]);
+
+    // Load campaigns for simulator context
+    useEffect(() => {
+        async function loadCampaigns() {
+            if (!subworkspaceId) return;
+            try {
+                const q = query(collection(db, "campaigns"), where("subworkspace_id", "==", subworkspaceId));
+                const snap = await getDocs(q);
+                const campaignsData = snap.docs.map(d => ({ id: d.id, name: d.data().name || "Campaña sin nombre" }));
+                setCampaigns(campaignsData);
+            } catch (err) {
+                console.error("Error loading campaigns:", err);
+            }
+        }
+        loadCampaigns();
     }, [subworkspaceId]);
 
     const handleAddGlobalField = async (field: AnalysisField) => {
@@ -496,6 +517,22 @@ export function TestingEnvironment({ subworkspaceId, orbOnly }: TestingEnvironme
                         </p>
                     </div>
 
+                    <div className="w-full max-w-xs mb-4">
+                        <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5 text-left">
+                            Simular contexto de Campaña (Métricas)
+                        </label>
+                        <select
+                            className="w-full text-sm border-gray-200 dark:border-gray-700 rounded-md bg-white dark:bg-gray-800 p-2"
+                            onChange={(e) => setSelectedCampaignId(e.target.value)}
+                            value={selectedCampaignId || ""}
+                        >
+                            <option value="">-- Ninguna (Usar configuración general) --</option>
+                            {campaigns.map(c => (
+                                <option key={c.id} value={c.id}>{c.name}</option>
+                            ))}
+                        </select>
+                    </div>
+
                     {retellAgentId ? (
                         <div className="transform scale-125">
                             <VoiceOrb
@@ -503,6 +540,7 @@ export function TestingEnvironment({ subworkspaceId, orbOnly }: TestingEnvironme
                                 prompt={getPromptWithVariables()}
                                 analysisConfig={analysisConfig}
                                 subworkspaceId={subworkspaceId}
+                                campaignId={selectedCampaignId || undefined}
                             />
                         </div>
                     ) : (
