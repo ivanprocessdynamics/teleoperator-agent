@@ -70,7 +70,7 @@ export function ToolEditorDialog({ open, onOpenChange, toolToEdit, onSave }: Too
     const addHeader = () => setHeaders([...headers, { key: "", value: "" }]);
     const updateHeader = (index: number, field: "key" | "value", val: string) => {
         const newHeaders = [...headers];
-        newHeaders[index][field] = val;
+        newHeaders[index] = { ...newHeaders[index], [field]: val };
         setHeaders(newHeaders);
     };
     const removeHeader = (index: number) => setHeaders(headers.filter((_, i) => i !== index));

@@ -1,6 +1,7 @@
 
 import { NextResponse } from "next/server";
-import { adminDb, admin } from "@/lib/firebase-admin";
+import { adminDb } from "@/lib/firebase-admin";
+import * as admin from "firebase-admin";
 
 export async function POST(req: Request) {
     const startTime = Date.now();
@@ -72,9 +73,10 @@ export async function POST(req: Request) {
         }
 
         // 2. Prepare Request
+        // 2. Prepare Request
         let url = toolConfig.url;
         const method = toolConfig.method || 'GET';
-        let headers = {};
+        let headers: Record<string, string> = {};
         if (toolConfig.headers) {
             toolConfig.headers.forEach((h: any) => {
                 headers[h.key] = h.value;
