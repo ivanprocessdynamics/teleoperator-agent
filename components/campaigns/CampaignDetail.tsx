@@ -12,6 +12,7 @@ import { CampaignPrompt } from "./CampaignPrompt";
 import { CampaignAnalysis } from "./CampaignAnalysis";
 import { AgentToolsConfig } from "@/components/tools/AgentToolsConfig";
 import { AgentTool } from "@/types/tools";
+import { DataResetButton } from "@/components/common/DataResetButton";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import {
@@ -931,17 +932,28 @@ export function CampaignDetail({ campaignId, subworkspaceId, onBack }: CampaignD
                                     </div>
                                 </div>
 
-                                {/* Info Box */}
-                                <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-100 dark:border-blue-800">
-                                    <p className="text-sm text-blue-700 dark:text-blue-300">
-                                        <strong>Nota:</strong> Al pulsar "Lanzar Campaña", el sistema comenzará a llamar secuencialmente a cada número de la tabla, respetando el límite de concurrencia configurado.
-                                    </p>
+                                {/* Danger Zone */}
+                                <div className="border-t border-gray-200 dark:border-gray-800 pt-6 mt-6">
+                                    <h3 className="text-sm font-semibold text-red-600 dark:text-red-400 flex items-center gap-2 mb-4">
+                                        Zona de Peligro
+                                    </h3>
+                                    <div className="bg-red-50 dark:bg-red-900/10 rounded-lg p-4 flex items-center justify-between border border-red-100 dark:border-red-900/30">
+                                        <div className="mr-4">
+                                            <p className="text-sm font-medium text-red-900 dark:text-red-200">
+                                                Restablecer datos de campaña
+                                            </p>
+                                            <p className="text-xs text-red-700 dark:text-red-300 mt-1">
+                                                Elimina todo el historial de llamadas y estadísticas asociadas a esta campaña.
+                                            </p>
+                                        </div>
+                                        <DataResetButton type="campaign" id={campaignId} />
+                                    </div>
                                 </div>
                             </div>
                         </TabsContent>
                     </Tabs>
-                </div>
-            </div>
+                </div >
+            </div >
         </div >
     );
 }

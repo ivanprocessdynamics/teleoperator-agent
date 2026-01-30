@@ -15,6 +15,7 @@ import { CampaignAnalysis } from "@/components/campaigns/CampaignAnalysis";
 import { ConnectPhoneNumberModal } from "@/components/inbound/PhoneNumberConnectModal";
 import { AgentToolsConfig } from "@/components/tools/AgentToolsConfig";
 import { AgentTool } from "@/types/tools";
+import { DataResetButton } from "@/components/common/DataResetButton";
 
 interface InboundAgentViewProps {
     subworkspaceId: string;
@@ -210,6 +211,19 @@ export function InboundAgentView({ subworkspaceId, agentId }: InboundAgentViewPr
                                     />
                                 </div>
                             </div>
+
+                            {/* DANGER ZONE */}
+                            <div className="bg-red-50 dark:bg-red-900/10 rounded-lg shadow-sm border border-red-100 dark:border-red-900/30 flex flex-col shrink-0">
+                                <div className="p-4 border-b border-red-100 dark:border-red-900/30 sticky top-0 bg-red-50 dark:bg-red-900/10 z-10 rounded-t-lg">
+                                    <h3 className="font-semibold text-red-900 dark:text-red-200">Zona de Peligro</h3>
+                                </div>
+                                <div className="p-4 flex items-center justify-between">
+                                    <p className="text-sm text-red-700 dark:text-red-300 mr-4">
+                                        Eliminar todo el historial de llamadas y estadísticas de este agente.
+                                    </p>
+                                    <DataResetButton type="subworkspace" id={subworkspaceId} />
+                                </div>
+                            </div>
                         </div>
 
                         {/* RIGHT COLUMN: Testing Environment */}
@@ -269,6 +283,6 @@ export function InboundAgentView({ subworkspaceId, agentId }: InboundAgentViewPr
                     </div>
                 </TabsContent>
             </Tabs>
-        </div>
+        </div >
     );
 }
