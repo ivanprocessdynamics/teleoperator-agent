@@ -417,6 +417,10 @@ async function handleCallAnalyzed(callId: string, data: any) {
                         const subDoc = await adminDb.collection("subworkspaces").doc(metaSubworkspaceId).get();
                         if (subDoc.exists) {
                             const subSettings = subDoc.data();
+                            // DEBUG: Log the full structure of analysis_config
+                            console.log(`[AI Extraction] DEBUG - Full analysis_config structure:`, JSON.stringify(subSettings?.analysis_config || 'UNDEFINED', null, 2));
+                            console.log(`[AI Extraction] DEBUG - analysis_config keys:`, Object.keys(subSettings?.analysis_config || {}));
+
                             customFields = subSettings?.analysis_config?.custom_fields || [];
                             configSource = `subworkspace:${metaSubworkspaceId}`;
                             resolvedSubworkspaceId = metaSubworkspaceId;
