@@ -14,6 +14,10 @@ export async function executeToolCall(request: ToolExecutionRequest) {
 
     console.log(`[Tool Service] Executing tool: ${name} for agent: ${agent_id}`);
 
+    // Helper to match sanitized names
+    const sanitize = (str: string) => str.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '_').substring(0, 64);
+    const targetName = sanitize(name);
+
     // 1. Find the tool config
     let toolConfig = null;
     let contextId = null; // campaignId or subworkspaceId
@@ -24,7 +28,8 @@ export async function executeToolCall(request: ToolExecutionRequest) {
     if (!campaignsSnapshot.empty) {
         const campDoc = campaignsSnapshot.docs[0];
         const campData = campDoc.data();
-        toolConfig = campData.tools?.find((t: any) => t.name === name);
+        // Match using sanitized name
+        toolConfig = campData.tools?.find((t: any) => sanitize(t.name) === targetName);
         contextId = campDoc.id;
         contextType = 'campaign';
     }
@@ -35,7 +40,7 @@ export async function executeToolCall(request: ToolExecutionRequest) {
         if (!subSnapshot.empty) {
             const subDoc = subSnapshot.docs[0];
             const subData = subDoc.data();
-            toolConfig = subData.tools?.find((t: any) => t.name === name);
+            toolConfig = subData.tools?.find((t: any) => sanitize(t.name) === targetName);
             contextId = subDoc.id;
             contextType = 'subworkspace';
         } else {
@@ -44,7 +49,7 @@ export async function executeToolCall(request: ToolExecutionRequest) {
             if (!subSnapshot2.empty) {
                 const subDoc = subSnapshot2.docs[0];
                 const subData = subDoc.data();
-                toolConfig = subData.tools?.find((t: any) => t.name === name);
+                toolConfig = subData.tools?.find((t: any) => sanitize(t.name) === targetName);
                 contextId = subDoc.id;
                 contextType = 'subworkspace';
             }
