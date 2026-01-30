@@ -471,14 +471,22 @@ export function CampaignDetail({ campaignId, subworkspaceId, onBack }: CampaignD
                                     </div>
                                     <div>
                                         <h4 className="text-lg font-bold text-gray-900 dark:text-gray-100 flex items-center gap-2">
-                                            {executor.state.isPaused ? "Campaña Pausada" : "Enviando..."}
+                                            {executor.state.isPaused
+                                                ? "Campaña Pausada"
+                                                : (!executor.state.isRunning && executor.state.activeCalls > 0)
+                                                    ? "Deteniendo..."
+                                                    : "Enviando..."}
                                             <span className={cn(
                                                 "text-xs font-medium px-2.5 py-0.5 rounded-full border",
                                                 executor.state.isPaused
                                                     ? "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/20 dark:text-amber-400 dark:border-amber-800"
                                                     : "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/20 dark:text-blue-400 dark:border-blue-800"
                                             )}>
-                                                {executor.state.isPaused ? "En espera" : "Llamando..."}
+                                                {executor.state.isPaused
+                                                    ? "En espera"
+                                                    : (!executor.state.isRunning && executor.state.activeCalls > 0)
+                                                        ? "Finalizando..."
+                                                        : "Llamando..."}
                                             </span>
                                         </h4>
                                         <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
@@ -509,9 +517,11 @@ export function CampaignDetail({ campaignId, subworkspaceId, onBack }: CampaignD
                                     <Button
                                         variant="destructive"
                                         onClick={executor.stop}
-                                        className="bg-red-50 text-red-600 hover:bg-red-100 border border-red-200 shadow-none dark:bg-red-900/10 dark:text-red-400 dark:border-red-900/50 dark:hover:bg-red-900/30"
+                                        disabled={!executor.state.isRunning && executor.state.activeCalls > 0}
+                                        className="bg-red-50 text-red-600 hover:bg-red-100 border border-red-200 shadow-none dark:bg-red-900/10 dark:text-red-400 dark:border-red-900/50 dark:hover:bg-red-900/30 disabled:opacity-50"
                                     >
-                                        <Square className="mr-2 h-4 w-4 fill-current" /> Detener
+                                        <Square className="mr-2 h-4 w-4 fill-current" />
+                                        {(!executor.state.isRunning && executor.state.activeCalls > 0) ? "Deteniendo..." : "Detener"}
                                     </Button>
                                 </div>
                             </div>
