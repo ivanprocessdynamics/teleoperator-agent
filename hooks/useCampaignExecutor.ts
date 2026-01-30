@@ -310,16 +310,32 @@ export function useCampaignExecutor({
         }).catch(err => console.error("Error resuming campaign:", err));
     }, [campaignId]);
 
-    const stop = useCallback(() => {
+    const stop = useCallback(async () => {
         isRunningRef.current = false;
         isPausedRef.current = false;
         setState(prev => ({ ...prev, isRunning: false, isPaused: false }));
 
-        // Force update status in DB to ensure it doesn't stay stuck in "running"
-        updateDoc(doc(db, "campaigns", campaignId), {
+        // Force update status in DB
+        await updateDoc(doc(db, "campaigns", campaignId), {
             status: 'draft'
         }).catch(err => console.error("Error stopping campaign:", err));
-    }, [campaignId]);
+
+        // FORCE RESET: Find all rows that are currently "calling" and mark them as failed
+        // This prevents the "Stopping..." state from getting stuck if a call never reports back.
+        const stuckRows = rows.filter(r => r.status === 'calling');
+        if (stuckRows.length > 0) {
+            console.log(`[Stop] Force resetting ${stuckRows.length} stuck rows...`);
+            const promises = stuckRows.map(row =>
+                updateDoc(doc(db, "campaign_rows", row.id), {
+                    status: 'failed',
+                    last_error: 'Campaña detenida manualmente',
+                    call_id: row.call_id || null
+                })
+            );
+            await Promise.allSettled(promises);
+            console.log("[Stop] Stuck rows reset.");
+        }
+    }, [campaignId, rows]);
 
     const resetRows = useCallback(async (startFromIndex: number = 0) => {
         const sortedRows = [...rows].sort((a, b) => a.id.localeCompare(b.id));

@@ -517,11 +517,10 @@ export function CampaignDetail({ campaignId, subworkspaceId, onBack }: CampaignD
                                     <Button
                                         variant="destructive"
                                         onClick={executor.stop}
-                                        disabled={!executor.state.isRunning && executor.state.activeCalls > 0}
-                                        className="bg-red-50 text-red-600 hover:bg-red-100 border border-red-200 shadow-none dark:bg-red-900/10 dark:text-red-400 dark:border-red-900/50 dark:hover:bg-red-900/30 disabled:opacity-50"
+                                        className="bg-red-50 text-red-600 hover:bg-red-100 border border-red-200 shadow-none dark:bg-red-900/10 dark:text-red-400 dark:border-red-900/50 dark:hover:bg-red-900/30"
                                     >
                                         <Square className="mr-2 h-4 w-4 fill-current" />
-                                        {(!executor.state.isRunning && executor.state.activeCalls > 0) ? "Deteniendo..." : "Detener"}
+                                        {(!executor.state.isRunning && executor.state.activeCalls > 0) ? "Forzar Detención" : "Detener"}
                                     </Button>
                                 </div>
                             </div>
