@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { doc, updateDoc, onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { FlaskConical, BarChart3, History, Settings2, Mic, Phone, Database } from "lucide-react";
+import { FlaskConical, BarChart3, History, Settings2, Mic, Phone, Database, BookOpen } from "lucide-react";
 import { TestingEnvironment } from "@/components/TestingEnvironment";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
@@ -101,7 +101,7 @@ export function InboundAgentView({ subworkspaceId, agentId }: InboundAgentViewPr
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
                 <div className="flex flex-col xl:flex-row items-center justify-between gap-4 mb-6">
                     <h1 className="text-2xl font-bold text-gray-900 dark:text-white shrink-0">Configuración del Agente</h1>
-                    <TabsList className="grid w-full max-w-[600px] grid-cols-4 bg-gray-100 dark:bg-gray-800 p-1 rounded-lg">
+                    <TabsList className="grid w-full max-w-[750px] grid-cols-5 bg-gray-100 dark:bg-gray-800 p-1 rounded-lg">
                         <TabsTrigger
                             value="config"
                             className="gap-2 text-gray-900 dark:text-gray-300 data-[state=active]:bg-white dark:data-[state=active]:bg-gray-700 data-[state=active]:text-gray-900 dark:data-[state=active]:text-white data-[state=active]:shadow-sm transition-all"
@@ -113,6 +113,12 @@ export function InboundAgentView({ subworkspaceId, agentId }: InboundAgentViewPr
                             className="gap-2 text-gray-900 dark:text-gray-300 data-[state=active]:bg-white dark:data-[state=active]:bg-gray-700 data-[state=active]:text-gray-900 dark:data-[state=active]:text-white data-[state=active]:shadow-sm transition-all"
                         >
                             <Database className="h-4 w-4" /> Herramientas
+                        </TabsTrigger>
+                        <TabsTrigger
+                            value="knowledge"
+                            className="gap-2 text-gray-900 dark:text-gray-300 data-[state=active]:bg-white dark:data-[state=active]:bg-gray-700 data-[state=active]:text-gray-900 dark:data-[state=active]:text-white data-[state=active]:shadow-sm transition-all"
+                        >
+                            <BookOpen className="h-4 w-4" /> Conocimiento
                         </TabsTrigger>
                         <TabsTrigger
                             value="history"
@@ -216,13 +222,27 @@ export function InboundAgentView({ subworkspaceId, agentId }: InboundAgentViewPr
                 </TabsContent>
 
                 <TabsContent value="tools" forceMount className="mt-0 data-[state=inactive]:hidden text-gray-900 dark:text-gray-100">
-                    <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-800 p-6">
-                        <AgentToolsConfig
-                            tools={tools}
-                            onSaveTools={handleSaveTools}
-                            onSync={handleSyncTools}
-                            logParentPath={`subworkspaces/${subworkspaceId}`}
-                        />
+                    <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-800 p-10 flex flex-col items-center justify-center text-center min-h-[300px]">
+                        <div className="p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-full mb-4">
+                            <Database className="h-8 w-8 text-yellow-600 dark:text-yellow-400" />
+                        </div>
+                        <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">Herramientas y APIs</h3>
+                        <p className="text-gray-500 max-w-sm">
+                            Todavía no funciona, estoy en ello.
+                        </p>
+                    </div>
+                </TabsContent>
+
+                {/* KNOWLEDGE BASE TAB */}
+                <TabsContent value="knowledge" forceMount className="mt-0 data-[state=inactive]:hidden text-gray-900 dark:text-gray-100">
+                    <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-800 p-10 flex flex-col items-center justify-center text-center min-h-[300px]">
+                        <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-full mb-4">
+                            <BookOpen className="h-8 w-8 text-purple-600 dark:text-purple-400" />
+                        </div>
+                        <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">Base de Conocimiento</h3>
+                        <p className="text-gray-500 max-w-sm">
+                            Todavía no funciona, estoy en ello.
+                        </p>
                     </div>
                 </TabsContent>
 
