@@ -467,8 +467,17 @@ async function handleCallAnalyzed(callId: string, data: any) {
             // Filter out archived fields
             const activeFields = customFields.filter((f: any) => !f.isArchived);
 
+            console.log(`[AI Extraction] ========================================`);
+            console.log(`[AI Extraction] Final Check Before OpenAI Call:`);
+            console.log(`[AI Extraction]   - Total custom fields found: ${customFields.length}`);
+            console.log(`[AI Extraction]   - Active (non-archived) fields: ${activeFields.length}`);
+            console.log(`[AI Extraction]   - Active field names: ${JSON.stringify(activeFields.map((f: any) => f.name))}`);
+            console.log(`[AI Extraction]   - Transcript text length: ${transcriptText?.length || 0} chars`);
+            console.log(`[AI Extraction]   - Config source: ${configSource}`);
+            console.log(`[AI Extraction] ========================================`);
+
             if (activeFields.length > 0 && transcriptText) {
-                console.log(`[AI Extraction] Generating analysis for ${activeFields.length} active custom fields using OpenAI (source: ${configSource})...`);
+                console.log(`[AI Extraction] ✅ PROCEEDING with OpenAI analysis for ${activeFields.length} fields...`);
 
                 if (!process.env.OPENAI_API_KEY) {
                     console.warn("[AI Extraction] Missing OPENAI_API_KEY, skipping local extraction.");
@@ -523,7 +532,10 @@ async function handleCallAnalyzed(callId: string, data: any) {
                     }
                 }
             } else {
-                console.log(`[AI Extraction] No active custom fields found or empty transcript.`);
+                const skipReason = activeFields.length === 0
+                    ? `No active custom fields (total found: ${customFields.length}, active after filter: ${activeFields.length})`
+                    : `Empty transcript (length: ${transcriptText?.length || 0})`;
+                console.log(`[AI Extraction] ⚠️ SKIPPING extraction: ${skipReason}`);
             }
         } catch (err) {
             console.error("[AI Extraction] Error generating analysis:", err);
