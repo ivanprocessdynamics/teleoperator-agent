@@ -356,6 +356,10 @@ async function handleCallAnalyzed(callId: string, data: any) {
     // Track resolved subworkspace for saving to call document
     let resolvedSubworkspaceId: string | null = data.metadata?.subworkspace_id || null;
 
+    let customFields: any[] = [];
+    let configSource = 'none';
+    let activeFields: any[] = [];
+
     // AI Extraction (Primary for Custom Fields)
     // Campaign-First approach: If call has campaign_id, use that Campaign's config.
     // Otherwise, fall back to Subworkspace config (for Testing Environment calls).
@@ -367,10 +371,8 @@ async function handleCallAnalyzed(callId: string, data: any) {
         console.log(`[AI Extraction] Subworkspace ID from metadata: ${data.metadata?.subworkspace_id || 'NONE'}`);
         console.log(`[AI Extraction] Full metadata: ${JSON.stringify(data.metadata)}`);
         console.log(`[AI Extraction] Transcript length: ${transcriptText?.length || 0} chars`);
-        try {
 
-            let customFields: any[] = [];
-            let configSource = 'none';
+        try {
 
             // 1. Check if this call is from a Campaign (via metadata)
             const campaignId = data.metadata?.campaign_id;
@@ -495,7 +497,7 @@ async function handleCallAnalyzed(callId: string, data: any) {
             }
 
             // Filter out archived fields
-            const activeFields = customFields.filter((f: any) => !f.isArchived);
+            activeFields = customFields.filter((f: any) => !f.isArchived);
 
             console.log(`[AI Extraction] ========================================`);
             console.log(`[AI Extraction] Final Check Before OpenAI Call:`);
@@ -580,9 +582,13 @@ async function handleCallAnalyzed(callId: string, data: any) {
         ...(resolvedSubworkspaceId && { subworkspace_id: resolvedSubworkspaceId }), // Ensure subworkspace is set for stats
         _debug: {
             adminDbInitialized: !!adminDb,
+            configuredFieldsCount: customFields?.length || 0, // Fields found in subworkspace config
+            activeFieldsCount: activeFields?.length || 0,     // Fields after filtering archived
+            extractedFieldsCount: analysis.custom_analysis_data?.length || 0, // Fields extracted by AI
             hasCustomFields: analysis.custom_analysis_data?.length > 0 || false,
             customFieldsCount: analysis.custom_analysis_data?.length || 0,
             resolvedSubworkspaceId: resolvedSubworkspaceId || 'NONE',
+            configSource: configSource || 'NONE',
             timestampProcessed: new Date().toISOString()
         }
     };
