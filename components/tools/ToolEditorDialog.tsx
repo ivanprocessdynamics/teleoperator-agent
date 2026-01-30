@@ -149,9 +149,19 @@ export function ToolEditorDialog({ open, onOpenChange, toolToEdit, onSave }: Too
                             </div>
                             {headers.map((h, i) => (
                                 <div key={i} className="flex gap-2 items-center">
-                                    <Input placeholder="Key" value={h.key} onChange={e => updateHeader(i, "key", e.target.value)} className="h-8 text-xs font-mono" />
-                                    <Input placeholder="Value" value={h.value} onChange={e => updateHeader(i, "value", e.target.value)} className="h-8 text-xs font-mono flex-1" />
-                                    <Button variant="ghost" size="icon" onClick={() => removeHeader(i)} className="h-8 w-8 text-muted-foreground hover:text-destructive"><Trash2 className="h-4 w-4" /></Button>
+                                    <Input
+                                        placeholder="Key (ej. Authorization)"
+                                        value={h.key}
+                                        onChange={e => updateHeader(i, "key", e.target.value)}
+                                        className="h-9 text-xs font-mono w-1/3 shrink-0"
+                                    />
+                                    <Input
+                                        placeholder="Value (ej. Bearer ...)"
+                                        value={h.value}
+                                        onChange={e => updateHeader(i, "value", e.target.value)}
+                                        className="h-9 text-xs font-mono flex-1 min-w-0"
+                                    />
+                                    <Button variant="ghost" size="icon" onClick={() => removeHeader(i)} className="h-9 w-9 text-muted-foreground hover:text-destructive shrink-0"><Trash2 className="h-4 w-4" /></Button>
                                 </div>
                             ))}
                             {headers.length === 0 && <p className="text-xs text-muted-foreground italic">Sin headers configurados.</p>}
