@@ -420,11 +420,21 @@ async function handleCallAnalyzed(callId: string, data: any) {
                             // DEBUG: Log the full structure of analysis_config
                             console.log(`[AI Extraction] DEBUG - Full analysis_config structure:`, JSON.stringify(subSettings?.analysis_config || 'UNDEFINED', null, 2));
                             console.log(`[AI Extraction] DEBUG - analysis_config keys:`, Object.keys(subSettings?.analysis_config || {}));
+                            console.log(`[AI Extraction] DEBUG - global_analysis_definitions count:`, subSettings?.global_analysis_definitions?.length || 0);
 
+                            // PRIORITY: Try analysis_config.custom_fields first
                             customFields = subSettings?.analysis_config?.custom_fields || [];
+
+                            // FALLBACK: If empty, use global_analysis_definitions (where TestingEnvironment stores fields)
+                            if (customFields.length === 0 && subSettings?.global_analysis_definitions?.length > 0) {
+                                console.log(`[AI Extraction] analysis_config.custom_fields is empty, falling back to global_analysis_definitions`);
+                                customFields = subSettings!.global_analysis_definitions.filter((f: any) => !f.isArchived);
+                                console.log(`[AI Extraction] Loaded ${customFields.length} active fields from global_analysis_definitions`);
+                            }
+
                             configSource = `subworkspace:${metaSubworkspaceId}`;
                             resolvedSubworkspaceId = metaSubworkspaceId;
-                            console.log(`[AI Extraction] FOUND! Loaded ${customFields.length} custom fields from Subworkspace ID (Admin).`);
+                            console.log(`[AI Extraction] FOUND! Total ${customFields.length} custom fields from Subworkspace ID (Admin).`);
                             console.log(`[AI Extraction] Custom fields: ${JSON.stringify(customFields.map((f: any) => f.name))}`);
                         } else {
                             console.log(`[AI Extraction] Subworkspace ${metaSubworkspaceId} not found (Admin)`);
@@ -433,7 +443,15 @@ async function handleCallAnalyzed(callId: string, data: any) {
                         const subDoc = await getDoc(doc(db, "subworkspaces", metaSubworkspaceId));
                         if (subDoc.exists()) {
                             const subSettings = subDoc.data();
+                            // PRIORITY: Try analysis_config.custom_fields first
                             customFields = subSettings?.analysis_config?.custom_fields || [];
+
+                            // FALLBACK: If empty, use global_analysis_definitions
+                            if (customFields.length === 0 && subSettings?.global_analysis_definitions?.length > 0) {
+                                console.log(`[AI Extraction] analysis_config.custom_fields is empty, falling back to global_analysis_definitions (Client)`);
+                                customFields = subSettings.global_analysis_definitions.filter((f: any) => !f.isArchived);
+                            }
+
                             configSource = `subworkspace:${metaSubworkspaceId}`;
                             resolvedSubworkspaceId = metaSubworkspaceId;
                             console.log(`[AI Extraction] FOUND! Loaded ${customFields.length} custom fields from Subworkspace ID (Client).`);
@@ -452,7 +470,15 @@ async function handleCallAnalyzed(callId: string, data: any) {
                             const snapshot = await adminDb.collection("subworkspaces").where("retell_agent_id", "==", data.agent_id).get();
                             if (!snapshot.empty) {
                                 const subSettings = snapshot.docs[0].data();
+                                // PRIORITY: analysis_config.custom_fields
                                 customFields = subSettings?.analysis_config?.custom_fields || [];
+
+                                // FALLBACK: global_analysis_definitions
+                                if (customFields.length === 0 && subSettings?.global_analysis_definitions?.length > 0) {
+                                    console.log(`[AI Extraction] Falling back to global_analysis_definitions (agent_id lookup)`);
+                                    customFields = subSettings.global_analysis_definitions.filter((f: any) => !f.isArchived);
+                                }
+
                                 configSource = `subworkspace:${snapshot.docs[0].id}`;
                                 resolvedSubworkspaceId = snapshot.docs[0].id;
                                 console.log(`[AI Extraction] FOUND! Loaded ${customFields.length} custom fields from Subworkspace by agent_id (Admin).`);
