@@ -14,9 +14,10 @@ interface AgentToolsConfigProps {
     tools: AgentTool[];
     onSaveTools: (tools: AgentTool[]) => void;
     onSync?: () => Promise<void>; // Optional Sync Handler
+    logParentPath?: string; // Explicit path for logs (e.g. subworkspaces/XYZ)
 }
 
-export function AgentToolsConfig({ tools, onSaveTools, onSync }: AgentToolsConfigProps) {
+export function AgentToolsConfig({ tools, onSaveTools, onSync, logParentPath }: AgentToolsConfigProps) {
     const [editorOpen, setEditorOpen] = useState(false);
     const [editingTool, setEditingTool] = useState<AgentTool | null>(null);
     const [isSyncing, setIsSyncing] = useState(false);
@@ -26,7 +27,6 @@ export function AgentToolsConfig({ tools, onSaveTools, onSync }: AgentToolsConfi
     const params = useParams();
     // Identify context: Campaign or Subworkspace
     const campaignId = params.campaignId as string;
-    const workspaceId = params.workspaceId as string; // This might be subworkspace or workspace?
     // In InboundAgentView, usually we don't have URL params for subworkspace if embedded?
     // Actually InboundView assumes subworkspace is passed or derived.
     // BUT logs are stored in subworkspaces/{id}/tool_logs or campaigns/{id}/tool_logs
@@ -43,9 +43,10 @@ export function AgentToolsConfig({ tools, onSaveTools, onSync }: AgentToolsConfi
     // But modifying props requires changing parents.
     // Let's try to use the params first.
 
-    const collectionPath = campaignId
-        ? `campaigns/${campaignId}/tool_logs`
-        : null; // TODO: Handle Inbound case (need subworkspace ID from somewhere)
+    // Determine path: Explicit Prop > Campaign Param > Null
+    const collectionPath = logParentPath
+        ? `${logParentPath}/tool_logs`
+        : (campaignId ? `campaigns/${campaignId}/tool_logs` : null);
 
     useEffect(() => {
         if (!collectionPath) return;

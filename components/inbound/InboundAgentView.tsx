@@ -221,6 +221,7 @@ export function InboundAgentView({ subworkspaceId, agentId }: InboundAgentViewPr
                             tools={tools}
                             onSaveTools={handleSaveTools}
                             onSync={handleSyncTools}
+                            logParentPath={`subworkspaces/${subworkspaceId}`}
                         />
                     </div>
                 </TabsContent>
