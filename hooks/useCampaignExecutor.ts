@@ -304,7 +304,12 @@ export function useCampaignExecutor({
         isRunningRef.current = false;
         isPausedRef.current = false;
         setState(prev => ({ ...prev, isRunning: false, isPaused: false }));
-    }, []);
+
+        // Force update status in DB to ensure it doesn't stay stuck in "running"
+        updateDoc(doc(db, "campaigns", campaignId), {
+            status: 'draft'
+        }).catch(err => console.error("Error stopping campaign:", err));
+    }, [campaignId]);
 
     const resetRows = useCallback(async (startFromIndex: number = 0) => {
         const sortedRows = [...rows].sort((a, b) => a.id.localeCompare(b.id));
