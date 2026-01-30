@@ -372,7 +372,11 @@ export function CampaignDetail({ campaignId, subworkspaceId, onBack }: CampaignD
 
             {/* Active Campaign Dashboard */}
             {
-                !executor.hasBeenRun && !executor.state.isRunning && campaign.status === 'draft' && (
+                // Only show "Start" card if not running AND not paused AND status is draft (or no executor activity)
+                !executor.state.isRunning &&
+                !executor.state.isPaused &&
+                executor.state.activeCalls === 0 &&
+                campaign.status !== 'completed' && (
                     <div className="mb-6 bg-white dark:bg-gray-900 border border-green-200 dark:border-green-800 rounded-xl p-6 shadow-md animate-in fade-in slide-in-from-top-2 relative overflow-hidden">
                         <div className="absolute top-0 right-0 w-64 h-64 bg-green-500/5 rounded-full blur-3xl -mr-32 -mt-32 pointer-events-none" />
 
@@ -443,6 +447,7 @@ export function CampaignDetail({ campaignId, subworkspaceId, onBack }: CampaignD
             }
 
             {
+                // Show "Sending" card if Running OR Paused OR Active Calls exist
                 (executor.state.isRunning || executor.state.isPaused || executor.state.activeCalls > 0) && (
                     <div className="mb-6 bg-white dark:bg-gray-900 border border-blue-200 dark:border-blue-800 rounded-xl p-6 shadow-md animate-in fade-in slide-in-from-top-2 relative overflow-hidden">
                         {/* Background Pulse Animation */}

@@ -293,12 +293,22 @@ export function useCampaignExecutor({
     const pause = useCallback(() => {
         isPausedRef.current = true;
         setState(prev => ({ ...prev, isPaused: true }));
-    }, []);
+
+        // Force update status in DB
+        updateDoc(doc(db, "campaigns", campaignId), {
+            status: 'paused'
+        }).catch(err => console.error("Error pausing campaign:", err));
+    }, [campaignId]);
 
     const resume = useCallback(() => {
         isPausedRef.current = false;
         setState(prev => ({ ...prev, isPaused: false }));
-    }, []);
+
+        // Force update status in DB
+        updateDoc(doc(db, "campaigns", campaignId), {
+            status: 'running'
+        }).catch(err => console.error("Error resuming campaign:", err));
+    }, [campaignId]);
 
     const stop = useCallback(() => {
         isRunningRef.current = false;
