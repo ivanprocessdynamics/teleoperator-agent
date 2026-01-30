@@ -7,7 +7,7 @@ const retell = new Retell({
 
 export async function POST(req: Request) {
     try {
-        const { agent_id, prompt, subworkspace_id, campaign_id } = await req.json();
+        const { agent_id, prompt, subworkspace_id } = await req.json();
 
         if (!process.env.RETELL_API_KEY) {
             return NextResponse.json(
@@ -15,6 +15,7 @@ export async function POST(req: Request) {
                 { status: 500 }
             );
         }
+
         // Create a Web Call to get the access token
         const webCallResponse = await retell.call.createWebCall({
             agent_id: agent_id,
@@ -24,8 +25,7 @@ export async function POST(req: Request) {
             metadata: {
                 type: 'testing',
                 agent_id: agent_id,
-                subworkspace_id: subworkspace_id || null, // For webhook to load custom field config
-                campaign_id: campaign_id || null // For webhook to load campaign metrics
+                subworkspace_id: subworkspace_id || null // For webhook to load custom field config
             }
         });
 
