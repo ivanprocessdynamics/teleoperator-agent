@@ -6,7 +6,7 @@ import { doc, onSnapshot, updateDoc, getDoc, arrayUnion, arrayRemove, collection
 import { db } from "@/lib/firebase";
 import { Campaign, CampaignColumn, AnalysisConfig, AnalysisField, CallingConfig } from "@/types/campaign";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Play, Save, Check, Loader2, FileText, Phone, Users, Target, Zap, Star, MessageCircle, Mail, Pause, Square, Settings, Activity, Globe } from "lucide-react";
+import { ArrowLeft, Play, Save, Check, Loader2, FileText, Phone, Users, Target, Zap, Star, MessageCircle, Mail, Pause, Square, Settings, Activity, Globe, Database } from "lucide-react";
 import { CampaignTable } from "./CampaignTable";
 import { CampaignPrompt } from "./CampaignPrompt";
 import { CampaignAnalysis } from "./CampaignAnalysis";

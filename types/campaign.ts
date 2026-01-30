@@ -50,6 +50,9 @@ export interface Campaign {
 
     // Analysis Configuration
     analysis_config?: AnalysisConfig;
+
+    // Tools
+    tools?: AgentTool[];
 }
 
 export interface AnalysisField {
