@@ -339,6 +339,10 @@ async function handleCallEnded(callId: string, data: any) {
 
 async function handleCallAnalyzed(callId: string, data: any) {
     let analysis = data.call_analysis || {};
+    // Ensure custom_analysis_data is an array (Retell sometimes sends object or undefined)
+    if (!analysis.custom_analysis_data || !Array.isArray(analysis.custom_analysis_data)) {
+        analysis.custom_analysis_data = [];
+    }
 
     // We update ONLY the analysis fields + transcript (if improved)
     // Sometimes call.analyzed has a better/final transcript
