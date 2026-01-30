@@ -23,7 +23,7 @@ if (!admin.apps.length) {
                     privateKey: formatPrivateKey(privateKey),
                 }),
             });
-            console.log('Firebase Admin Initialized successfully');
+            console.log(`[Admin SDK] Firebase Admin Initialized successfully. Project: ${projectId}`);
         } catch (error) {
             console.error('Firebase Admin initialization failed:', error);
         }

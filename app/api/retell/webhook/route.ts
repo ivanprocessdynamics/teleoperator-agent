@@ -289,22 +289,21 @@ async function handleCallEnded(callId: string, data: any) {
     // Resolve subworkspace_id: from metadata first, then try to find by agent_id
     let resolvedSubworkspaceId = data.metadata?.subworkspace_id || null;
 
-    if (!resolvedSubworkspaceId && data.agent_id) {
-        // Try to find subworkspace by agent_id
-        if (adminDb) {
-            const snapshot = await adminDb.collection("subworkspaces").where("retell_agent_id", "==", data.agent_id).get();
-            if (!snapshot.empty) {
-                resolvedSubworkspaceId = snapshot.docs[0].id;
-                console.log(`[call_ended] Resolved subworkspace_id from agent_id: ${resolvedSubworkspaceId}`);
-            }
-        } else {
-            const q = query(collection(db, "subworkspaces"), where("retell_agent_id", "==", data.agent_id));
-            const snapshot = await getDocs(q);
-            if (!snapshot.empty) {
-                resolvedSubworkspaceId = snapshot.docs[0].id;
-                console.log(`[call_ended] Resolved subworkspace_id from agent_id: ${resolvedSubworkspaceId}`);
+    try {
+        if (!resolvedSubworkspaceId && data.agent_id) {
+            // Try to find subworkspace by agent_id
+            if (adminDb) {
+                const snapshot = await adminDb.collection("subworkspaces").where("retell_agent_id", "==", data.agent_id).get();
+                if (!snapshot.empty) {
+                    resolvedSubworkspaceId = snapshot.docs[0].id;
+                    console.log(`[call_ended] Resolved subworkspace_id from agent_id (Admin): ${resolvedSubworkspaceId}`);
+                }
+            } else {
+                console.warn("[call_ended] Admin SDK not available for subworkspace resolution. Skipping Client SDK fallback to avoid permission errors.");
             }
         }
+    } catch (resolutionError) {
+        console.error("[call_ended] Error processing subworkspace resolution (skipping to save):", resolutionError);
     }
 
     // Prepare basic call record
