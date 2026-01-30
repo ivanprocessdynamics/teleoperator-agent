@@ -1,6 +1,6 @@
 import { initializeApp, getApps, getApp } from "firebase/app";
 import { getAuth, GoogleAuthProvider } from "firebase/auth";
-import { getFirestore, enableIndexedDbPersistence } from "firebase/firestore";
+import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, getFirestore } from "firebase/firestore";
 
 const firebaseConfig = {
     apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -23,18 +23,28 @@ let googleProvider: any;
 try {
     if (firebaseConfig.apiKey) {
         auth = getAuth(app);
-        db = getFirestore(app);
         googleProvider = new GoogleAuthProvider();
 
-        // Enable offline persistence for faster loads
+        // Initialize Firestore with multi-tab persistence support
         if (typeof window !== "undefined") {
-            enableIndexedDbPersistence(db).catch((err) => {
-                if (err.code === "failed-precondition") {
-                    console.warn("Persistence failed: Multiple tabs open");
-                } else if (err.code === "unimplemented") {
-                    console.warn("Persistence not supported by browser");
+            try {
+                db = initializeFirestore(app, {
+                    localCache: persistentLocalCache({
+                        tabManager: persistentMultipleTabManager()
+                    })
+                });
+            } catch (err: any) {
+                // If already initialized, just get the instance
+                if (err.code === 'failed-precondition' || err.message?.includes('already been called')) {
+                    db = getFirestore(app);
+                } else {
+                    console.warn("Error initializing Firestore with persistence:", err);
+                    db = getFirestore(app);
                 }
-            });
+            }
+        } else {
+            // Server-side: no persistence needed
+            db = getFirestore(app);
         }
     } else {
         console.warn("Firebase API Key missing. Services not initialized. (OK for build time)");
