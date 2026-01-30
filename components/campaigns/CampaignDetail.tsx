@@ -320,7 +320,8 @@ export function CampaignDetail({ campaignId, subworkspaceId, onBack }: CampaignD
         callingConfig: campaign?.calling_config || { from_number: '+34877450708', concurrency_limit: 1, retry_failed: false },
         phoneColumnId: phoneColumnId,
         campaignPrompt: campaign?.prompt_template || '',
-        columns: campaign?.columns || [] // Pass columns for dynamic variables
+        columns: campaign?.columns || [], // Pass columns for dynamic variables
+        subworkspaceId: activeSubworkspaceId || ''
     });
 
     const handleLaunch = async () => {

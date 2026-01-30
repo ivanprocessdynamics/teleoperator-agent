@@ -234,17 +234,21 @@ export async function POST(req: Request) {
 
         if (event === "call_ended") {
             // Priority: Save Transcript IMMEDIATELY
+            console.log(`[Webhook] Processing call_ended for ${callId}...`);
             await handleCallEnded(callId, callData);
 
             // Update Campaign Row Status (if this call was part of a campaign)
             rowUpdateResult = await updateCampaignRowStatus(callId, callData, 'ended');
+            console.log(`[Webhook] call_ended processing complete for ${callId}`);
         }
         else if (event === "call.analyzed" || event === "call_analyzed") {
             // Secondary: enrich with Analysis later
+            console.log(`[Webhook] Processing call_analyzed for ${callId}...`);
             await handleCallAnalyzed(callId, callData);
+            console.log(`[Webhook] call_analyzed processing complete for ${callId}`);
         }
         else if (event === "call_started") {
-            console.log("Call started event received");
+            console.log(`[Webhook] Call started event received for ${callId}`);
             // Update Campaign Row Status to 'calling'
             rowUpdateResult = await updateCampaignRowStatus(callId, callData, 'started');
         }

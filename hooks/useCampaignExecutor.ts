@@ -21,6 +21,7 @@ interface UseCampaignExecutorProps {
     callingConfig: CallingConfig;
     phoneColumnId: string;
     campaignPrompt: string;  // The prompt template for the agent
+    subworkspaceId: string;
 }
 
 export function useCampaignExecutor({
@@ -29,7 +30,8 @@ export function useCampaignExecutor({
     callingConfig,
     phoneColumnId,
     campaignPrompt,
-    columns
+    columns,
+    subworkspaceId
 }: UseCampaignExecutorProps & { columns: CampaignColumn[] }) {
     const [state, setState] = useState<ExecutorState>({
         isRunning: false,
@@ -241,6 +243,7 @@ export function useCampaignExecutor({
                     metadata: {
                         campaign_id: campaignId,
                         row_id: row.id,
+                        subworkspace_id: subworkspaceId
                     }
                 })
             });
@@ -269,7 +272,7 @@ export function useCampaignExecutor({
             // This is just to cleanup the Set.
             initiatingRowsRef.current.delete(row.id);
         }
-    }, [campaignId, agentId, callingConfig.from_number, callingConfig.target_country_code, phoneColumnId, columns, campaignPrompt]);
+    }, [campaignId, agentId, callingConfig.from_number, callingConfig.target_country_code, phoneColumnId, columns, campaignPrompt, subworkspaceId]);
 
     const start = useCallback((promptOverride?: string) => {
         if (promptOverride) {
