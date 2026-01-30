@@ -595,7 +595,7 @@ export function CallHistoryTable({ agentId: initialAgentId, subworkspaceId, work
 
                                 // Try lookup by campaign_id (metadata) OR agent_id (direct map)
                                 const campaignName = (call.metadata?.campaign_id ? campaignMap[call.metadata.campaign_id] : null)
-                                    || campaignMap[call.agent_id];
+                                    || agentMap[call.agent_id]?.name;
 
                                 return (
                                     <TableRow key={call.id} className="group hover:bg-blue-50/50 dark:hover:bg-blue-900/10 transition-colors">

@@ -442,30 +442,23 @@ async function handleCallAnalyzed(callId: string, data: any) {
                 if (customFields.length === 0) {
                     console.log(`[AI Extraction] Searching for subworkspace with retell_agent_id = "${data.agent_id}"`);
 
-                    if (adminDb) {
-                        const snapshot = await adminDb.collection("subworkspaces").where("retell_agent_id", "==", data.agent_id).get();
-                        if (!snapshot.empty) {
-                            const subSettings = snapshot.docs[0].data();
-                            customFields = subSettings?.analysis_config?.custom_fields || [];
-                            configSource = `subworkspace:${snapshot.docs[0].id}`;
-                            resolvedSubworkspaceId = snapshot.docs[0].id;
-                            console.log(`[AI Extraction] FOUND! Loaded ${customFields.length} custom fields from Subworkspace by agent_id (Admin).`);
-                            console.log(`[AI Extraction] Custom fields: ${JSON.stringify(customFields.map((f: any) => f.name))}`);
+                    try {
+                        if (adminDb) {
+                            const snapshot = await adminDb.collection("subworkspaces").where("retell_agent_id", "==", data.agent_id).get();
+                            if (!snapshot.empty) {
+                                const subSettings = snapshot.docs[0].data();
+                                customFields = subSettings?.analysis_config?.custom_fields || [];
+                                configSource = `subworkspace:${snapshot.docs[0].id}`;
+                                resolvedSubworkspaceId = snapshot.docs[0].id;
+                                console.log(`[AI Extraction] FOUND! Loaded ${customFields.length} custom fields from Subworkspace by agent_id (Admin).`);
+                            } else {
+                                console.log(`[AI Extraction] NO MATCH FOUND for agent ${data.agent_id} (Admin)`);
+                            }
                         } else {
-                            console.log(`[AI Extraction] NO MATCH FOUND for agent ${data.agent_id} (Admin)`);
+                            console.warn("[AI Extraction] Admin SDK not available. Skipping Client SDK fallback to avoid permission errors.");
                         }
-                    } else {
-                        const q = query(collection(db, "subworkspaces"), where("retell_agent_id", "==", data.agent_id));
-                        const snapshot = await getDocs(q);
-                        if (!snapshot.empty) {
-                            const subSettings = snapshot.docs[0].data();
-                            customFields = subSettings?.analysis_config?.custom_fields || [];
-                            configSource = `subworkspace:${snapshot.docs[0].id}`;
-                            resolvedSubworkspaceId = snapshot.docs[0].id;
-                            console.log(`[AI Extraction] Loaded ${customFields.length} custom fields from Subworkspace by agent_id (Client).`);
-                        } else {
-                            console.log(`[AI Extraction] No subworkspace found for agent ${data.agent_id} (Client)`);
-                        }
+                    } catch (err) {
+                        console.error("[AI Extraction] Error resolving subworkspace by agent_id:", err);
                     }
                 }
             }
