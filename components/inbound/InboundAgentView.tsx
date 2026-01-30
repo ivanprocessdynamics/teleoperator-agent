@@ -35,7 +35,6 @@ export function InboundAgentView({ subworkspaceId, agentId }: InboundAgentViewPr
             }
         });
         return () => unsub();
-        return () => unsub();
     }, [subworkspaceId]);
 
     // Self-healing: Ensure retell_agent_id is synced to the subworkspace document

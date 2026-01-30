@@ -360,13 +360,14 @@ async function handleCallAnalyzed(callId: string, data: any) {
     // Campaign-First approach: If call has campaign_id, use that Campaign's config.
     // Otherwise, fall back to Subworkspace config (for Testing Environment calls).
     if (data.agent_id) {
+        console.log(`[AI Extraction] ========================================`);
+        console.log(`[AI Extraction] CRITICAL CHECK: adminDb initialized = ${!!adminDb}`);
+        console.log(`[AI Extraction] Starting extraction for agent_id: ${data.agent_id}`);
+        console.log(`[AI Extraction] Campaign ID from metadata: ${data.metadata?.campaign_id || 'NONE'}`);
+        console.log(`[AI Extraction] Subworkspace ID from metadata: ${data.metadata?.subworkspace_id || 'NONE'}`);
+        console.log(`[AI Extraction] Full metadata: ${JSON.stringify(data.metadata)}`);
+        console.log(`[AI Extraction] Transcript length: ${transcriptText?.length || 0} chars`);
         try {
-            console.log(`[AI Extraction] ========================================`);
-            console.log(`[AI Extraction] Starting extraction for agent_id: ${data.agent_id}`);
-            console.log(`[AI Extraction] Campaign ID from metadata: ${data.metadata?.campaign_id || 'NONE'}`);
-            console.log(`[AI Extraction] Subworkspace ID from metadata: ${data.metadata?.subworkspace_id || 'NONE'}`);
-            console.log(`[AI Extraction] Full metadata: ${JSON.stringify(data.metadata)}`);
-            console.log(`[AI Extraction] Transcript length: ${transcriptText?.length || 0} chars`);
 
             let customFields: any[] = [];
             let configSource = 'none';
@@ -534,7 +535,14 @@ async function handleCallAnalyzed(callId: string, data: any) {
         event_type: 'call_analyzed',
         post_call_analysis_done: true,
         updated_at: serverTimestamp(),
-        ...(resolvedSubworkspaceId && { subworkspace_id: resolvedSubworkspaceId }) // Ensure subworkspace is set for stats
+        ...(resolvedSubworkspaceId && { subworkspace_id: resolvedSubworkspaceId }), // Ensure subworkspace is set for stats
+        _debug: {
+            adminDbInitialized: !!adminDb,
+            hasCustomFields: analysis.custom_analysis_data?.length > 0 || false,
+            customFieldsCount: analysis.custom_analysis_data?.length || 0,
+            resolvedSubworkspaceId: resolvedSubworkspaceId || 'NONE',
+            timestampProcessed: new Date().toISOString()
+        }
     };
 
     if (transcriptNodes) {
@@ -543,5 +551,5 @@ async function handleCallAnalyzed(callId: string, data: any) {
 
     // Merge these updates
     await setDoc(doc(db, "calls", callId), updates, { merge: true });
-    console.log(`[call.analyzed] Analysis updated for ${callId}`);
+    console.log(`[call.analyzed] Analysis updated for ${callId}. Debug: ${JSON.stringify(updates._debug)}`);
 }
