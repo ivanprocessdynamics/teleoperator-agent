@@ -51,12 +51,12 @@ export function ToolEditorDialog({ open, onOpenChange, toolToEdit, onSave }: Too
     const handleSave = () => {
         if (!name || !url) return;
 
-        // Basic snake_case validation for name
-        const sanitizedName = name.trim().toLowerCase().replace(/[^a-z0-9_]/g, '_');
+        // Allow any name (will be sanitized for LLM function name on sync)
+        const finalName = name.trim();
 
         const newTool: AgentTool = {
             id: toolToEdit?.id || uuidv4(),
-            name: sanitizedName,
+            name: finalName,
             description,
             url,
             method,
@@ -97,14 +97,14 @@ export function ToolEditorDialog({ open, onOpenChange, toolToEdit, onSave }: Too
                     {/* General Info */}
                     <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
-                            <Label>Nombre (Función)</Label>
+                            <Label>Nombre de la Herramienta</Label>
                             <Input
-                                placeholder="ej. buscar_cliente (snake_case)"
+                                placeholder="ej. Buscar Cliente"
                                 value={name}
                                 onChange={e => setName(e.target.value)}
-                                className="font-mono"
+                                className="font-semibold"
                             />
-                            <p className="text-xs text-muted-foreground">Nombre único que el LLM usará para invocar esta función.</p>
+                            <p className="text-xs text-muted-foreground">Nombre identificativo para el agente.</p>
                         </div>
                         <div className="space-y-2">
                             <Label>Descripción (Prompt)</Label>

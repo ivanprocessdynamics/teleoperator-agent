@@ -73,7 +73,8 @@ export async function POST(req: Request) {
             const retellTools = body.tools.map((t: any) => ({
                 type: "function",
                 function: {
-                    name: t.name,
+                    // Sanitize name to satisfy OpenAI reqs (^[a-zA-Z0-9_-]{1,64}$)
+                    name: t.name.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '_').substring(0, 64),
                     description: t.description,
                     parameters: {
                         type: "object",

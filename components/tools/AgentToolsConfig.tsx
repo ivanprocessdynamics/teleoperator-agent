@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Plus, Settings, RefreshCw, Trash2, Edit, Code, Globe, Database } from "lucide-react";
+import { Plus, Database, RefreshCw, Trash2, Edit, Code, Globe, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { AgentTool } from "@/types/tools";
 import { ToolEditorDialog } from "@/components/tools/ToolEditorDialog";
@@ -28,14 +28,23 @@ export function AgentToolsConfig({ tools, onSaveTools, onSync }: AgentToolsConfi
         setEditorOpen(true);
     };
 
-    const handleDelete = (id: string) => {
+    const handleDelete = async (id: string) => {
         if (confirm("¿Estás seguro de eliminar esta herramienta?")) {
             const newTools = tools.filter(t => t.id !== id);
             onSaveTools(newTools);
+
+            if (onSync) {
+                setIsSyncing(true);
+                try {
+                    await onSync();
+                } finally {
+                    setIsSyncing(false);
+                }
+            }
         }
     };
 
-    const handleSaveTool = (tool: AgentTool) => {
+    const handleSaveTool = async (tool: AgentTool) => {
         let newTools = [...tools];
         const index = newTools.findIndex(t => t.id === tool.id);
 
@@ -45,92 +54,94 @@ export function AgentToolsConfig({ tools, onSaveTools, onSync }: AgentToolsConfi
             newTools.push(tool);
         }
         onSaveTools(newTools);
-    };
 
-    const handleSyncClick = async () => {
-        if (!onSync) return;
-        setIsSyncing(true);
-        try {
-            await onSync();
-        } finally {
-            setIsSyncing(false);
+        if (onSync) {
+            setIsSyncing(true);
+            try {
+                await onSync();
+            } finally {
+                setIsSyncing(false);
+            }
         }
     };
 
     return (
         <div className="space-y-6">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <div className="flex justify-between items-center">
                 <div>
                     <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
                         <Database className="h-5 w-5 text-indigo-500" />
                         Herramientas y APIs
                     </h3>
                     <p className="text-sm text-gray-500 dark:text-gray-400">
-                        Configura las acciones que el agente puede realizar conectándose a servicios externos.
+                        Capacidades externas del agente.
                     </p>
                 </div>
                 <div className="flex items-center gap-2">
-                    {onSync && (
-                        <Button
-                            variant="outline"
-                            onClick={handleSyncClick}
-                            disabled={isSyncing}
-                            className={cn("gap-2", isSyncing && "opacity-80")}
-                        >
-                            <RefreshCw className={cn("h-4 w-4", isSyncing && "animate-spin")} />
-                            {isSyncing ? "Sincronizando..." : "Sincronizar con Retell"}
-                        </Button>
+                    {isSyncing && (
+                        <span className="text-xs text-muted-foreground animate-pulse flex items-center gap-1">
+                            <RefreshCw className="h-3 w-3 animate-spin" /> Guardando...
+                        </span>
                     )}
-                    <Button onClick={handleAdd} className="gap-2 bg-indigo-600 hover:bg-indigo-700 text-white">
-                        <Plus className="h-4 w-4" /> Añadir Herramienta
+                    <Button onClick={handleAdd} className="gap-2 bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm hover:shadow-md transition-all">
+                        <Plus className="h-4 w-4" /> Nueva Herramienta
                     </Button>
                 </div>
             </div>
 
             {tools.length === 0 ? (
-                <div className="border border-dashed border-gray-200 dark:border-gray-800 rounded-lg p-10 flex flex-col items-center justify-center text-center">
-                    <div className="h-12 w-12 rounded-full bg-indigo-50 dark:bg-indigo-900/20 flex items-center justify-center mb-4">
-                        <Code className="h-6 w-6 text-indigo-500" />
+                <div className="border border-dashed border-gray-200 dark:border-gray-800 rounded-xl p-12 flex flex-col items-center justify-center text-center bg-gray-50/50 dark:bg-gray-900/50 hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors">
+                    <div className="h-16 w-16 rounded-full bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center mb-4 ring-8 ring-indigo-50 dark:ring-indigo-900/10">
+                        <Zap className="h-8 w-8 text-indigo-600 dark:text-indigo-400" />
                     </div>
-                    <h4 className="font-medium text-gray-900 dark:text-white mb-2">No hay herramientas configuradas</h4>
-                    <p className="text-sm text-gray-500 dark:text-gray-400 max-w-sm mb-6">
-                        Añade tu primera herramienta para que el agente pueda buscar información, crear incidencias o consultar bases de datos.
+                    <h4 className="font-semibold text-lg text-gray-900 dark:text-white mb-2">No hay herramientas activas</h4>
+                    <p className="text-sm text-gray-500 dark:text-gray-400 max-w-sm mb-8 leading-relaxed">
+                        Conecta tu agente a servicios externos (CRM, Calendario, Base de Datos) para que pueda realizar acciones reales.
                     </p>
-                    <Button variant="outline" onClick={handleAdd}>Empezar ahora</Button>
+                    <Button variant="outline" onClick={handleAdd} className="border-indigo-200 text-indigo-700 hover:bg-indigo-50 hover:text-indigo-800 dark:border-indigo-800 dark:text-indigo-300 dark:hover:bg-indigo-900/50">
+                        Configurar mi primera herramienta
+                    </Button>
                 </div>
             ) : (
                 <div className="grid grid-cols-1 gap-4">
                     {tools.map((tool) => (
                         <div
                             key={tool.id}
-                            className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-4 flex flex-col sm:flex-row sm:items-center gap-4 hover:border-indigo-200 dark:hover:border-indigo-800 transition-colors shadow-sm"
+                            className="group bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-5 flex flex-col sm:flex-row sm:items-center gap-5 hover:border-indigo-300 dark:hover:border-indigo-700 transition-all hover:shadow-md cursor-pointer"
+                            onClick={() => handleEdit(tool)}
                         >
-                            <div className="h-10 w-10 rounded-lg bg-gray-100 dark:bg-gray-800 flex items-center justify-center shrink-0 font-mono text-xs font-bold text-gray-500">
+                            <div className={cn(
+                                "h-12 w-12 rounded-xl flex items-center justify-center shrink-0 font-bold text-sm shadow-sm",
+                                tool.method === 'GET' ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300" :
+                                    tool.method === 'POST' ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300" :
+                                        tool.method === 'DELETE' ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300" :
+                                            "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300"
+                            )}>
                                 {tool.method}
                             </div>
 
-                            <div className="flex-1 min-w-0">
-                                <div className="flex items-center gap-2">
-                                    <h4 className="font-semibold text-gray-900 dark:text-white truncate font-mono text-sm">
+                            <div className="flex-1 min-w-0 space-y-1">
+                                <div className="flex items-center gap-3">
+                                    <h4 className="font-bold text-gray-900 dark:text-white text-base truncate">
                                         {tool.name}
                                     </h4>
-                                    <span className="text-[10px] uppercase font-bold px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-800 text-gray-500 border border-gray-200 dark:border-gray-700">
+                                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200">
                                         {tool.parameters.length} params
                                     </span>
                                 </div>
-                                <p className="text-sm text-gray-500 dark:text-gray-400 truncate">
+                                <p className="text-sm text-gray-500 dark:text-gray-400 line-clamp-1">
                                     {tool.description || "Sin descripción"}
                                 </p>
-                                <div className="flex items-center gap-1 mt-1 text-xs text-gray-400 font-mono truncate">
+                                <div className="flex items-center gap-1.5 text-xs text-gray-400 font-mono truncate pt-1 opacity-80">
                                     <Globe className="h-3 w-3" /> {tool.url}
                                 </div>
                             </div>
 
-                            <div className="flex items-center gap-2 shrink-0 border-t sm:border-t-0 sm:border-l border-gray-100 dark:border-gray-800 pt-3 sm:pt-0 sm:pl-3">
-                                <Button variant="ghost" size="icon" onClick={() => handleEdit(tool)} className="h-8 w-8 text-gray-500 hover:text-indigo-600">
+                            <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity pl-2">
+                                <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); handleEdit(tool); }} className="h-9 w-9 text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/20">
                                     <Edit className="h-4 w-4" />
                                 </Button>
-                                <Button variant="ghost" size="icon" onClick={() => handleDelete(tool.id)} className="h-8 w-8 text-gray-500 hover:text-red-600">
+                                <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); handleDelete(tool.id); }} className="h-9 w-9 text-gray-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20">
                                     <Trash2 className="h-4 w-4" />
                                 </Button>
                             </div>
