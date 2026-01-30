@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { doc, updateDoc, onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { FlaskConical, BarChart3, History, Settings2, Mic, Phone } from "lucide-react";
+import { FlaskConical, BarChart3, History, Settings2, Mic, Phone, Database } from "lucide-react";
 import { TestingEnvironment } from "@/components/TestingEnvironment";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
@@ -13,6 +13,8 @@ import { StatsDashboard } from "@/components/stats/StatsDashboard";
 import { CampaignPrompt } from "@/components/campaigns/CampaignPrompt";
 import { CampaignAnalysis } from "@/components/campaigns/CampaignAnalysis";
 import { ConnectPhoneNumberModal } from "@/components/inbound/PhoneNumberConnectModal";
+import { AgentToolsConfig } from "@/components/tools/AgentToolsConfig";
+import { AgentTool } from "@/types/tools";
 
 interface InboundAgentViewProps {
     subworkspaceId: string;
@@ -22,7 +24,8 @@ interface InboundAgentViewProps {
 export function InboundAgentView({ subworkspaceId, agentId }: InboundAgentViewProps) {
     const [activeTab, setActiveTab] = useState("config");
     const [promptData, setPromptData] = useState({ prompt: "" });
-    const [analysisConfig, setAnalysisConfig] = useState<any>({ custom_fields: [] }); // Use proper type
+    const [analysisConfig, setAnalysisConfig] = useState<any>({ custom_fields: [] });
+    const [tools, setTools] = useState<AgentTool[]>([]);
 
     // Fetch Data
     useEffect(() => {
@@ -32,19 +35,15 @@ export function InboundAgentView({ subworkspaceId, agentId }: InboundAgentViewPr
                 const data = docSnap.data();
                 setPromptData({ prompt: data.active_prompt || data.prompt_editable_text || "" });
                 setAnalysisConfig(data.analysis_config || { custom_fields: [] });
+                setTools(data.tools || []);
             }
         });
         return () => unsub();
     }, [subworkspaceId]);
 
     // Self-healing: Ensure retell_agent_id is synced to the subworkspace document
-    // This is critical for the webhook to find the subworkspace by agent_id
     useEffect(() => {
         if (!agentId || !subworkspaceId) return;
-
-        // We only update if it's missing or different to avoid infinite loops, 
-        // but we need to check the current value first. 
-        // Only safe way without extra reads is to do it once on mount or when agentId changes.
         updateDoc(doc(db, "subworkspaces", subworkspaceId), {
             retell_agent_id: agentId
         }).catch(err => console.error("Error syncing agent ID:", err));
@@ -71,19 +70,50 @@ export function InboundAgentView({ subworkspaceId, agentId }: InboundAgentViewPr
         }
     };
 
+    const handleSaveTools = async (newTools: AgentTool[]) => {
+        try {
+            await updateDoc(doc(db, "subworkspaces", subworkspaceId), {
+                tools: newTools
+            });
+        } catch (e) {
+            console.error("Error saving tools", e);
+        }
+    };
+
+    const handleSyncTools = async () => {
+        if (!agentId) return;
+        const response = await fetch("/api/retell/update-agent", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                agent_id: agentId,
+                tools: tools
+            }),
+        });
+
+        if (!response.ok) {
+            throw new Error("Failed to sync tools to Retell");
+        }
+    };
+
     return (
         <div className="flex flex-col gap-6">
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
                 <div className="flex flex-col xl:flex-row items-center justify-between gap-4 mb-6">
                     <h1 className="text-2xl font-bold text-gray-900 dark:text-white shrink-0">Configuración del Agente</h1>
-                    <TabsList className="grid w-full max-w-[600px] grid-cols-3 bg-gray-100 dark:bg-gray-800 p-1 rounded-lg">
+                    <TabsList className="grid w-full max-w-[600px] grid-cols-4 bg-gray-100 dark:bg-gray-800 p-1 rounded-lg">
                         <TabsTrigger
                             value="config"
                             className="gap-2 text-gray-900 dark:text-gray-300 data-[state=active]:bg-white dark:data-[state=active]:bg-gray-700 data-[state=active]:text-gray-900 dark:data-[state=active]:text-white data-[state=active]:shadow-sm transition-all"
                         >
                             <Settings2 className="h-4 w-4" /> Configuración
                         </TabsTrigger>
-
+                        <TabsTrigger
+                            value="tools"
+                            className="gap-2 text-gray-900 dark:text-gray-300 data-[state=active]:bg-white dark:data-[state=active]:bg-gray-700 data-[state=active]:text-gray-900 dark:data-[state=active]:text-white data-[state=active]:shadow-sm transition-all"
+                        >
+                            <Database className="h-4 w-4" /> Herramientas
+                        </TabsTrigger>
                         <TabsTrigger
                             value="history"
                             className="gap-2 text-gray-900 dark:text-gray-300 data-[state=active]:bg-white dark:data-[state=active]:bg-gray-700 data-[state=active]:text-gray-900 dark:data-[state=active]:text-white data-[state=active]:shadow-sm transition-all"
@@ -185,7 +215,15 @@ export function InboundAgentView({ subworkspaceId, agentId }: InboundAgentViewPr
                     </div>
                 </TabsContent>
 
-
+                <TabsContent value="tools" forceMount className="mt-0 data-[state=inactive]:hidden text-gray-900 dark:text-gray-100">
+                    <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-800 p-6">
+                        <AgentToolsConfig
+                            tools={tools}
+                            onSaveTools={handleSaveTools}
+                            onSync={handleSyncTools}
+                        />
+                    </div>
+                </TabsContent>
 
                 {/* HISTORY TAB */}
                 <TabsContent value="history" forceMount className="mt-6 data-[state=inactive]:hidden">
@@ -210,6 +248,6 @@ export function InboundAgentView({ subworkspaceId, agentId }: InboundAgentViewPr
                     </div>
                 </TabsContent>
             </Tabs>
-
-        </div>);
+        </div>
+    );
 }

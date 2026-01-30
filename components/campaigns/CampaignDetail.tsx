@@ -10,6 +10,8 @@ import { ArrowLeft, Play, Save, Check, Loader2, FileText, Phone, Users, Target, 
 import { CampaignTable } from "./CampaignTable";
 import { CampaignPrompt } from "./CampaignPrompt";
 import { CampaignAnalysis } from "./CampaignAnalysis";
+import { AgentToolsConfig } from "@/components/tools/AgentToolsConfig";
+import { AgentTool } from "@/types/tools";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import {
@@ -248,6 +250,8 @@ export function CampaignDetail({ campaignId, subworkspaceId, onBack }: CampaignD
     }, [retellAgentId]);
 
     const handleUpdateAnalysis = (analysis_config: AnalysisConfig) => debouncedSave({ analysis_config });
+
+    const handleUpdateTools = (tools: AgentTool[]) => debouncedSave({ tools });
 
     // Active Sync: Global (Subworkspace) -> Campaign
     // FIX: Do NOT auto-add new global fields to local active list.
@@ -734,11 +738,25 @@ export function CampaignDetail({ campaignId, subworkspaceId, onBack }: CampaignD
                 {/* Right: Prompt Editor & Analysis (5 cols) - Sticky */}
                 <div className="col-span-12 lg:col-span-5 h-full overflow-y-auto pr-2">
                     <Tabs defaultValue="prompt" className="w-full">
-                        <TabsList className="grid w-full grid-cols-3 mb-4 bg-gray-100 dark:bg-gray-800">
+                        <TabsList className="grid w-full grid-cols-4 mb-4 bg-gray-100 dark:bg-gray-800">
                             <TabsTrigger value="prompt">Prompt</TabsTrigger>
+                            <TabsTrigger value="tools" className="gap-2"><Database className="h-3.5 w-3.5" />Herramientas</TabsTrigger>
                             <TabsTrigger value="analysis">Análisis & IA</TabsTrigger>
                             <TabsTrigger value="calling"><Phone className="h-3.5 w-3.5 mr-1.5" />Llamadas</TabsTrigger>
                         </TabsList>
+
+                        <TabsContent value="tools">
+                            <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-5">
+                                <AgentToolsConfig
+                                    tools={campaign?.tools || []}
+                                    onSaveTools={handleUpdateTools}
+                                    onSync={() => {
+                                        // For campaigns, syncing prompt also syncs tools because update-agent handles it all
+                                        return handleSyncPrompt(campaign?.prompt_template || "");
+                                    }}
+                                />
+                            </div>
+                        </TabsContent>
 
                         <TabsContent value="prompt">
                             <CampaignPrompt

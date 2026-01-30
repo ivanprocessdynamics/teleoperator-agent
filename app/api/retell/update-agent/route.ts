@@ -65,6 +65,50 @@ export async function POST(req: Request) {
             }
         }
 
+        // 1b. Handle Tools Update (Push to LLM)
+        if (body.tools) {
+            console.log("Tools update requested. Count:", body.tools.length);
+
+            // Map internal tools to OpenAI Function format
+            const retellTools = body.tools.map((t: any) => ({
+                type: "function",
+                function: {
+                    name: t.name,
+                    description: t.description,
+                    parameters: {
+                        type: "object",
+                        properties: t.parameters.reduce((acc: any, p: any) => ({
+                            ...acc,
+                            [p.name]: {
+                                type: p.type,
+                                description: p.description
+                            }
+                        }), {}),
+                        required: t.parameters.filter((p: any) => p.required).map((p: any) => p.name)
+                    }
+                }
+            }));
+
+            // Reuse existing agent/llm retrieval logic if available, or fetch if not
+            // For simplicity, we fetch again or assume prompt logic fetched it? 
+            // Better to consolidate retrieval.
+
+            // REFACTOR: Retrieve agent once if either prompt OR tools is present
+            if (!agent_id) throw new Error("Agent ID missing");
+
+            const agent = await retell.agent.retrieve(agent_id);
+            if (agent.response_engine?.type === 'retell-llm' && agent.response_engine.llm_id) {
+                const llmId = agent.response_engine.llm_id;
+                console.log("Updating LLM Tools...", llmId);
+
+                await retell.llm.update(llmId, {
+                    tools: retellTools
+                } as any);
+                updates.tools_updated = true;
+            }
+        }
+
+
         // 2. Handle Analysis Config Update
         if (analysis_config) {
             try {

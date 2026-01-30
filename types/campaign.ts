@@ -1,3 +1,5 @@
+import { AgentTool } from "@/types/tools";
+
 export type CampaignStatus = 'draft' | 'running' | 'completed' | 'paused';
 
 export interface CampaignColumn {
