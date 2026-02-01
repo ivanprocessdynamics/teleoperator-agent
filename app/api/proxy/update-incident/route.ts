@@ -3,9 +3,9 @@ import { NextRequest, NextResponse } from 'next/server';
 export async function POST(req: NextRequest) {
     try {
         const body = await req.json();
-        const { id, priority, status } = body;
+        const { id, ...fieldsToUpdate } = body;
 
-        // 3. Validate 'id' exists
+        // 1. Validaciones básicas
         if (!id) {
             return NextResponse.json(
                 { error: "Missing 'id' parameter in request body" },
@@ -13,42 +13,63 @@ export async function POST(req: NextRequest) {
             );
         }
 
-        // 4. Read Authorization header
         const authHeader = req.headers.get('authorization');
-
-        // 5. Construct target URL
         const targetUrl = `https://us-central1-satflow-d3744.cloudfunctions.net/api/v1/incidents/${id}`;
 
-        console.log(`[Proxy] Forwarding PATCH to: ${targetUrl}`);
+        // --- LÓGICA DE CONCATENACIÓN (APPEND) ---
 
-        // 6. Make PATCH request
+        // Si la petición incluye una descripción nueva, tenemos que leer la antigua primero
+        if (fieldsToUpdate.description) {
+            console.log(`[Proxy] Fetching current description for Incident ${id}...`);
+
+            // A. Hacemos GET para leer lo que hay ahora
+            const currentDataResponse = await fetch(targetUrl, {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(authHeader ? { 'Authorization': authHeader } : {})
+                }
+            });
+
+            if (currentDataResponse.ok) {
+                const currentData = await currentDataResponse.json();
+                const oldDescription = currentData.description || "";
+                const newNote = fieldsToUpdate.description;
+
+                // B. Combinamos: Lo viejo + Salto de línea + ACTUALIZACIÓN + Lo nuevo
+                // Usamos '\n' para que quede ordenado visualmente
+                fieldsToUpdate.description = `${oldDescription}\n\nACTUALIZACIÓN: ${newNote}`;
+
+                console.log(`[Proxy] Description appended. Length: ${fieldsToUpdate.description.length}`);
+            } else {
+                console.warn(`[Proxy] Could not fetch current incident data. Status: ${currentDataResponse.status}`);
+                // Si falla la lectura, decidimos si sobrescribimos o paramos. 
+                // En este caso, dejamos que siga y sobrescribirá (o puedes lanzar error).
+            }
+        }
+
+        // ----------------------------------------
+
+        console.log(`[Proxy] Patching Incident ${id}...`);
+
+        // 2. Hacemos el PATCH con los datos ya combinados
         const apiResponse = await fetch(targetUrl, {
             method: 'PATCH',
             headers: {
                 'Content-Type': 'application/json',
-                // Pass Authorization if present
                 ...(authHeader ? { 'Authorization': authHeader } : {})
             },
-            body: JSON.stringify({
-                priority,
-                status
-            })
+            body: JSON.stringify(fieldsToUpdate)
         });
 
-        // 7. Return exact response
-        // Parse JSON if possible, otherwise text
+        // 3. Procesamos respuesta
         const contentType = apiResponse.headers.get('content-type');
         let data;
         if (contentType && contentType.includes('application/json')) {
             data = await apiResponse.json();
         } else {
-            // Fallback for non-JSON answers
             const text = await apiResponse.text();
-            try {
-                data = JSON.parse(text);
-            } catch {
-                data = { message: text };
-            }
+            try { data = JSON.parse(text); } catch { data = { message: text }; }
         }
 
         return NextResponse.json(data, { status: apiResponse.status });
