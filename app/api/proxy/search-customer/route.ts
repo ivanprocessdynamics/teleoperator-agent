@@ -10,7 +10,10 @@ export async function POST(req: NextRequest) {
         }
 
         // Recuperamos el teléfono
-        const phone = body.phone || req.headers.get('x-user-number');
+        // Prioridad: 1. Body (Tool Call) 2. Query Param (Retell Config) 3. Header (Retell Config)
+        const phone = body.phone ||
+            req.nextUrl.searchParams.get('phone') ||
+            req.headers.get('x-user-number');
 
         if (!phone) {
             console.error("[Search Proxy] Error: No phone number found in Body or Headers");
