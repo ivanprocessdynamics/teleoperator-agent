@@ -21,6 +21,8 @@ export async function POST(req: NextRequest) {
         let body: any = {};
         try {
             const rawBody = await req.text();
+            console.log(`[SMS Proxy] RAW Body: ${rawBody.substring(0, 500)}`); // Log first 500 chars
+
             if (rawBody) {
                 body = JSON.parse(rawBody);
             }
@@ -28,7 +30,11 @@ export async function POST(req: NextRequest) {
             console.warn("[SMS Proxy] JSON parsing warning:", e);
         }
 
-        const { phone, incidentId, scheduledDate, scheduledTime, address, name } = body;
+        // Support Retell 'args' wrapper if present
+        const payload = body.args || body;
+        const { phone, incidentId, scheduledDate, scheduledTime, address, name } = payload;
+
+        console.log(`[SMS Proxy] Parsed Phone: '${phone}'`);
 
         // 1. Validation
         if (!phone) {
