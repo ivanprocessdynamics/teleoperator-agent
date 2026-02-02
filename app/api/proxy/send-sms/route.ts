@@ -45,8 +45,17 @@ export async function POST(req: NextRequest) {
         }
 
         // 2. Message Construction
-        // "Hola {Nombre}, tu visita está confirmada para el {scheduledDate} a las {scheduledTime} en {address}. Ref: {incidentId}. En caso de que la dirección no sea correcta, por favor vueelva a llamar."
-        const messageBody = `Hola ${name || "Cliente"}, tu visita está confirmada para el ${scheduledDate || "la fecha acordada"} a las ${scheduledTime || ""} en ${address || "tu dirección"}. Ref: ${incidentId || "N/A"}.\nEn caso de que la dirección no sea correcta, por favor vuelva a llamar.`;
+        const messageBody = `Hola ${name || "Cliente"},
+
+Tu visita técnica ha sido confirmada:
+📅 Fecha: ${scheduledDate || "Pendiente"}
+⏰ Hora: ${scheduledTime || "Pendiente"}
+📍 Dirección: ${address || "Sin dirección"}
+
+Ref: ${incidentId || "N/A"}
+
+Si la dirección no es correcta, por favor llámanos lo antes posible.
+Gracias.`;
 
         console.log(`[SMS Proxy] Sending SMS to ${phone} for Incident ${incidentId}`);
 
