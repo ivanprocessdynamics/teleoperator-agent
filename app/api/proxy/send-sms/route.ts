@@ -34,12 +34,17 @@ export async function POST(req: NextRequest) {
         const payload = body.args || body;
         const { phone, incidentId, scheduledDate, scheduledTime, address, name } = payload;
 
-        console.log(`[SMS Proxy] Parsed Phone: '${phone}'`);
+        // --- LÓGICA HÍBRIDA ---
+        // 1. Miramos si la IA nos manda un número específico (body.phone)
+        // 2. Si no, usamos el número del llamante (header x-user-number)
+        const targetPhone = phone || req.headers.get('x-user-number');
+
+        console.log(`[SMS Proxy] Parsed Phone: '${phone}' -> Target: '${targetPhone}'`);
 
         // 1. Validation
-        if (!phone) {
+        if (!targetPhone) {
             return NextResponse.json(
-                { error: "Missing 'phone' parameter" },
+                { error: "Phone number missing in Body and Headers" },
                 { status: 400 }
             );
         }
@@ -57,7 +62,7 @@ Ref: ${incidentId || "N/A"}
 Si la dirección no es correcta, por favor llámanos lo antes posible.
 Gracias.`;
 
-        console.log(`[SMS Proxy] Sending SMS to ${phone} for Incident ${incidentId}`);
+        console.log(`[SMS Proxy] Sending SMS to ${targetPhone} for Incident ${incidentId}`);
 
         // 3. Send via Twilio
         let message;
@@ -65,7 +70,7 @@ Gracias.`;
             message = await client.messages.create({
                 body: messageBody,
                 from: SENDER_ID, // Try alphanumeric first
-                to: phone
+                to: targetPhone
             });
         } catch (twilioError: any) {
             console.warn("[SMS Proxy] Alphanumeric ID failed or error, retrying with number if 21212/21612...", twilioError.code);
@@ -74,7 +79,7 @@ Gracias.`;
                 message = await client.messages.create({
                     body: messageBody,
                     from: twilioNumber,
-                    to: phone
+                    to: targetPhone
                 });
             } else {
                 throw twilioError;
