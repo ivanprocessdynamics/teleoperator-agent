@@ -18,8 +18,17 @@ const client = twilio(accountSid, authToken);
 
 export async function POST(req: NextRequest) {
     try {
-        const body = await req.json();
-        const { phone, incidentId, scheduledDate, scheduledTime, address, name, workspaceId } = body;
+        let body: any = {};
+        try {
+            const rawBody = await req.text();
+            if (rawBody) {
+                body = JSON.parse(rawBody);
+            }
+        } catch (e) {
+            console.warn("[SMS Proxy] JSON parsing warning:", e);
+        }
+
+        const { phone, incidentId, scheduledDate, scheduledTime, address, name } = body;
 
         // 1. Validation
         if (!phone) {
