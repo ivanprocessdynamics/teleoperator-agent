@@ -1,42 +1,34 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-// Recibimos POST desde Retell para evitar problemas de URL encoding
 export async function POST(req: NextRequest) {
     try {
         let body: any = {};
         try {
             body = await req.json();
         } catch (e) {
-            console.log("[Search Proxy] No JSON Body or Invalid JSON");
+            console.log("[Search Proxy] Warning: Could not parse JSON body");
         }
 
-        console.log("[Search Proxy] Body received:", JSON.stringify(body, null, 2));
-
-        // Prioridad de búsqueda del teléfono:
-        // 1. Body (si el LLM lo envía explícitamente)
-        // 2. Query Param (si se configuró en Retell como ?phone={{user_number}})
-        // 3. Header personalizado (x-user-number)
-        const phone = body.phone ||
-            body.phone_number ||
-            req.nextUrl.searchParams.get('phone') ||
-            req.headers.get('x-user-number');
+        // Recuperamos el teléfono
+        const phone = body.phone || req.headers.get('x-user-number');
 
         if (!phone) {
-            console.error("[Search Proxy] Missing phone. Keys checked: Body, Query(?phone), Header(x-user-number)");
+            console.error("[Search Proxy] Error: No phone number found in Body or Headers");
             return NextResponse.json({ error: "Phone number required" }, { status: 400 });
         }
 
-        // 🛡️ EL SECRETO: Esto convierte el "+" en "%2B" automáticamente
-        const encodedPhone = encodeURIComponent(phone);
+        // --- EL CAMBIO CLAVE ---
+        // En lugar de fabricar el string a mano, usamos la clase URL.
+        // Ella sola se encarga de poner el %2B donde toca.
+        const satflowUrl = new URL("https://us-central1-satflow-d3744.cloudfunctions.net/api/v1/customers/search");
+        satflowUrl.searchParams.set("phone", phone); // <--- Esto protege el '+' automáticamente
 
-        // Construimos la URL real para SatFlow (que es GET)
-        const targetUrl = `https://us-central1-satflow-d3744.cloudfunctions.net/api/v1/customers/search?phone=${encodedPhone}`;
+        console.log(`[Search Proxy] Input Phone: '${phone}'`);
+        console.log(`[Search Proxy] Generated URL: ${satflowUrl.toString()}`);
 
         const authHeader = req.headers.get('authorization');
-        console.log(`[Search Proxy] Buscando: ${phone} -> Enviando a API: ${targetUrl}`);
 
-        // Hacemos la llamada real
-        const apiResponse = await fetch(targetUrl, {
+        const apiResponse = await fetch(satflowUrl.toString(), {
             method: 'GET',
             headers: {
                 'Content-Type': 'application/json',
@@ -45,16 +37,18 @@ export async function POST(req: NextRequest) {
         });
 
         if (!apiResponse.ok) {
+            console.error(`[Search Proxy] SatFlow Error: ${apiResponse.status}`);
             return NextResponse.json({ found: false }, { status: apiResponse.status });
         }
 
         const data = await apiResponse.json();
         const customers = data.data || [];
 
-        // Simplificamos la respuesta para la IA
         if (customers.length > 0) {
             const client = customers[0];
             const fullAddress = `${client.street || ''}, ${client.city || ''}`.replace(/^, |, $/g, '');
+
+            console.log(`[Search Proxy] SUCCESS: Found client ${client.id}`);
 
             return NextResponse.json({
                 found: true,
@@ -65,11 +59,12 @@ export async function POST(req: NextRequest) {
                 email: client.email
             });
         } else {
+            console.log(`[Search Proxy] Not Found. SatFlow returned empty list.`);
             return NextResponse.json({ found: false });
         }
 
     } catch (error: any) {
-        console.error("[Search Proxy] Error:", error);
+        console.error("[Search Proxy] Critical Error:", error);
         return NextResponse.json({ error: "Internal Error" }, { status: 500 });
     }
 }
