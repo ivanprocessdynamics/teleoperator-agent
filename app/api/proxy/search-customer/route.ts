@@ -2,16 +2,21 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export async function POST(req: NextRequest) {
     try {
-        // 1. Leemos el Body (Aquí el '+' llega INTACTO)
+        // 1. Leemos el Body RAW para depurar
+        const rawBody = await req.text();
+        console.log(`[Search Proxy] RAW Body received: '${rawBody}'`);
+
         let body: any = {};
-        try {
-            body = await req.json();
-        } catch (e) {
-            console.log("[Search Proxy] Body vacío, intentando headers...");
+        if (rawBody) {
+            try {
+                body = JSON.parse(rawBody);
+            } catch (e) {
+                console.log("[Search Proxy] JSON parsing failed");
+            }
         }
 
         // 2. Solo aceptamos Body o Headers. IGNORAMOS la URL intencionadamente.
-        const phone = body.phone || req.headers.get('x-user-number');
+        const phone = body.phone || body.args?.phone || req.headers.get('x-user-number');
 
         console.log(`[Search Proxy] Teléfono recibido (INPUT): '${phone}'`);
 
