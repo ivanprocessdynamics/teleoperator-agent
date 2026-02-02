@@ -2,35 +2,33 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export async function POST(req: NextRequest) {
     try {
+        // 1. Leemos el Body (Aquí el '+' llega INTACTO)
         let body: any = {};
         try {
             body = await req.json();
         } catch (e) {
-            console.log("[Search Proxy] Warning: Could not parse JSON body");
+            console.log("[Search Proxy] Body vacío, intentando headers...");
         }
 
-        // Recuperamos el teléfono
-        // Prioridad: 1. Body (Tool Call) 2. Query Param (Retell Config) 3. Header (Retell Config)
-        const phone = body.phone ||
-            req.nextUrl.searchParams.get('phone') ||
-            req.headers.get('x-user-number');
+        // 2. Solo aceptamos Body o Headers. IGNORAMOS la URL intencionadamente.
+        const phone = body.phone || req.headers.get('x-user-number');
+
+        console.log(`[Search Proxy] Teléfono recibido (INPUT): '${phone}'`);
 
         if (!phone) {
-            console.error("[Search Proxy] Error: No phone number found in Body or Headers");
-            return NextResponse.json({ error: "Phone number required" }, { status: 400 });
+            return NextResponse.json({ error: "Phone required (Send in JSON body)" }, { status: 400 });
         }
 
-        // --- EL CAMBIO CLAVE ---
-        // En lugar de fabricar el string a mano, usamos la clase URL.
-        // Ella sola se encarga de poner el %2B donde toca.
+        // 3. Construimos la URL hacia SatFlow de forma segura
+        // La clase URL se encarga de convertir el '+' en '%2B' automáticamente.
         const satflowUrl = new URL("https://us-central1-satflow-d3744.cloudfunctions.net/api/v1/customers/search");
-        satflowUrl.searchParams.set("phone", phone); // <--- Esto protege el '+' automáticamente
+        satflowUrl.searchParams.set("phone", phone);
 
-        console.log(`[Search Proxy] Input Phone: '${phone}'`);
-        console.log(`[Search Proxy] Generated URL: ${satflowUrl.toString()}`);
+        console.log(`[Search Proxy] URL Generada: ${satflowUrl.toString()}`);
 
         const authHeader = req.headers.get('authorization');
 
+        // 4. Llamada a SatFlow
         const apiResponse = await fetch(satflowUrl.toString(), {
             method: 'GET',
             headers: {
@@ -40,7 +38,6 @@ export async function POST(req: NextRequest) {
         });
 
         if (!apiResponse.ok) {
-            console.error(`[Search Proxy] SatFlow Error: ${apiResponse.status}`);
             return NextResponse.json({ found: false }, { status: apiResponse.status });
         }
 
@@ -51,8 +48,6 @@ export async function POST(req: NextRequest) {
             const client = customers[0];
             const fullAddress = `${client.street || ''}, ${client.city || ''}`.replace(/^, |, $/g, '');
 
-            console.log(`[Search Proxy] SUCCESS: Found client ${client.id}`);
-
             return NextResponse.json({
                 found: true,
                 id: client.id,
@@ -62,12 +57,11 @@ export async function POST(req: NextRequest) {
                 email: client.email
             });
         } else {
-            console.log(`[Search Proxy] Not Found. SatFlow returned empty list.`);
             return NextResponse.json({ found: false });
         }
 
     } catch (error: any) {
-        console.error("[Search Proxy] Critical Error:", error);
+        console.error("[Search Proxy] Error:", error);
         return NextResponse.json({ error: "Internal Error" }, { status: 500 });
     }
 }
