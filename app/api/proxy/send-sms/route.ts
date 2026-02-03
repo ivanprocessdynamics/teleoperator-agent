@@ -49,18 +49,24 @@ export async function POST(req: NextRequest) {
             );
         }
 
+        // Obtén tu dominio base (ponlo en .env mejor, o hardcodeado para probar)
+        // Ej: https://mi-empresa-soporte.vercel.app
+        const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || "https://teleoperator-agent.vercel.app";
+
+        // Generamos el enlace único
+        const correctionLink = `${BASE_URL}/corregir-direccion?id=${incidentId}`;
+
         // 2. Message Construction
-        const messageBody = `Hola ${name || "Cliente"},
+        const messageBody = `
+Hola ${name || "Cliente"}, confirmamos tu visita técnica:
+📅 ${scheduledDate || "Pendiente"} a las ${scheduledTime || "Pendiente"}
+📍 ${address || "Sin dirección"}
 
-Tu visita técnica ha sido confirmada:
-📅 Fecha: ${scheduledDate || "Pendiente"}
-⏰ Hora: ${scheduledTime || "Pendiente"}
-📍 Dirección: ${address || "Sin dirección"}
+Si la dirección es incorrecta, modifícala aquí:
+${correctionLink}
 
-Ref: ${incidentId || "N/A"}
-
-Si la dirección no es correcta, por favor llámanos lo antes posible.
-Gracias.`;
+Gracias.
+`.trim();
 
         console.log(`[SMS Proxy] Sending SMS to ${targetPhone} for Incident ${incidentId}`);
 
