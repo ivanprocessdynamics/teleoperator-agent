@@ -11,7 +11,8 @@ export async function POST(req: NextRequest) {
         }
 
         // 1. Validamos la nueva dirección con Google Maps
-        const cleanAddress = await validateAddress(address);
+        const valResult = await validateAddress(address);
+        const cleanAddress = valResult.address;
 
         // 2. Enviamos a SatFlow
         // Usamos la misma lógica que en update-incident: PATCH a /incidents/:id

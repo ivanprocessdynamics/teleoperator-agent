@@ -12,9 +12,12 @@ export async function POST(req: NextRequest) {
         let finalAddress = rawAddress;
 
         // 2. Validación con Google Maps (Si hay dirección)
+        let validationDebug: any = null;
         if (rawAddress && rawAddress.length > 5) {
             console.log(`[Create Incident] Validando dirección: ${rawAddress}`);
-            finalAddress = await validateAddress(rawAddress);
+            const result = await validateAddress(rawAddress);
+            finalAddress = result.address;
+            validationDebug = result.debug;
             console.log(`[Create Incident] Dirección corregida: ${finalAddress}`);
         }
 
@@ -28,6 +31,7 @@ export async function POST(req: NextRequest) {
         };
 
         // 4. Enviar a SatFlow
+        // (Asegúrate de usar tu URL y Headers correctos aquí)
         const satflowUrl = "https://us-central1-satflow-d3744.cloudfunctions.net/api/v1/incidents";
         const authHeader = req.headers.get('authorization');
 
@@ -55,6 +59,7 @@ export async function POST(req: NextRequest) {
                 ...data.data, // Los datos que devolvió SatFlow
                 location: finalAddress // FORZAMOS la dirección corregida por si SatFlow no la devolvió actualizada
             },
+            validationDebug, // <--- EXPOSE DEBUG INFO HERE
             message: "Incident created successfully"
         });
 
