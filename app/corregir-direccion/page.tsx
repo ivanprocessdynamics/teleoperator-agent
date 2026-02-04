@@ -100,9 +100,17 @@ function AddressForm() {
                 // Helper to extract component
                 const getComp = (type: string) => components.find((c: any) => c.types.includes(type))?.long_name || '';
 
-                const fetchedZip = getComp('postal_code');
-                const fetchedCity = getComp('locality') || getComp('administrative_area_level_2'); // City or fallback
+                let fetchedZip = getComp('postal_code');
+                const fetchedCity = getComp('locality') || getComp('administrative_area_level_2');
                 const fetchedProvince = getComp('administrative_area_level_2') || getComp('administrative_area_level_1');
+
+                // FALLBACK: Si no hay CP estructurado, búscalo en el texto formateado (ej: "43204 Reus")
+                if (!fetchedZip && data.result.formatted_address) {
+                    const match = data.result.formatted_address.match(/\b\d{5}\b/);
+                    if (match) {
+                        fetchedZip = match[0];
+                    }
+                }
 
                 if (fetchedZip) setPostalCode(fetchedZip);
                 if (fetchedCity) setCity(fetchedCity);

@@ -15,8 +15,8 @@ export async function GET(req: NextRequest) {
     }
 
     try {
-        // Pedimos solo los campos de address_components para ahorrar (aunque Details suele tener precio fijo)
-        const url = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${placeId}&fields=address_components&key=${apiKey}&language=es`;
+        // Pedimos address_components Y formatted_address para tener un fallback de texto
+        const url = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${placeId}&fields=address_components,formatted_address&key=${apiKey}&language=es`;
 
         const response = await fetch(url);
         const data = await response.json();
