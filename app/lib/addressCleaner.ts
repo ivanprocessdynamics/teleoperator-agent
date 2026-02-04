@@ -44,8 +44,31 @@ export async function cleanAddressWithAI(dirtyAddress: string): Promise<string> 
         console.log(`[AI Cleaner] Resultado: "${cleaned}"`);
         return cleaned;
 
-    } catch (error) {
-        console.error("[AI Cleaner] Error:", error);
-        return dirtyAddress; // Si falla la IA, devolvemos la original
+    } catch (error: any) {
+        console.error(`[AI Cleaner] Error con modelo principal (${process.env.OPENAI_MODEL || "gpt-5.1"}):`, error.message);
+
+        // Fallback a modelo conocido si falla el puntero
+        try {
+            console.log("[AI Cleaner] Intentando fallback a gpt-4o...");
+            const fallbackResponse = await openai.chat.completions.create({
+                model: "gpt-4o",
+                messages: [
+                    {
+                        role: "system",
+                        content: "Eres un experto en corrección de direcciones de España. Corrige errores fonéticos importantes (ej: 'au lestia' -> 'Aulèsties'). Devuelve SOLO la dirección corregida."
+                    },
+                    {
+                        role: "user",
+                        content: dirtyAddress
+                    }
+                ]
+            });
+            const cleaned = fallbackResponse.choices[0].message.content?.trim() || dirtyAddress;
+            console.log(`[AI Cleaner] Resultado (Fallback): "${cleaned}"`);
+            return cleaned;
+        } catch (fallbackError) {
+            console.error("[AI Cleaner] Falló también el fallback:", fallbackError);
+            return dirtyAddress;
+        }
     }
 }
