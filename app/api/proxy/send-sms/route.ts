@@ -69,11 +69,11 @@ export async function POST(req: NextRequest) {
         const correctionLink = await shortenUrl(longLink);
 
         // 2. Message Construction
-        const refId = incidentId ? incidentId.slice(-6).toUpperCase() : "N/A";
+        const refId = incidentId || "N/A";
 
         const messageBody = `
-🛠️ Visita Técnica
-Ref: #${refId}
+Hola ${name || "Cliente"}, confirmamos tu visita técnica:
+Ref: ${refId}
 
 📅 ${scheduledDate || "Pendiente"}
 ⏰ ${scheduledTime || "Pendiente"}
