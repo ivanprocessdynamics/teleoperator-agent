@@ -1,23 +1,14 @@
 'use client';
 
-import { useState, useEffect, Suspense, useRef } from 'react';
+import { useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { MapPin, Loader2, CheckCircle2, AlertCircle, Search } from 'lucide-react';
-
-function useDebounce<T>(value: T, delay: number): T {
-    const [debouncedValue, setDebouncedValue] = useState(value);
-    useEffect(() => {
-        const handler = setTimeout(() => setDebouncedValue(value), delay);
-        return () => clearTimeout(handler);
-    }, [value, delay]);
-    return debouncedValue;
-}
+import { MapPin, Loader2, CheckCircle2 } from 'lucide-react';
 
 function AddressForm() {
     const searchParams = useSearchParams();
     const incidentId = searchParams.get('id');
 
-    // Granular State
+    // Granular State - Manual Entry Only
     const [street, setStreet] = useState('');
     const [number, setNumber] = useState('');
     const [floor, setFloor] = useState('');
@@ -27,113 +18,11 @@ function AddressForm() {
 
     const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
 
-    // Autocomplete State
-    const [searchTerm, setSearchTerm] = useState('');
-    const [suggestions, setSuggestions] = useState<any[]>([]);
-    const [showSuggestions, setShowSuggestions] = useState(false);
-
-    // Flags
-    const isSelectingRef = useRef(false);
-    const debouncedSearch = useDebounce(searchTerm, 500);
-    const wrapperRef = useRef<HTMLDivElement>(null);
-    const [loadingDetails, setLoadingDetails] = useState(false); // Feedback visual
-
-    // Close suggestions
-    useEffect(() => {
-        function handleClickOutside(event: MouseEvent) {
-            if (wrapperRef.current && !wrapperRef.current.contains(event.target as Node)) {
-                setShowSuggestions(false);
-            }
-        }
-        document.addEventListener("mousedown", handleClickOutside);
-        return () => document.removeEventListener("mousedown", handleClickOutside);
-    }, []);
-
-    // Fetch suggestions logic
-    useEffect(() => {
-        async function fetchSuggestions() {
-            if (isSelectingRef.current) {
-                isSelectingRef.current = false;
-                return;
-            }
-
-            if (debouncedSearch.length < 3) {
-                setSuggestions([]);
-                return;
-            }
-            try {
-                const res = await fetch(`/api/proxy/places-autocomplete?input=${encodeURIComponent(debouncedSearch)}`);
-                const data = await res.json();
-                if (data.predictions) {
-                    setSuggestions(data.predictions.slice(0, 3));
-                    setShowSuggestions(true);
-                }
-            } catch (e) {
-                console.error("Autocomplete error:", e);
-            }
-        }
-
-        if (!isSelectingRef.current) {
-            fetchSuggestions();
-        }
-    }, [debouncedSearch]);
-
-    // NEW: Fetch Details for accurate CP/City
-    const handleSelect = async (suggestion: any) => {
-        isSelectingRef.current = true; // Stop autocomplete loop
-
-        const main = suggestion.structured_formatting?.main_text || suggestion.description;
-        setSearchTerm(main);
-        setStreet(main); // Initial Street Name
-
-        // Hide dropdown immediately
-        setSuggestions([]);
-        setShowSuggestions(false);
-        setLoadingDetails(true); // FEEDBACK
-
-        console.log("Fetching details for:", suggestion.place_id);
-
-        try {
-            const res = await fetch(`/api/proxy/place-details?place_id=${suggestion.place_id}`);
-            if (!res.ok) throw new Error(`Status ${res.status}`);
-
-            const data = await res.json();
-            console.log("Details received:", data);
-
-            if (data.result && data.result.address_components) {
-                const components = data.result.address_components;
-
-                // Helper to extract component
-                const getComp = (type: string) => components.find((c: any) => c.types.includes(type))?.long_name || '';
-
-                let fetchedZip = getComp('postal_code');
-                const fetchedCity = getComp('locality') || getComp('administrative_area_level_2');
-                const fetchedProvince = getComp('administrative_area_level_2') || getComp('administrative_area_level_1');
-
-                // FALLBACK: Si no hay CP estructurado, búscalo en el texto formateado (ej: "Tarragona, 43204")
-                if (!fetchedZip && data.result.formatted_address) {
-                    console.log("CP missing in components. Checking formatted_address:", data.result.formatted_address);
-                    const match = data.result.formatted_address.match(/\b\d{5}\b/);
-                    if (match) {
-                        fetchedZip = match[0];
-                    }
-                }
-
-                if (fetchedZip) setPostalCode(fetchedZip);
-                if (fetchedCity) setCity(fetchedCity);
-                if (fetchedProvince && fetchedProvince !== fetchedCity) setProvince(fetchedProvince);
-            }
-        } catch (e) {
-            console.error("Details fetch error:", e);
-        } finally {
-            setLoadingDetails(false);
-        }
-    };
-
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!incidentId) return;
 
+        // Construct full address string
         const fullAddress = `${street}, ${number}, ${floor ? `Piso ${floor},` : ''} ${postalCode} ${city}, ${province} (España)`;
 
         setStatus('loading');
@@ -179,51 +68,12 @@ function AddressForm() {
                     <div>
                         <h1 className="text-xl font-bold text-gray-900">Corregir Dirección</h1>
                         <p className="text-sm text-gray-500">
-                            Confirma los datos de tu ubicación
+                            Introduce los datos manualmente
                         </p>
                     </div>
                 </div>
 
                 <div className="space-y-6">
-                    {/* Autocomplete Search */}
-                    <div className="relative" ref={wrapperRef}>
-                        <label className="block text-sm font-bold text-gray-700 mb-1 flex justify-between">
-                            <span>Buscar Calle</span>
-                            {loadingDetails && <span className="text-xs text-blue-500 animate-pulse">Cargando datos...</span>}
-                        </label>
-                        <div className="relative">
-                            <Search className="absolute left-3 top-3.5 w-5 h-5 text-gray-400" />
-                            <input
-                                type="text"
-                                placeholder="Escribe para buscar..."
-                                className="w-full pl-10 p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition bg-gray-50"
-                                value={searchTerm}
-                                onChange={(e) => {
-                                    setSearchTerm(e.target.value);
-                                    setShowSuggestions(true);
-                                    isSelectingRef.current = false;
-                                }}
-                            />
-                        </div>
-                        {showSuggestions && suggestions.length > 0 && (
-                            <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-2xl max-h-60 overflow-auto divide-y divide-gray-100">
-                                {suggestions.map((suggestion) => (
-                                    <button
-                                        key={suggestion.place_id}
-                                        type="button"
-                                        onClick={() => handleSelect(suggestion)}
-                                        className="w-full text-left p-3 hover:bg-blue-50 transition flex items-start gap-3 group"
-                                    >
-                                        <MapPin className="w-4 h-4 text-gray-400 mt-1 group-hover:text-blue-500" />
-                                        <span className="text-sm text-gray-700">
-                                            {suggestion.description}
-                                        </span>
-                                    </button>
-                                ))}
-                            </div>
-                        )}
-                    </div>
-
                     <form onSubmit={handleSubmit} className="space-y-4">
                         {/* Street */}
                         <div>
@@ -269,7 +119,7 @@ function AddressForm() {
                                     value={postalCode}
                                     onChange={(e) => setPostalCode(e.target.value)}
                                     className="w-full p-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-                                    placeholder="4300..."
+                                    placeholder="CP"
                                 />
                             </div>
                             <div className="col-span-2">
