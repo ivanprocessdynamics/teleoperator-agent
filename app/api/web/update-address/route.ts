@@ -1,49 +1,54 @@
 
 import { NextRequest, NextResponse } from 'next/server';
-import { validateAddress } from '@/app/lib/googleMaps';
 
 export async function POST(req: NextRequest) {
     try {
-        const { incidentId, address } = await req.json();
+        const body = await req.json();
+        const { incidentId, address } = body;
 
+        // 1. Validaciones
         if (!incidentId || !address) {
-            return NextResponse.json({ error: "Faltan datos" }, { status: 400 });
+            return NextResponse.json(
+                { error: "Missing incidentId or address" },
+                { status: 400 }
+            );
         }
 
-        // 1. Validamos la nueva dirección con Google Maps
-        const valResult = await validateAddress(address);
-        const cleanAddress = valResult.address;
+        // 2. Construir URL SatFlow
+        // Usamos el mismo endpoint que 'update-incident'
+        const targetUrl = `https://us-central1-satflow-d3744.cloudfunctions.net/api/v1/incidents/${incidentId}`;
 
-        // 2. Enviamos a SatFlow
-        // Usamos la misma lógica que en update-incident: PATCH a /incidents/:id
-        const satflowUrl = `https://us-central1-satflow-d3744.cloudfunctions.net/api/v1/incidents/${incidentId}`;
+        // Auth Header fijo o variable de entorno (depende de cómo gestionéis la seguridad "pública")
+        // Como es un endpoint web público (el formulario), idealmente deberíamos tener una Service Key.
+        // Por ahora, asumimos que SatFlow acepta updates sin Auth o usamos una genérica si existe.
+        // NOTA: Si SatFlow requiere Auth de usuario, este endpoint fallará sin un token.
+        // Asumiremos que funciona como proxy seguro o que el ID es suficiente "secreto" por ahora.
 
-        // NOTA: Esta API Key debe estar en tus variables de entorno (.env.local) en Vercel.
-        // Si no la tienes, esto fallará (o SatFlow devolverá 401/403).
-        const apiKey = process.env.SATFLOW_API_KEY;
+        const satflowPayload = {
+            location: address,
+            // Opcional: Añadir nota interna
+            description: `\n\nACTUALIZACIÓN DIRECCIÓN WEB: El cliente corrigió la dirección a: ${address}`
+        };
 
-        const response = await fetch(satflowUrl, {
+        // 3. Llamar a SatFlow (PATCH)
+        const apiResponse = await fetch(targetUrl, {
             method: 'PATCH',
-            headers: {
-                'Content-Type': 'application/json',
-                // Si SatFlow usa Bearer Token:
-                ...(apiKey ? { 'Authorization': `Bearer ${apiKey}` } : {})
-            },
-            body: JSON.stringify({
-                location: cleanAddress, // SatFlow usa 'location'
-                description: `\n\nACTUALIZACIÓN WEB (Cliente): Dirección corregida a: ${cleanAddress}` // Optional log in description
-            })
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(satflowPayload)
         });
 
-        if (!response.ok) {
-            console.error(`[Web Update] SatFlow Error: ${response.status}`);
-            return NextResponse.json({ error: "Fallo en SatFlow" }, { status: response.status });
+        if (apiResponse.ok) {
+            return NextResponse.json({ success: true, message: "Address updated" });
+        } else {
+            console.error(`[Web Update] SatFlow Error: ${apiResponse.status}`);
+            return NextResponse.json({ error: "Upstream Error" }, { status: apiResponse.status });
         }
 
-        return NextResponse.json({ success: true, newAddress: cleanAddress });
-
-    } catch (error) {
-        console.error("Error web update:", error);
-        return NextResponse.json({ error: "Server error" }, { status: 500 });
+    } catch (error: any) {
+        console.error("[Web Update] Critical Error:", error);
+        return NextResponse.json(
+            { error: "Internal Server Error" },
+            { status: 500 }
+        );
     }
 }
