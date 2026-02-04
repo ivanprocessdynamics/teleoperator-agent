@@ -16,12 +16,26 @@ const SENDER_ID = "SatFlow";
 
 const client = twilio(accountSid, authToken);
 
+// Helper to shorten URL
+async function shortenUrl(longUrl: string): Promise<string> {
+    try {
+        const response = await fetch(`https://tinyurl.com/api-create.php?url=${encodeURIComponent(longUrl)}`);
+        if (response.ok) {
+            return await response.text();
+        }
+        return longUrl;
+    } catch (e) {
+        console.warn("URL Shortener failed:", e);
+        return longUrl;
+    }
+}
+
 export async function POST(req: NextRequest) {
     try {
         let body: any = {};
         try {
             const rawBody = await req.text();
-            console.log(`[SMS Proxy] RAW Body: ${rawBody.substring(0, 500)}`); // Log first 500 chars
+            console.log(`[SMS Proxy] RAW Body: ${rawBody.substring(0, 500)}`);
 
             if (rawBody) {
                 body = JSON.parse(rawBody);
@@ -35,8 +49,6 @@ export async function POST(req: NextRequest) {
         const { phone, incidentId, scheduledDate, scheduledTime, address, name } = payload;
 
         // --- LÓGICA HÍBRIDA ---
-        // 1. Miramos si la IA nos manda un número específico (body.phone)
-        // 2. Si no, usamos el número del llamante (header x-user-number)
         const targetPhone = phone || req.headers.get('x-user-number');
 
         console.log(`[SMS Proxy] Parsed Phone: '${phone}' -> Target: '${targetPhone}'`);
@@ -49,17 +61,18 @@ export async function POST(req: NextRequest) {
             );
         }
 
-        // Obtén tu dominio base (ponlo en .env mejor, o hardcodeado para probar)
-        // Ej: https://mi-empresa-soporte.vercel.app
+        // Obtén tu dominio base
         const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || "https://teleoperator-agent.vercel.app";
 
-        // Generamos el enlace único
-        const correctionLink = `${BASE_URL}/corregir-direccion?id=${incidentId}`;
+        // Generamos el enlace único y lo acortamos
+        const longLink = `${BASE_URL}/corregir-direccion?id=${incidentId}`;
+        const correctionLink = await shortenUrl(longLink);
 
         // 2. Message Construction
         const messageBody = `
 Hola ${name || "Cliente"}, confirmamos tu visita técnica:
-📅 ${scheduledDate || "Pendiente"} a las ${scheduledTime || "Pendiente"}
+📅 ${scheduledDate || "Pendiente"}
+⏰ ${scheduledTime || "Pendiente"}
 📍 ${address || "Sin dirección"}
 
 Si la dirección es incorrecta, modifícala aquí:
