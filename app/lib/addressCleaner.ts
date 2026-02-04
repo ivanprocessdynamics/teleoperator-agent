@@ -50,13 +50,16 @@ export async function cleanAddressWithAI(dirtyAddress: string): Promise<string> 
           Tu tarea es corregir transcripciones de voz erróneas.
           
           Instrucciones:
-          1. Corrige nombres propios mal transcritos (fonéticamente).
-          2. IMPORTANTE: Devuelve la calle, número y piso.
-          3. Sigue el formato: Calle Nombre, Número, Piso, Código Postal Población.`
+          1. Corrige nombres propios con conocimiento fonético (ej: "au lestia" -> "Aulèsties").
+          2. ESTRUCTURA CRÍTICA: "Calle Nombre, Número, Piso/Puerta, CP Población".
+          3. IMPORTANTE: "Número cinco" es el Número de Calle "5". NO es el piso.
+          4. IMPORTANTE: "Tercero primera" es el Piso "3º 1ª".
+          5. EJEMPLO: Entrada "calle falsa numero cinco tercero primera" -> Salida "Calle Falsa, 5, 3º 1ª, CP..."
+          6. Devuelve SOLO la dirección final formateada.`
                 },
                 {
                     role: "user",
-                    content: `Corrige esta dirección: ${dirtyAddress}`
+                    content: `Corrige e interpreta: ${dirtyAddress}`
                 }
             ],
             temperature: 0.1,

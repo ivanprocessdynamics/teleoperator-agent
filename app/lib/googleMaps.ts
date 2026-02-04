@@ -48,9 +48,15 @@ export async function validateAddress(rawAddress: string): Promise<{ address: st
             // significa que no encontró la calle y hizo fallback al país.
             const isGenericCountry = result.types.includes('country') && result.types.length === 2 && result.types.includes('political');
 
-            // Check if result is just a City/Locality
-            const isLocality = result.types.includes('locality') || result.types.includes('administrative_area_level_2');
-            const hasStreet = result.types.includes('street_address') || result.types.includes('route') || result.types.includes('premise') || result.types.includes('subpremise');
+            // Check if result is just a City/Locality OR Postal Code
+            const isLocality = result.types.includes('locality') ||
+                result.types.includes('administrative_area_level_2') ||
+                result.types.includes('postal_code'); // <--- Añadido postal_code
+
+            const hasStreet = result.types.includes('street_address') ||
+                result.types.includes('route') ||
+                result.types.includes('premise') ||
+                result.types.includes('subpremise');
 
             if (isGenericCountry || formatted === "Spain" || formatted === "España" || (isLocality && !hasStreet && cleanAddress.length > 15)) {
                 console.warn(`[Google Maps] Resultado demasiado genérico ('${formatted}') para input detallado. Usando original saneado.`);
