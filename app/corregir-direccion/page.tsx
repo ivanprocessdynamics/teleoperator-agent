@@ -36,6 +36,7 @@ function AddressForm() {
     const isSelectingRef = useRef(false);
     const debouncedSearch = useDebounce(searchTerm, 500);
     const wrapperRef = useRef<HTMLDivElement>(null);
+    const [loadingDetails, setLoadingDetails] = useState(false); // Feedback visual
 
     // Close suggestions
     useEffect(() => {
@@ -88,11 +89,16 @@ function AddressForm() {
         // Hide dropdown immediately
         setSuggestions([]);
         setShowSuggestions(false);
+        setLoadingDetails(true); // FEEDBACK
 
-        // Fetch robust details (Postal Code, Province, etc)
+        console.log("Fetching details for:", suggestion.place_id);
+
         try {
             const res = await fetch(`/api/proxy/place-details?place_id=${suggestion.place_id}`);
+            if (!res.ok) throw new Error(`Status ${res.status}`);
+
             const data = await res.json();
+            console.log("Details received:", data);
 
             if (data.result && data.result.address_components) {
                 const components = data.result.address_components;
@@ -104,8 +110,9 @@ function AddressForm() {
                 const fetchedCity = getComp('locality') || getComp('administrative_area_level_2');
                 const fetchedProvince = getComp('administrative_area_level_2') || getComp('administrative_area_level_1');
 
-                // FALLBACK: Si no hay CP estructurado, búscalo en el texto formateado (ej: "43204 Reus")
+                // FALLBACK: Si no hay CP estructurado, búscalo en el texto formateado (ej: "Tarragona, 43204")
                 if (!fetchedZip && data.result.formatted_address) {
+                    console.log("CP missing in components. Checking formatted_address:", data.result.formatted_address);
                     const match = data.result.formatted_address.match(/\b\d{5}\b/);
                     if (match) {
                         fetchedZip = match[0];
@@ -118,7 +125,8 @@ function AddressForm() {
             }
         } catch (e) {
             console.error("Details fetch error:", e);
-            // Fallback (keep existing heuristic if needed, or do nothing)
+        } finally {
+            setLoadingDetails(false);
         }
     };
 
@@ -179,8 +187,9 @@ function AddressForm() {
                 <div className="space-y-6">
                     {/* Autocomplete Search */}
                     <div className="relative" ref={wrapperRef}>
-                        <label className="block text-sm font-bold text-gray-700 mb-1">
-                            Buscar Calle
+                        <label className="block text-sm font-bold text-gray-700 mb-1 flex justify-between">
+                            <span>Buscar Calle</span>
+                            {loadingDetails && <span className="text-xs text-blue-500 animate-pulse">Cargando datos...</span>}
                         </label>
                         <div className="relative">
                             <Search className="absolute left-3 top-3.5 w-5 h-5 text-gray-400" />
