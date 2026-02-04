@@ -5,11 +5,37 @@ const openai = new OpenAI({
     apiKey: process.env.OPENAI_API_KEY,
 });
 
+// Helper para asegurar conversión de números comunes
+function textToDigits(text: string): string {
+    const map: { [key: string]: string } = {
+        "uno": "1", "una": "1", "primero": "1º", "primera": "1ª",
+        "dos": "2", "segundo": "2º", "segunda": "2ª",
+        "tres": "3", "tercero": "3º", "tercera": "3ª",
+        "cuatro": "4", "cuarto": "4º", "cuarta": "4ª",
+        "cinco": "5", "quinto": "5º", "quinta": "5ª",
+        "seis": "6", "sexto": "6º", "sexta": "6ª",
+        "siete": "7", "septimo": "7º", "septima": "7ª",
+        "ocho": "8", "octavo": "8º", "octava": "8ª",
+        "nueve": "9", "noveno": "9º", "novena": "9ª",
+        "diez": "10", "decimo": "10º", "decima": "10ª",
+        "once": "11", "doce": "12", "trece": "13", "catorce": "14", "quince": "15",
+        "veinte": "20", "treinta": "30", "cuarenta": "40"
+    };
+
+    let processed = text;
+    // Reemplazo case-insensitive de palabras completas
+    Object.keys(map).forEach(key => {
+        const regex = new RegExp(`\\b${key}\\b`, 'gi');
+        processed = processed.replace(regex, map[key]);
+    });
+    return processed;
+}
+
 export async function cleanAddressWithAI(dirtyAddress: string): Promise<string> {
     // Safe check if key is missing to avoid crashing
     if (!process.env.OPENAI_API_KEY) {
         console.warn("[AI Cleaner] Missing OPENAI_API_KEY, skipping AI cleaning.");
-        return dirtyAddress;
+        return textToDigits(dirtyAddress); // Al menos aplicamos la limpieza manual
     }
 
     console.log(`[AI Cleaner] Limpiando: "${dirtyAddress}"`);
@@ -20,27 +46,28 @@ export async function cleanAddressWithAI(dirtyAddress: string): Promise<string> 
             messages: [
                 {
                     role: "system",
-                    content: `Eres un experto en direcciones de España y corrección fonética.
-          Tu tarea es corregir transcripciones de voz erróneas de direcciones de forma conservadora.
+                    content: `Eres un experto en direcciones de España.
+          Tu tarea es corregir transcripciones de voz erróneas.
           
           Instrucciones:
-          1. Corrige nombres propios mal transcritos (ej: "Dantoni" -> "d'Antoni", "au lestia" -> "Aulèsties").
-          2. Detecta calles en Cataluña/España (Carrer, Avinguda, Calle...).
-          3. OBLIGATORIO: Convierte CUALQUIER número en texto a dígitos ("cinco" -> "5", "tercero" -> "3º", "primero" -> "1º").
-          4. IMPORTANTE: Mantén el piso y puerta si existen, pero formateados (ej: "tercero primera" -> "3º 1ª").
-          5. Si la dirección parece ya correcta, devuélvela tal cual.
-          6. DEVUELVE SOLO LA DIRECCIÓN CORREGIDA. Nada más. En formato: Calle, Número, Piso, CP Población.`
+          1. Corrige nombres propios mal transcritos (fonéticamente).
+          2. IMPORTANTE: Devuelve la calle, número y piso.
+          3. Sigue el formato: Calle Nombre, Número, Piso, Código Postal Población.`
                 },
                 {
                     role: "user",
                     content: `Corrige esta dirección: ${dirtyAddress}`
                 }
             ],
-            temperature: 0.1, // Creatividad baja para ser preciso
+            temperature: 0.1,
             max_tokens: 100,
         });
 
-        const cleaned = response.choices[0].message.content?.trim() || dirtyAddress;
+        let cleaned = response.choices[0].message.content?.trim() || dirtyAddress;
+
+        // POST-PROCESADO: Aseguramos los números con el helper (doble seguridad)
+        cleaned = textToDigits(cleaned);
+
         console.log(`[AI Cleaner] Resultado: "${cleaned}"`);
         return cleaned;
 
@@ -55,7 +82,7 @@ export async function cleanAddressWithAI(dirtyAddress: string): Promise<string> 
                 messages: [
                     {
                         role: "system",
-                        content: "Eres un experto en corrección de direcciones de España. Corrige errores fonéticos importantes (ej: 'au lestia' -> 'Aulèsties'). Devuelve SOLO la dirección corregida."
+                        content: "Corrige dirección España. Fonética y formato. Devuelve SOLO dirección."
                     },
                     {
                         role: "user",
@@ -63,12 +90,14 @@ export async function cleanAddressWithAI(dirtyAddress: string): Promise<string> 
                     }
                 ]
             });
-            const cleaned = fallbackResponse.choices[0].message.content?.trim() || dirtyAddress;
+            let cleaned = fallbackResponse.choices[0].message.content?.trim() || dirtyAddress;
+            // Aplicar también al fallback
+            cleaned = textToDigits(cleaned);
             console.log(`[AI Cleaner] Resultado (Fallback): "${cleaned}"`);
             return cleaned;
         } catch (fallbackError) {
             console.error("[AI Cleaner] Falló también el fallback:", fallbackError);
-            return dirtyAddress;
+            return textToDigits(dirtyAddress);
         }
     }
 }
