@@ -20,8 +20,17 @@ export async function validateAddress(rawAddress: string): Promise<{ address: st
 
         debugInfo.sanitized = cleanAddress;
 
+        // Validar longitud mínima tras limpieza
+        if (cleanAddress.length < 5) {
+            console.warn(`[Google Maps] Dirección demasiado corta tras limpieza: '${cleanAddress}'. Usando original.`);
+            debugInfo.error = "TOO_SHORT_AFTER_CLEANAL";
+            return { address: rawAddress, debug: debugInfo };
+        }
+
         // 3. Añadimos contexto forzado si no está presente
         const query = encodeURIComponent(`${cleanAddress}, España`);
+
+        console.log(`[Google Maps] Buscando: ${cleanAddress}`);
         const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${query}&key=${apiKey}&language=es`;
 
         debugInfo.url = url.replace(apiKey, "HIDDEN"); // Hide key in logs
@@ -32,8 +41,20 @@ export async function validateAddress(rawAddress: string): Promise<{ address: st
         debugInfo.googleStatus = data.status;
 
         if (data.status === 'OK' && data.results.length > 0) {
-            // Devolvemos la dirección formateada oficial de Google
-            const formatted = data.results[0].formatted_address;
+            const result = data.results[0];
+            const formatted = result.formatted_address;
+
+            // PROTECCIÓN: Si Google devuelve solo "España" (o país generico) y nosotros enviamos algo más largo,
+            // significa que no encontró la calle y hizo fallback al país.
+            // Verificamos si el result types es solo 'country' o 'political'
+            const isGenericCountry = result.types.includes('country') && result.types.length === 2 && result.types.includes('political');
+
+            if (isGenericCountry || formatted === "Spain" || formatted === "España") {
+                console.warn(`[Google Maps] Resultado demasiado genérico ('${formatted}') para input '${cleanAddress}'. Usando original.`);
+                debugInfo.error = "GENERIC_COUNTRY_FALLBACK";
+                return { address: rawAddress, debug: debugInfo };
+            }
+
             console.log(`[Google Maps] Corrección: '${rawAddress}' -> '${formatted}'`);
             debugInfo.success = true;
             return { address: formatted, debug: debugInfo };

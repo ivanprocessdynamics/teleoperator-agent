@@ -1,6 +1,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { validateAddress } from '@/app/lib/googleMaps';
+import { cleanAddressWithAI } from '@/app/lib/addressCleaner';
 
 export async function POST(req: NextRequest) {
     try {
@@ -11,14 +12,20 @@ export async function POST(req: NextRequest) {
         let rawAddress = body.address || body.location || "";
         let finalAddress = rawAddress;
 
-        // 2. Validación con Google Maps (Si hay dirección)
-        let validationDebug: any = null;
-        if (rawAddress && rawAddress.length > 5) {
-            console.log(`[Create Incident] Validando dirección: ${rawAddress}`);
-            const result = await validateAddress(rawAddress);
+        // 2. Limpieza IA + Validación Google
+        let validationDebug: any = { original: rawAddress };
+
+        if (rawAddress && rawAddress.length > 3) {
+            // A. Limpieza Fonética con IA
+            const aiCleaned = await cleanAddressWithAI(rawAddress);
+            validationDebug.aiCleaned = aiCleaned;
+
+            // B. Geocoding con Google Maps
+            const result = await validateAddress(aiCleaned);
             finalAddress = result.address;
-            validationDebug = result.debug;
-            console.log(`[Create Incident] Dirección corregida: ${finalAddress}`);
+            validationDebug.googleResult = result.debug;
+
+            console.log(`[Create Incident] Pipeline: '${rawAddress}' -> AI: '${aiCleaned}' -> Google: '${finalAddress}'`);
         }
 
         // 3. Preparar Payload para SatFlow (USANDO LA DIRECCIÓN CORREGIDA)
