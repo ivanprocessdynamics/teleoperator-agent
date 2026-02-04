@@ -32,7 +32,7 @@ function AddressForm() {
     const [suggestions, setSuggestions] = useState<any[]>([]);
     const [showSuggestions, setShowSuggestions] = useState(false);
 
-    // Flags to control behavior
+    // Flags
     const isSelectingRef = useRef(false);
     const debouncedSearch = useDebounce(searchTerm, 500);
     const wrapperRef = useRef<HTMLDivElement>(null);
@@ -51,9 +51,8 @@ function AddressForm() {
     // Fetch suggestions logic
     useEffect(() => {
         async function fetchSuggestions() {
-            // Si estamos seleccionando, o es muy corto, no buscamos
             if (isSelectingRef.current) {
-                isSelectingRef.current = false; // Reset flag
+                isSelectingRef.current = false;
                 return;
             }
 
@@ -65,7 +64,6 @@ function AddressForm() {
                 const res = await fetch(`/api/proxy/places-autocomplete?input=${encodeURIComponent(debouncedSearch)}`);
                 const data = await res.json();
                 if (data.predictions) {
-                    // Limitamos a 3 sugerencias (reduce carga visual, aunque coste API es por petición)
                     setSuggestions(data.predictions.slice(0, 3));
                     setShowSuggestions(true);
                 }
@@ -74,61 +72,52 @@ function AddressForm() {
             }
         }
 
-        // Solo lanzamos búsqueda si NO venimos de una selección reciente
         if (!isSelectingRef.current) {
             fetchSuggestions();
         }
     }, [debouncedSearch]);
 
-    const handleSelect = (suggestion: any) => {
-        isSelectingRef.current = true; // Flag to prevent re-search loop
+    // NEW: Fetch Details for accurate CP/City
+    const handleSelect = async (suggestion: any) => {
+        isSelectingRef.current = true; // Stop autocomplete loop
 
         const main = suggestion.structured_formatting?.main_text || suggestion.description;
-        const secondary = suggestion.structured_formatting?.secondary_text || "";
-
-        // Fill Search Input with the street name only (cleaner)
         setSearchTerm(main);
-        setStreet(main);
+        setStreet(main); // Initial Street Name
 
-        // Heuristic Parsing for CP and City
-        // Formatos típicos secondary: "Reus, Tarragona, España" OR "43204 Reus, Tarragona, España"
-        const parts = secondary.split(',').map((p: string) => p.trim());
-
-        let foundCP = "";
-        let foundCity = "";
-        let foundProvince = "";
-
-        // Try to find CP in parts
-        for (const part of parts) {
-            const cpMatch = part.match(/\b\d{5}\b/); // Busca 5 dígitos
-            if (cpMatch) {
-                foundCP = cpMatch[0];
-                // Remove CP from part to get city if they are mixed "43204 Reus"
-                const cityCandidate = part.replace(foundCP, "").trim();
-                if (cityCandidate && cityCandidate.length > 2) {
-                    foundCity = cityCandidate;
-                }
-            } else if (!foundCity && part !== "España") {
-                // Si no tiene CP y no hemos encontrado ciudad, asumimos que es ciudad
-                foundCity = part;
-            } else if (!foundProvince && part !== "España" && part !== foundCity) {
-                foundProvince = part;
-            }
-        }
-
-        setPostalCode(foundCP);
-        setCity(foundCity || parts[0]); // Fallback
-        setProvince(foundProvince || parts[1] || "");
-
+        // Hide dropdown immediately
         setSuggestions([]);
         setShowSuggestions(false);
+
+        // Fetch robust details (Postal Code, Province, etc)
+        try {
+            const res = await fetch(`/api/proxy/place-details?place_id=${suggestion.place_id}`);
+            const data = await res.json();
+
+            if (data.result && data.result.address_components) {
+                const components = data.result.address_components;
+
+                // Helper to extract component
+                const getComp = (type: string) => components.find((c: any) => c.types.includes(type))?.long_name || '';
+
+                const fetchedZip = getComp('postal_code');
+                const fetchedCity = getComp('locality') || getComp('administrative_area_level_2'); // City or fallback
+                const fetchedProvince = getComp('administrative_area_level_2') || getComp('administrative_area_level_1');
+
+                if (fetchedZip) setPostalCode(fetchedZip);
+                if (fetchedCity) setCity(fetchedCity);
+                if (fetchedProvince && fetchedProvince !== fetchedCity) setProvince(fetchedProvince);
+            }
+        } catch (e) {
+            console.error("Details fetch error:", e);
+            // Fallback (keep existing heuristic if needed, or do nothing)
+        }
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!incidentId) return;
 
-        // Construct full address string
         const fullAddress = `${street}, ${number}, ${floor ? `Piso ${floor},` : ''} ${postalCode} ${city}, ${province} (España)`;
 
         setStatus('loading');
@@ -195,7 +184,7 @@ function AddressForm() {
                                 onChange={(e) => {
                                     setSearchTerm(e.target.value);
                                     setShowSuggestions(true);
-                                    isSelectingRef.current = false; // User typing means new search intent
+                                    isSelectingRef.current = false;
                                 }}
                             />
                         </div>
