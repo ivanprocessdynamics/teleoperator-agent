@@ -2,38 +2,41 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export async function POST(req: NextRequest) {
     try {
-        // 1. Leemos el Body RAW para depurar
-        const rawBody = await req.text();
-        console.log(`[Search Proxy] RAW Body received: '${rawBody}'`);
-
         let body: any = {};
-        if (rawBody) {
-            try {
-                body = JSON.parse(rawBody);
-            } catch (e) {
-                console.log("[Search Proxy] JSON parsing failed");
-            }
+        try {
+            const rawBody = await req.text();
+            if (rawBody) body = JSON.parse(rawBody);
+        } catch (e) {
+            console.log("[Search Proxy] Body vacío o inválido");
         }
 
-        // 2. Solo aceptamos Body o Headers. IGNORAMOS la URL intencionadamente.
-        const phone = body.phone || body.args?.phone || req.headers.get('x-user-number');
+        // VARIABLES DE BÚSQUEDA
+        const bodyPhone = body.phone;
+        const bodyName = body.name; // <--- Nuevo campo
+        const headerPhone = req.headers.get('x-user-number');
 
-        console.log(`[Search Proxy] Teléfono recibido (INPUT): '${phone}'`);
+        console.log(`[Search Proxy] Inputs -> Name: '${bodyName}', BodyPhone: '${bodyPhone}', HeaderPhone: '${headerPhone}'`);
 
-        if (!phone) {
-            return NextResponse.json({ error: "Phone required (Send in JSON body)" }, { status: 400 });
-        }
-
-        // 3. Construimos la URL hacia SatFlow de forma segura
-        // La clase URL se encarga de convertir el '+' en '%2B' automáticamente.
         const satflowUrl = new URL("https://us-central1-satflow-d3744.cloudfunctions.net/api/v1/customers/search");
-        satflowUrl.searchParams.set("phone", phone);
+
+        // LÓGICA DE PRIORIDAD:
+        // 1. Si la IA nos manda un NOMBRE, buscamos por nombre (prioridad manual).
+        // 2. Si la IA nos manda un TELÉFONO, buscamos por ese teléfono (prioridad manual).
+        // 3. Si la IA no manda nada, usamos el TELÉFONO DEL LLAMANTE (automático).
+
+        if (bodyName) {
+            satflowUrl.searchParams.set("name", bodyName);
+        } else if (bodyPhone) {
+            satflowUrl.searchParams.set("phone", bodyPhone);
+        } else if (headerPhone) {
+            satflowUrl.searchParams.set("phone", headerPhone);
+        } else {
+            return NextResponse.json({ error: "No search criteria provided" }, { status: 400 });
+        }
 
         console.log(`[Search Proxy] URL Generada: ${satflowUrl.toString()}`);
 
         const authHeader = req.headers.get('authorization');
-
-        // 4. Llamada a SatFlow
         const apiResponse = await fetch(satflowUrl.toString(), {
             method: 'GET',
             headers: {
@@ -50,7 +53,7 @@ export async function POST(req: NextRequest) {
         const customers = data.data || [];
 
         if (customers.length > 0) {
-            const client = customers[0];
+            const client = customers[0]; // Cogemos el primero que coincida
             const fullAddress = `${client.street || ''}, ${client.city || ''}`.replace(/^, |, $/g, '');
 
             return NextResponse.json({
