@@ -2,7 +2,7 @@
 
 import { useState, useEffect, Suspense, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { MapPin, Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
+import { MapPin, Loader2, CheckCircle2, AlertCircle, Search } from 'lucide-react';
 
 function useDebounce<T>(value: T, delay: number): T {
     const [debouncedValue, setDebouncedValue] = useState(value);
@@ -17,16 +17,24 @@ function AddressForm() {
     const searchParams = useSearchParams();
     const incidentId = searchParams.get('id');
 
-    const [address, setAddress] = useState('');
+    // Granular State
+    const [street, setStreet] = useState('');
+    const [number, setNumber] = useState('');
+    const [floor, setFloor] = useState('');
+    const [postalCode, setPostalCode] = useState('');
+    const [city, setCity] = useState('');
+    const [province, setProvince] = useState('');
+
     const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
 
     // Autocomplete State
+    const [searchTerm, setSearchTerm] = useState('');
     const [suggestions, setSuggestions] = useState<any[]>([]);
     const [showSuggestions, setShowSuggestions] = useState(false);
-    const debouncedAddress = useDebounce(address, 500);
+    const debouncedSearch = useDebounce(searchTerm, 500);
     const wrapperRef = useRef<HTMLDivElement>(null);
 
-    // Close suggestions when clicking outside
+    // Close suggestions
     useEffect(() => {
         function handleClickOutside(event: MouseEvent) {
             if (wrapperRef.current && !wrapperRef.current.contains(event.target as Node)) {
@@ -37,16 +45,15 @@ function AddressForm() {
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, []);
 
-    // Fetch suggestions when user types
+    // Fetch suggestions
     useEffect(() => {
         async function fetchSuggestions() {
-            if (debouncedAddress.length < 3) {
+            if (debouncedSearch.length < 3) {
                 setSuggestions([]);
                 return;
             }
-
             try {
-                const res = await fetch(`/api/proxy/places-autocomplete?input=${encodeURIComponent(debouncedAddress)}`);
+                const res = await fetch(`/api/proxy/places-autocomplete?input=${encodeURIComponent(debouncedSearch)}`);
                 const data = await res.json();
                 if (data.predictions) {
                     setSuggestions(data.predictions);
@@ -56,27 +63,34 @@ function AddressForm() {
                 console.error("Autocomplete error:", e);
             }
         }
-
-        // Only fetch if we are typing (not if we just selected)
-        // To distinguish, we could check if current address matches a selected one, 
-        // but simple debounce is usually enough if we hide suggestions on select.
-        if (status === 'idle') {
-            fetchSuggestions();
-        }
-    }, [debouncedAddress, status]);
+        fetchSuggestions();
+    }, [debouncedSearch]);
 
     const handleSelect = (suggestion: any) => {
-        setAddress(suggestion.description + ", "); // Add comma for appending details
+        // Parse prediction to fill fields logically
+        // main_text usually has "Street" or "Street, Num"
+        // secondary_text has "City, Province, Country"
+        const main = suggestion.structured_formatting?.main_text || suggestion.description;
+        const secondary = suggestion.structured_formatting?.secondary_text || "";
+
+        setStreet(main); // Best guess for street
+        setSearchTerm(main); // Update search box too
+
+        // Parsed approximation for City/Province
+        const parts = secondary.split(',').map((p: string) => p.trim());
+        if (parts.length >= 1) setCity(parts[0]);
+        if (parts.length >= 2) setProvince(parts[1]);
+
         setSuggestions([]);
         setShowSuggestions(false);
-        // Focus back to input
-        const input = document.getElementById('address-input');
-        if (input) input.focus();
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!incidentId || !address) return;
+        if (!incidentId) return;
+
+        // Construct full address string
+        const fullAddress = `${street}, ${number}, ${floor ? `Piso ${floor},` : ''} ${postalCode} ${city}, ${province} (España)`;
 
         setStatus('loading');
 
@@ -84,7 +98,7 @@ function AddressForm() {
             const res = await fetch('/api/web/update-address', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ incidentId, address }),
+                body: JSON.stringify({ incidentId, address: fullAddress }),
             });
 
             if (res.ok) {
@@ -104,8 +118,8 @@ function AddressForm() {
                     <div className="mx-auto w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
                         <CheckCircle2 className="w-8 h-8 text-green-600" />
                     </div>
-                    <h1 className="text-2xl font-bold text-gray-900 mb-2">¡Dirección Actualizada!</h1>
-                    <p className="text-gray-600">Hemos informado al técnico del cambio. Gracias por tu ayuda.</p>
+                    <h1 className="text-2xl font-bold text-gray-900 mb-2">¡Dirección Guardada!</h1>
+                    <p className="text-gray-600">Hemos actualizado la información de tu visita.</p>
                 </div>
             </div>
         );
@@ -121,35 +135,30 @@ function AddressForm() {
                     <div>
                         <h1 className="text-xl font-bold text-gray-900">Corregir Dirección</h1>
                         <p className="text-xs text-gray-500 font-mono bg-gray-100 px-2 py-0.5 rounded inline-block mt-1">
-                            Ref: {incidentId?.slice(0, 8)}...
+                            Ref: {incidentId ? incidentId.slice(-6).toUpperCase() : '...'}
                         </p>
                     </div>
                 </div>
 
-                <form onSubmit={handleSubmit} className="space-y-6">
-                    <div className="space-y-2 relative" ref={wrapperRef}>
-                        <label className="block text-sm font-semibold text-gray-700">
-                            Dirección Completa
+                <div className="space-y-6">
+                    {/* Autocomplete Search */}
+                    <div className="relative" ref={wrapperRef}>
+                        <label className="block text-sm font-bold text-gray-700 mb-1">
+                            Buscar Calle
                         </label>
-                        <p className="text-xs text-gray-500 mb-2">
-                            Empieza a escribir y selecciona tu calle. Luego <b>añade el piso y puerta</b>.
-                        </p>
-
-                        <input
-                            id="address-input"
-                            type="text"
-                            required
-                            placeholder="Ej: Calle Mayor 5..."
-                            className="w-full p-4 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition text-gray-900 text-lg shadow-sm"
-                            value={address}
-                            onChange={(e) => {
-                                setAddress(e.target.value);
-                                setShowSuggestions(true);
-                            }}
-                            autoComplete="off"
-                        />
-
-                        {/* Suggestions Dropdown */}
+                        <div className="relative">
+                            <Search className="absolute left-3 top-3.5 w-5 h-5 text-gray-400" />
+                            <input
+                                type="text"
+                                placeholder="Escribe para buscar..."
+                                className="w-full pl-10 p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition bg-gray-50"
+                                value={searchTerm}
+                                onChange={(e) => {
+                                    setSearchTerm(e.target.value);
+                                    setShowSuggestions(true);
+                                }}
+                            />
+                        </div>
                         {showSuggestions && suggestions.length > 0 && (
                             <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-2xl max-h-60 overflow-auto divide-y divide-gray-100">
                                 {suggestions.map((suggestion) => (
@@ -160,7 +169,7 @@ function AddressForm() {
                                         className="w-full text-left p-3 hover:bg-blue-50 transition flex items-start gap-3 group"
                                     >
                                         <MapPin className="w-4 h-4 text-gray-400 mt-1 group-hover:text-blue-500" />
-                                        <span className="text-sm text-gray-700 group-hover:text-gray-900">
+                                        <span className="text-sm text-gray-700">
                                             {suggestion.description}
                                         </span>
                                     </button>
@@ -169,28 +178,96 @@ function AddressForm() {
                         )}
                     </div>
 
-                    <button
-                        type="submit"
-                        disabled={status === 'loading'}
-                        className="w-full bg-slate-900 text-white py-4 rounded-xl font-semibold text-lg hover:bg-slate-800 transition disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg shadow-slate-900/20"
-                    >
-                        {status === 'loading' ? (
-                            <>
-                                <Loader2 className="w-5 h-5 animate-spin" />
-                                Guardando...
-                            </>
-                        ) : (
-                            'Confirmar Dirección'
-                        )}
-                    </button>
-
-                    {status === 'error' && (
-                        <div className="p-4 bg-red-50 text-red-600 rounded-xl flex items-center gap-2 text-sm">
-                            <AlertCircle className="w-4 h-4 flex-shrink-0" />
-                            Hubo un error. Por favor inténtalo de nuevo.
+                    <form onSubmit={handleSubmit} className="space-y-4">
+                        {/* Street */}
+                        <div>
+                            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Calle / Avenida</label>
+                            <input
+                                required
+                                value={street}
+                                onChange={(e) => setStreet(e.target.value)}
+                                className="w-full p-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                                placeholder="Nombre de la calle"
+                            />
                         </div>
-                    )}
-                </form>
+
+                        {/* Num & Floor */}
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Número</label>
+                                <input
+                                    required
+                                    value={number}
+                                    onChange={(e) => setNumber(e.target.value)}
+                                    className="w-full p-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                                    placeholder="Nº"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Piso / Puerta</label>
+                                <input
+                                    value={floor}
+                                    onChange={(e) => setFloor(e.target.value)}
+                                    className="w-full p-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                                    placeholder="Ej: 3º 1ª"
+                                />
+                            </div>
+                        </div>
+
+                        {/* CP & City */}
+                        <div className="grid grid-cols-3 gap-4">
+                            <div className="col-span-1">
+                                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">CP</label>
+                                <input
+                                    required
+                                    value={postalCode}
+                                    onChange={(e) => setPostalCode(e.target.value)}
+                                    className="w-full p-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                                    placeholder="4300..."
+                                />
+                            </div>
+                            <div className="col-span-2">
+                                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Población</label>
+                                <input
+                                    required
+                                    value={city}
+                                    onChange={(e) => setCity(e.target.value)}
+                                    className="w-full p-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                                    placeholder="Ciudad"
+                                />
+                            </div>
+                        </div>
+
+                        {/* Province */}
+                        <div>
+                            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Provincia</label>
+                            <input
+                                required
+                                value={province}
+                                onChange={(e) => setProvince(e.target.value)}
+                                className="w-full p-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                                placeholder="Provincia"
+                            />
+                        </div>
+
+                        <div className="pt-2">
+                            <button
+                                type="submit"
+                                disabled={status === 'loading'}
+                                className="w-full bg-slate-900 text-white py-4 rounded-xl font-semibold text-lg hover:bg-slate-800 transition disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg shadow-slate-900/20"
+                            >
+                                {status === 'loading' ? (
+                                    <>
+                                        <Loader2 className="w-5 h-5 animate-spin" />
+                                        Guardando...
+                                    </>
+                                ) : (
+                                    'Confirmar Dirección'
+                                )}
+                            </button>
+                        </div>
+                    </form>
+                </div>
             </div>
         </div>
     );

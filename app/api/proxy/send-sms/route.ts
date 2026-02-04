@@ -69,16 +69,18 @@ export async function POST(req: NextRequest) {
         const correctionLink = await shortenUrl(longLink);
 
         // 2. Message Construction
+        const refId = incidentId ? incidentId.slice(-6).toUpperCase() : "N/A";
+
         const messageBody = `
-Hola ${name || "Cliente"}, confirmamos tu visita técnica:
+🛠️ Visita Técnica
+Ref: #${refId}
+
 📅 ${scheduledDate || "Pendiente"}
 ⏰ ${scheduledTime || "Pendiente"}
 📍 ${address || "Sin dirección"}
 
-Si la dirección es incorrecta, modifícala aquí:
+¿Dirección incorrecta? Corrígela aquí:
 ${correctionLink}
-
-Gracias.
 `.trim();
 
         console.log(`[SMS Proxy] Sending SMS to ${targetPhone} for Incident ${incidentId}`);
