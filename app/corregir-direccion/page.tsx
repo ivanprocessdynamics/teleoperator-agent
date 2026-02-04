@@ -31,6 +31,9 @@ function AddressForm() {
     const [searchTerm, setSearchTerm] = useState('');
     const [suggestions, setSuggestions] = useState<any[]>([]);
     const [showSuggestions, setShowSuggestions] = useState(false);
+
+    // Flags to control behavior
+    const isSelectingRef = useRef(false);
     const debouncedSearch = useDebounce(searchTerm, 500);
     const wrapperRef = useRef<HTMLDivElement>(null);
 
@@ -45,9 +48,15 @@ function AddressForm() {
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, []);
 
-    // Fetch suggestions
+    // Fetch suggestions logic
     useEffect(() => {
         async function fetchSuggestions() {
+            // Si estamos seleccionando, o es muy corto, no buscamos
+            if (isSelectingRef.current) {
+                isSelectingRef.current = false; // Reset flag
+                return;
+            }
+
             if (debouncedSearch.length < 3) {
                 setSuggestions([]);
                 return;
@@ -56,30 +65,60 @@ function AddressForm() {
                 const res = await fetch(`/api/proxy/places-autocomplete?input=${encodeURIComponent(debouncedSearch)}`);
                 const data = await res.json();
                 if (data.predictions) {
-                    setSuggestions(data.predictions);
+                    // Limitamos a 3 sugerencias (reduce carga visual, aunque coste API es por petición)
+                    setSuggestions(data.predictions.slice(0, 3));
                     setShowSuggestions(true);
                 }
             } catch (e) {
                 console.error("Autocomplete error:", e);
             }
         }
-        fetchSuggestions();
+
+        // Solo lanzamos búsqueda si NO venimos de una selección reciente
+        if (!isSelectingRef.current) {
+            fetchSuggestions();
+        }
     }, [debouncedSearch]);
 
     const handleSelect = (suggestion: any) => {
-        // Parse prediction to fill fields logically
-        // main_text usually has "Street" or "Street, Num"
-        // secondary_text has "City, Province, Country"
+        isSelectingRef.current = true; // Flag to prevent re-search loop
+
         const main = suggestion.structured_formatting?.main_text || suggestion.description;
         const secondary = suggestion.structured_formatting?.secondary_text || "";
 
-        setStreet(main); // Best guess for street
-        setSearchTerm(main); // Update search box too
+        // Fill Search Input with the street name only (cleaner)
+        setSearchTerm(main);
+        setStreet(main);
 
-        // Parsed approximation for City/Province
+        // Heuristic Parsing for CP and City
+        // Formatos típicos secondary: "Reus, Tarragona, España" OR "43204 Reus, Tarragona, España"
         const parts = secondary.split(',').map((p: string) => p.trim());
-        if (parts.length >= 1) setCity(parts[0]);
-        if (parts.length >= 2) setProvince(parts[1]);
+
+        let foundCP = "";
+        let foundCity = "";
+        let foundProvince = "";
+
+        // Try to find CP in parts
+        for (const part of parts) {
+            const cpMatch = part.match(/\b\d{5}\b/); // Busca 5 dígitos
+            if (cpMatch) {
+                foundCP = cpMatch[0];
+                // Remove CP from part to get city if they are mixed "43204 Reus"
+                const cityCandidate = part.replace(foundCP, "").trim();
+                if (cityCandidate && cityCandidate.length > 2) {
+                    foundCity = cityCandidate;
+                }
+            } else if (!foundCity && part !== "España") {
+                // Si no tiene CP y no hemos encontrado ciudad, asumimos que es ciudad
+                foundCity = part;
+            } else if (!foundProvince && part !== "España" && part !== foundCity) {
+                foundProvince = part;
+            }
+        }
+
+        setPostalCode(foundCP);
+        setCity(foundCity || parts[0]); // Fallback
+        setProvince(foundProvince || parts[1] || "");
 
         setSuggestions([]);
         setShowSuggestions(false);
@@ -134,8 +173,8 @@ function AddressForm() {
                     </div>
                     <div>
                         <h1 className="text-xl font-bold text-gray-900">Corregir Dirección</h1>
-                        <p className="text-xs text-gray-500 font-mono bg-gray-100 px-2 py-0.5 rounded inline-block mt-1">
-                            Ref: {incidentId ? incidentId.slice(-6).toUpperCase() : '...'}
+                        <p className="text-sm text-gray-500">
+                            Confirma los datos de tu ubicación
                         </p>
                     </div>
                 </div>
@@ -156,6 +195,7 @@ function AddressForm() {
                                 onChange={(e) => {
                                     setSearchTerm(e.target.value);
                                     setShowSuggestions(true);
+                                    isSelectingRef.current = false; // User typing means new search intent
                                 }}
                             />
                         </div>
