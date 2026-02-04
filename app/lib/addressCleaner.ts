@@ -26,10 +26,10 @@ export async function cleanAddressWithAI(dirtyAddress: string): Promise<string> 
           Instrucciones:
           1. Corrige nombres propios mal transcritos (ej: "Dantoni" -> "d'Antoni", "au lestia" -> "Aulèsties").
           2. Detecta calles en Cataluña/España (Carrer, Avinguda, Calle...).
-          3. Convierte texto a números ("cinco" -> "5").
+          3. OBLIGATORIO: Convierte CUALQUIER número en texto a dígitos ("cinco" -> "5", "tercero" -> "3º", "primero" -> "1º").
           4. IMPORTANTE: Mantén el piso y puerta si existen, pero formateados (ej: "tercero primera" -> "3º 1ª").
           5. Si la dirección parece ya correcta, devuélvela tal cual.
-          6. DEVUELVE SOLO LA DIRECCIÓN CORREGIDA. Nada más.`
+          6. DEVUELVE SOLO LA DIRECCIÓN CORREGIDA. Nada más. En formato: Calle, Número, Piso, CP Población.`
                 },
                 {
                     role: "user",
