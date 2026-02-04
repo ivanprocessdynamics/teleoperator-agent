@@ -2,7 +2,7 @@
 
 import { useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { MapPin, Loader2, CheckCircle2 } from 'lucide-react';
+import { MapPin, Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
 
 function AddressForm() {
     const searchParams = useSearchParams();
@@ -74,6 +74,12 @@ function AddressForm() {
                 </div>
 
                 <div className="space-y-6">
+                    {status === 'error' && (
+                        <div className="p-3 bg-red-50 text-red-600 rounded-lg text-sm flex items-center gap-2">
+                            <AlertCircle className="w-4 h-4" />
+                            Hubo un error al guardar. Inténtalo de nuevo.
+                        </div>
+                    )}
                     <form onSubmit={handleSubmit} className="space-y-4">
                         {/* Street */}
                         <div>

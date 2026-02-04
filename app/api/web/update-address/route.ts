@@ -40,8 +40,9 @@ export async function POST(req: NextRequest) {
         if (apiResponse.ok) {
             return NextResponse.json({ success: true, message: "Address updated" });
         } else {
-            console.error(`[Web Update] SatFlow Error: ${apiResponse.status}`);
-            return NextResponse.json({ error: "Upstream Error" }, { status: apiResponse.status });
+            const errorText = await apiResponse.text();
+            console.error(`[Web Update] SatFlow Error: ${apiResponse.status} - ${errorText}`);
+            return NextResponse.json({ error: "Upstream Error", details: errorText }, { status: apiResponse.status });
         }
 
     } catch (error: any) {
