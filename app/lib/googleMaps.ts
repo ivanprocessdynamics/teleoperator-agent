@@ -11,8 +11,17 @@ export async function validateAddress(rawAddress: string): Promise<{ address: st
     }
 
     try {
-        // Añadimos "Spain" o tu región por defecto para ayudar a Google
-        const query = encodeURIComponent(`${rawAddress}, España`);
+        // --- LIMPIEZA PREVIA (SANITIZACIÓN) ---
+        // 1. Quitamos la palabra "numero" o "nº" para no confundir a Google
+        let cleanAddress = rawAddress.replace(/\b(numero|número|num|nº)\b/gi, "").trim();
+
+        // 2. Quitamos espacios dobles
+        cleanAddress = cleanAddress.replace(/\s+/g, " ");
+
+        debugInfo.sanitized = cleanAddress;
+
+        // 3. Añadimos contexto forzado si no está presente
+        const query = encodeURIComponent(`${cleanAddress}, España`);
         const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${query}&key=${apiKey}&language=es`;
 
         debugInfo.url = url.replace(apiKey, "HIDDEN"); // Hide key in logs
