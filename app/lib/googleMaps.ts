@@ -11,8 +11,8 @@ export async function validateAddress(rawAddress: string): Promise<{ address: st
     }
 
     try {
-        // --- LIMPIEZA PREVIA (SANITIZACIÓN) ---
-        // 1. Quitamos la palabra "numero" o "nº" para no confundir a Google
+        // LIMPIEZA
+        // 1. Quitar la palabra "numero" o "nº" para no confundir a Gugle
         let cleanAddress = rawAddress.replace(/\b(numero|número|num|nº)\b/gi, "").trim();
 
         // 2. Quitamos espacios dobles
@@ -20,7 +20,7 @@ export async function validateAddress(rawAddress: string): Promise<{ address: st
 
         debugInfo.sanitized = cleanAddress;
 
-        // Validar longitud mínima tras limpieza
+        // Longitud mínima tras limpieza de 5
         if (cleanAddress.length < 5) {
             console.warn(`[Google Maps] Dirección demasiado corta tras limpieza: '${cleanAddress}'. Usando original.`);
             debugInfo.error = "TOO_SHORT_AFTER_CLEANAL";
@@ -33,7 +33,7 @@ export async function validateAddress(rawAddress: string): Promise<{ address: st
         console.log(`[Google Maps] Buscando: ${cleanAddress}`);
         const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${query}&key=${apiKey}&language=es`;
 
-        debugInfo.url = url.replace(apiKey, "HIDDEN"); // Hide key in logs
+        debugInfo.url = url.replace(apiKey, "HIDDEN"); // Ocultar la key en logs
 
         const response = await fetch(url);
         const data = await response.json();
