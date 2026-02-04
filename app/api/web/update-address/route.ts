@@ -31,9 +31,15 @@ export async function POST(req: NextRequest) {
         };
 
         // 3. Llamar a SatFlow (PATCH)
+        // Usamos la API KEY de entorno para autenticar la petición 'admin'
+        const apiKey = process.env.SATFLOW_API_KEY;
+
         const apiResponse = await fetch(targetUrl, {
             method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${apiKey}` // <--- CLAVE MAESTRA
+            },
             body: JSON.stringify(satflowPayload)
         });
 
