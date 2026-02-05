@@ -12,6 +12,7 @@ import { CallHistoryTable } from "@/components/calls/CallHistoryTable";
 import { StatsDashboard } from "@/components/stats/StatsDashboard";
 import { CampaignPrompt } from "@/components/campaigns/CampaignPrompt";
 import { CampaignAnalysis } from "@/components/campaigns/CampaignAnalysis";
+import { CampaignKnowledgeBase } from "@/components/campaigns/CampaignKnowledgeBase";
 import { ConnectPhoneNumberModal } from "@/components/inbound/PhoneNumberConnectModal";
 import { AgentToolsConfig } from "@/components/tools/AgentToolsConfig";
 import { AgentTool } from "@/types/tools";
@@ -241,15 +242,7 @@ export function InboundAgentView({ subworkspaceId, agentId }: InboundAgentViewPr
 
                 {/* KNOWLEDGE BASE TAB */}
                 <TabsContent value="knowledge" forceMount className="mt-0 data-[state=inactive]:hidden text-gray-900 dark:text-gray-100">
-                    <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-800 p-10 flex flex-col items-center justify-center text-center min-h-[300px]">
-                        <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-full mb-4">
-                            <BookOpen className="h-8 w-8 text-purple-600 dark:text-purple-400" />
-                        </div>
-                        <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">Base de Conocimiento</h3>
-                        <p className="text-gray-500 max-w-sm">
-                            Todavía no funciona, estoy en ello.
-                        </p>
-                    </div>
+                    <CampaignKnowledgeBase subworkspaceId={subworkspaceId} />
                 </TabsContent>
 
                 {/* HISTORY TAB */}
