@@ -24,9 +24,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/contexts/AuthContext";
-import { CallHistoryTable } from "@/components/calls/CallHistoryTable";
-import { StatsDashboard } from "@/components/stats/StatsDashboard";
-import { History as HistoryIcon, BarChart3 } from "lucide-react";
+
 import {
     Select,
     SelectContent,
@@ -746,12 +744,10 @@ export function CampaignDetail({ campaignId, subworkspaceId, onBack }: CampaignD
                 {/* Right: Prompt Editor & Analysis (5 cols) - Sticky */}
                 <div className="col-span-12 lg:col-span-5 h-full overflow-y-auto pr-2">
                     <Tabs defaultValue="prompt" className="w-full">
-                        <TabsList className="grid w-full grid-cols-5 mb-4 bg-gray-100 dark:bg-gray-800">
+                        <TabsList className="grid w-full grid-cols-3 mb-4 bg-gray-100 dark:bg-gray-800">
                             <TabsTrigger value="prompt">Prompt</TabsTrigger>
                             <TabsTrigger value="analysis">Análisis</TabsTrigger>
                             <TabsTrigger value="calling"><Phone className="h-3.5 w-3.5" /></TabsTrigger>
-                            <TabsTrigger value="history"><HistoryIcon className="h-3.5 w-3.5" /></TabsTrigger>
-                            <TabsTrigger value="stats"><BarChart3 className="h-3.5 w-3.5" /></TabsTrigger>
                         </TabsList>
 
 
@@ -936,51 +932,7 @@ export function CampaignDetail({ campaignId, subworkspaceId, onBack }: CampaignD
                             </div>
                         </TabsContent>
 
-                        {/* HISTORY TAB */}
-                        <TabsContent value="history">
-                            <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
-                                <div className="flex justify-between items-center mb-4">
-                                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
-                                        <HistoryIcon className="h-5 w-5 text-gray-500" />
-                                        Historial de Llamadas
-                                    </h3>
-                                    {userData?.role === 'superadmin' && (
-                                        <DataResetButton
-                                            type="campaign"
-                                            id={campaignId}
-                                            variant="outline"
-                                            className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20"
-                                        />
-                                    )}
-                                </div>
-                                <CallHistoryTable
-                                    initialCampaignId={campaignId}
-                                    subworkspaceId={activeSubworkspaceId}
-                                />
-                            </div>
-                        </TabsContent>
 
-                        {/* STATS TAB */}
-                        <TabsContent value="stats">
-                            <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
-                                <div className="flex justify-end mb-4">
-                                    {userData?.role === 'superadmin' && (
-                                        <DataResetButton
-                                            type="campaign"
-                                            id={campaignId}
-                                            variant="outline"
-                                            className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20"
-                                        />
-                                    )}
-                                </div>
-                                {/* Wrap Stats in explicit height if needed or just block */}
-                                <StatsDashboard
-                                    initialCampaignId={campaignId}
-                                    subworkspaceId={activeSubworkspaceId}
-                                    showWorkspaceSelector={false}
-                                />
-                            </div>
-                        </TabsContent>
                     </Tabs>
                 </div >
             </div >
