@@ -15,26 +15,30 @@ export async function POST(req: NextRequest) {
         console.log("[Consult FAQ] Full Body:", JSON.stringify(body, null, 2));
 
         // Support extraction from different locations (Direct, Retell wrapped, etc)
-        let { KB_id, agent_id } = body;
+        // User requested to use 'retell_agent_id' as the function parameter
+        let { retell_agent_id, agent_id, KB_id } = body;
 
         // Handle "Args Only = OFF" structure which might wrap args in .args or .arguments
-        if (!KB_id && !agent_id) {
+        if (!retell_agent_id && !agent_id && !KB_id) {
             if (body.args) {
-                KB_id = body.args.KB_id;
+                retell_agent_id = body.args.retell_agent_id;
                 agent_id = body.args.agent_id;
+                KB_id = body.args.KB_id;
             } else if (body.arguments) {
-                KB_id = body.arguments.KB_id;
+                retell_agent_id = body.arguments.retell_agent_id;
                 agent_id = body.arguments.agent_id;
+                KB_id = body.arguments.KB_id;
             }
         }
 
-        const searchId = KB_id || agent_id;
+        // Prioritize retell_agent_id as requested, fallbacks for backward compat
+        const searchId = retell_agent_id || agent_id || KB_id;
 
-        console.log(`[Consult FAQ] Extracted IDs -> KB_id: ${KB_id}, agent_id: ${agent_id}. Final Search Term: ${searchId}`);
+        console.log(`[Consult FAQ] Extracted ID -> Final Search Term: ${searchId}`);
 
         if (!searchId) {
-            console.warn("[Consult FAQ] Missing KB_id (or agent_id) in request body (checked root, .args, and .arguments)");
-            return NextResponse.json({ error: "Missing KB_id" }, { status: 400 });
+            console.warn("[Consult FAQ] Missing retell_agent_id in request body");
+            return NextResponse.json({ error: "Missing retell_agent_id" }, { status: 400 });
         }
 
         let docData: any = null;
