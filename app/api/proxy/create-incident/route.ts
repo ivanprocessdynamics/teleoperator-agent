@@ -28,46 +28,71 @@ export async function POST(req: NextRequest) {
             console.log(`[Create Incident] Pipeline: '${rawAddress}' -> AI: '${aiCleaned}' -> Google: '${finalAddress}'`);
         }
 
-        // 3. Preparar Payload para SatFlow (USANDO LA DIRECCIÓN CORREGIDA)
-        // Eliminamos 'address' si existe para no duplicar, y forzamos 'location'
-        const { address, location, ...restOfBody } = body;
+        // 3. Preparar Payload para SatFlow
+        // Eliminamos 'address' para no duplicar y 'status' para que se cree como pending por defecto
+        const { address, location, status, ...restOfBody } = body;
 
         const satflowPayload = {
             ...restOfBody,
-            location: finalAddress, // <--- AQUÍ VA LA CORREGIDA
+            location: finalAddress, // Usamos la dirección corregida
         };
 
-        // 4. Enviar a SatFlow
-        // (Asegúrate de usar tu URL y Headers correctos aquí)
+        // 4. Enviar a SatFlow (POST - Creará el incidente en PENDING)
         const satflowUrl = "https://us-central1-satflow-d3744.cloudfunctions.net/api/v1/incidents";
         const authHeader = req.headers.get('authorization');
+        const headers = {
+            'Content-Type': 'application/json',
+            ...(authHeader ? { 'Authorization': authHeader } : {})
+        };
 
         const apiResponse = await fetch(satflowUrl, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                ...(authHeader ? { 'Authorization': authHeader } : {})
-            },
+            headers: headers,
             body: JSON.stringify(satflowPayload)
         });
 
         const data = await apiResponse.json();
 
         if (!apiResponse.ok) {
-            console.error("[Create Incident] Error SatFlow:", data);
+            console.error("[Create Incident] Error SatFlow (POST):", data);
             return NextResponse.json(data, { status: apiResponse.status });
         }
 
-        // 5. RESPUESTA CRÍTICA A RETELL
-        // Debemos devolver la dirección corregida para que la IA actualice su contexto
+        const incidentId = data.id || data.data?.id || (data._id); // Intentar obtener ID de varios sitios posibles
+        let finalStatus = 'pending'; // Estado por defecto
+
+        // 5. SI EL ESTADO SOLICITADO ES 'RESOLVED', HACEMOS PATCH INMEDIATO
+        if (status === 'resolved' && incidentId) {
+            console.log(`[Create Incident] Status is 'resolved'. Patching incident ${incidentId}...`);
+            try {
+                const patchUrl = `${satflowUrl}/${incidentId}`;
+                const patchResponse = await fetch(patchUrl, {
+                    method: 'PATCH',
+                    headers: headers,
+                    body: JSON.stringify({ status: 'resolved' })
+                });
+
+                if (patchResponse.ok) {
+                    console.log(`[Create Incident] Successfully patched ${incidentId} to resolved.`);
+                    finalStatus = 'resolved';
+                } else {
+                    console.error(`[Create Incident] Failed to patch ${incidentId} to resolved.`, await patchResponse.text());
+                }
+            } catch (patchError) {
+                console.error(`[Create Incident] Exception patching incident:`, patchError);
+            }
+        }
+
+        // 6. RESPUESTA CRÍTICA A RETELL
         return NextResponse.json({
             success: true,
             data: {
-                ...data.data, // Los datos que devolvió SatFlow
-                location: finalAddress // FORZAMOS la dirección corregida por si SatFlow no la devolvió actualizada
+                ...data.data,
+                location: finalAddress,
+                status: finalStatus // Devolvemos el estado real (pending o resolved)
             },
-            validationDebug, // <--- EXPOSE DEBUG INFO HERE
-            message: "Incident created successfully"
+            validationDebug,
+            message: finalStatus === 'resolved' ? "Incident created and resolved successfully" : "Incident created successfully"
         });
 
     } catch (error: any) {
