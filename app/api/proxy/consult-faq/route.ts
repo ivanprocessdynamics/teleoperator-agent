@@ -12,7 +12,7 @@ export async function POST(req: NextRequest) {
         }
 
         const body = await req.json();
-        const { KB_id, agent_id } = body; // Aceptamos KB_id como principal, fallback a agent_id
+        const { KB_id, agent_id } = body;
         const searchId = KB_id || agent_id;
 
         console.log(`[Consult FAQ] Received request. KB_id: ${KB_id}, agent_id: ${agent_id} -> Searching for: ${searchId}`);
@@ -22,13 +22,13 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: "Missing KB_id" }, { status: 400 });
         }
 
+        let docData: any = null;
+
         // 1. Intentar buscar por campo 'retell_agent_id'
         let snapshot = await adminDb.collection('subworkspaces')
             .where('retell_agent_id', '==', searchId)
             .limit(1)
             .get();
-
-        let docData: any = null;
 
         if (!snapshot.empty) {
             docData = snapshot.docs[0].data();
@@ -36,13 +36,39 @@ export async function POST(req: NextRequest) {
         } else {
             // 2. Fallback: Intentar buscar por ID de documento
             console.log(`[Consult FAQ] Not found by retell_agent_id. Trying Document ID lookup for: ${searchId}`);
-            // NOTA: Si 'satflow' es un slug o un ID custom en otro campo, habría que buscar por ese campo. 
-            // Asumimos que si no es retell_agent_id, podría ser el ID del documento.
             const docRef = await adminDb.collection('subworkspaces').doc(searchId).get();
 
             if (docRef.exists) {
                 docData = docRef.data();
                 console.log(`[Consult FAQ] Found by Document ID: ${searchId}`);
+            }
+        }
+
+        if (!docData) {
+            // 3. Fallback: Intentar buscar por campo 'slug'
+            console.log(`[Consult FAQ] Trying 'slug' lookup for: ${searchId}`);
+            const slugSnapshot = await adminDb.collection('subworkspaces')
+                .where('slug', '==', searchId)
+                .limit(1)
+                .get();
+
+            if (!slugSnapshot.empty) {
+                docData = slugSnapshot.docs[0].data();
+                console.log(`[Consult FAQ] Found by slug.`);
+            }
+        }
+
+        if (!docData) {
+            // 4. Fallback: Intentar buscar por campo 'name'
+            console.log(`[Consult FAQ] Trying 'name' lookup for: ${searchId}`);
+            const nameSnapshot = await adminDb.collection('subworkspaces')
+                .where('name', '==', searchId)
+                .limit(1)
+                .get();
+
+            if (!nameSnapshot.empty) {
+                docData = nameSnapshot.docs[0].data();
+                console.log(`[Consult FAQ] Found by name.`);
             }
         }
 
