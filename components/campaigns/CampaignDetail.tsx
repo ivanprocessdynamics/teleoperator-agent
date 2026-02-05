@@ -748,256 +748,234 @@ export function CampaignDetail({ campaignId, subworkspaceId, onBack }: CampaignD
                     <Tabs defaultValue="prompt" className="w-full">
                         <TabsList className="grid w-full grid-cols-7 mb-4 bg-gray-100 dark:bg-gray-800">
                             <TabsTrigger value="prompt">Prompt</TabsTrigger>
-                            <TabsTrigger value="tools"><Database className="h-3.5 w-3.5" /></TabsTrigger>
-                            <TabsTrigger value="knowledge"><BookOpen className="h-3.5 w-3.5" /></TabsTrigger>
-                            <TabsTrigger value="analysis">Análisis</TabsTrigger>
-                            <TabsTrigger value="calling"><Phone className="h-3.5 w-3.5" /></TabsTrigger>
-                            <TabsTrigger value="history"><HistoryIcon className="h-3.5 w-3.5" /></TabsTrigger>
-                            <TabsTrigger value="stats"><BarChart3 className="h-3.5 w-3.5" /></TabsTrigger>
-                        </TabsList>
 
-                        <TabsContent value="tools">
-                            <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-10 flex flex-col items-center justify-center text-center min-h-[300px]">
-                                <div className="p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-full mb-4">
-                                    <Database className="h-8 w-8 text-yellow-600 dark:text-yellow-400" />
-                                </div>
-                                <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">Herramientas y APIs</h3>
-                                <p className="text-gray-500 max-w-sm">
-                                    Todavía no funciona, estoy en ello.
-                                </p>
-                            </div>
-                        </TabsContent>
 
-                        <TabsContent value="knowledge">
-                            <CampaignKnowledgeBase subworkspaceId={activeSubworkspaceId || null} />
-                        </TabsContent>
+                            <TabsContent value="prompt">
+                                <CampaignPrompt
+                                    prompt={campaign?.prompt_template || ""}
+                                    columns={campaign?.columns || []}
+                                    onChange={handlePromptChange}
+                                    onImmediateChange={(val) => latestPromptRef.current = val}
+                                    onSyncAgent={handleSyncPrompt}
+                                    variableClass={styles.variable}
+                                    campaignId={campaignId}
+                                    subworkspaceId={activeSubworkspaceId || ""}
+                                    isAgentLevel={false}
+                                />
+                            </TabsContent>
 
-                        <TabsContent value="prompt">
-                            <CampaignPrompt
-                                prompt={campaign?.prompt_template || ""}
-                                columns={campaign?.columns || []}
-                                onChange={handlePromptChange}
-                                onImmediateChange={(val) => latestPromptRef.current = val}
-                                onSyncAgent={handleSyncPrompt}
-                                variableClass={styles.variable}
-                                campaignId={campaignId}
-                                subworkspaceId={activeSubworkspaceId || ""}
-                                isAgentLevel={false}
-                            />
-                        </TabsContent>
+                            <TabsContent value="analysis">
+                                <CampaignAnalysis
+                                    config={campaign?.analysis_config || {
+                                        enable_transcription: true,
+                                        standard_fields: {
+                                            satisfaction_score: true, sentiment: true, summary: true, user_sentiment: true, call_successful: true
+                                        },
+                                        custom_fields: []
+                                    }}
+                                    onChange={handleUpdateAnalysis}
+                                    globalFields={globalFields}
+                                    onAddGlobalField={handleAddGlobalField}
+                                    onDeleteGlobalField={handleDeleteGlobalField}
+                                    importableAgents={importableAgents}
+                                />
+                            </TabsContent>
 
-                        <TabsContent value="analysis">
-                            <CampaignAnalysis
-                                config={campaign?.analysis_config || {
-                                    enable_transcription: true,
-                                    standard_fields: {
-                                        satisfaction_score: true, sentiment: true, summary: true, user_sentiment: true, call_successful: true
-                                    },
-                                    custom_fields: []
-                                }}
-                                onChange={handleUpdateAnalysis}
-                                globalFields={globalFields}
-                                onAddGlobalField={handleAddGlobalField}
-                                onDeleteGlobalField={handleDeleteGlobalField}
-                                importableAgents={importableAgents}
-                            />
-                        </TabsContent>
+                            <TabsContent value="calling">
+                                <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-5 space-y-6">
+                                    <div>
+                                        <h3 className="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-2 mb-4">
+                                            <Settings className="h-4 w-4" /> Configuración de Llamadas
+                                        </h3>
 
-                        <TabsContent value="calling">
-                            <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-5 space-y-6">
-                                <div>
-                                    <h3 className="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-2 mb-4">
-                                        <Settings className="h-4 w-4" /> Configuración de Llamadas
-                                    </h3>
+                                        <div className="space-y-4">
 
-                                    <div className="space-y-4">
+                                            {/* From Number */}
+                                            <div>
+                                                <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1.5">
+                                                    Número de Origen (E.164)
+                                                </label>
+                                                <div className="flex items-center gap-2">
+                                                    <Phone className="h-4 w-4 text-gray-400" />
+                                                    <Select
+                                                        value={campaign.calling_config?.from_number || ""}
+                                                        onValueChange={(value) => {
+                                                            const newConfig: CallingConfig = {
+                                                                ...campaign.calling_config!,
+                                                                from_number: value,
+                                                                concurrency_limit: campaign.calling_config?.concurrency_limit || 1,
+                                                                retry_failed: campaign.calling_config?.retry_failed || false
+                                                            };
+                                                            debouncedSave({ calling_config: newConfig });
+                                                        }}
+                                                    >
+                                                        <SelectTrigger className="flex-1 h-9 text-sm border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500">
+                                                            <SelectValue placeholder="Seleccionar número..." />
+                                                        </SelectTrigger>
+                                                        <SelectContent>
+                                                            {phoneNumbers.length > 0 ? (
+                                                                phoneNumbers.map((phone) => (
+                                                                    <SelectItem key={phone.phone_number} value={phone.phone_number}>
+                                                                        <div className="flex items-center gap-2">
+                                                                            <span>{phone.phone_number}</span>
+                                                                            {phone.nickname && (
+                                                                                <span className="text-gray-500 text-xs">({phone.nickname})</span>
+                                                                            )}
+                                                                        </div>
+                                                                    </SelectItem>
+                                                                ))
+                                                            ) : (
+                                                                <div className="p-2 text-sm text-gray-500 text-center">
+                                                                    No hay números disponibles
+                                                                </div>
+                                                            )}
+                                                        </SelectContent>
+                                                    </Select>
+                                                </div>
+                                                <p className="text-[10px] text-gray-400 mt-1">Número de Retell utilizado para realizar las llamadas.</p>
+                                            </div>
 
-                                        {/* From Number */}
-                                        <div>
-                                            <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1.5">
-                                                Número de Origen (E.164)
-                                            </label>
-                                            <div className="flex items-center gap-2">
-                                                <Phone className="h-4 w-4 text-gray-400" />
+                                            {/* Concurrency Limit */}
+                                            <div>
+                                                <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1.5">
+                                                    Llamadas Simultáneas
+                                                </label>
+                                                <div className="flex items-center gap-3">
+                                                    <input
+                                                        type="range"
+                                                        min="1"
+                                                        max="5"
+                                                        value={campaign.calling_config?.concurrency_limit || 1}
+                                                        onChange={(e) => {
+                                                            const newConfig: CallingConfig = {
+                                                                from_number: campaign.calling_config?.from_number || "+34877450708",
+                                                                concurrency_limit: parseInt(e.target.value),
+                                                                retry_failed: campaign.calling_config?.retry_failed || false
+                                                            };
+                                                            debouncedSave({ calling_config: newConfig });
+                                                        }}
+                                                        className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-700"
+                                                    />
+                                                    <span className="text-lg font-bold text-gray-900 dark:text-white w-8 text-center">
+                                                        {campaign.calling_config?.concurrency_limit || 1}
+                                                    </span>
+                                                </div>
+                                                <p className="text-[10px] text-gray-400 mt-1">Máximo de llamadas en paralelo (recomendado: 1-2)</p>
+                                            </div>
+
+
+
+                                            {/* Country Selector */}
+                                            <div className="pt-2 border-t border-gray-100 dark:border-gray-800">
+                                                <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1.5">
+                                                    País de los teléfonos
+                                                </label>
                                                 <Select
-                                                    value={campaign.calling_config?.from_number || ""}
+                                                    value={campaign.calling_config?.target_country_code || "+34"}
                                                     onValueChange={(value) => {
                                                         const newConfig: CallingConfig = {
                                                             ...campaign.calling_config!,
-                                                            from_number: value,
-                                                            concurrency_limit: campaign.calling_config?.concurrency_limit || 1,
-                                                            retry_failed: campaign.calling_config?.retry_failed || false
+                                                            target_country_code: value
                                                         };
                                                         debouncedSave({ calling_config: newConfig });
                                                     }}
                                                 >
-                                                    <SelectTrigger className="flex-1 h-9 text-sm border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500">
-                                                        <SelectValue placeholder="Seleccionar número..." />
+                                                    <SelectTrigger className="w-full">
+                                                        <SelectValue placeholder="Seleccionar país..." />
                                                     </SelectTrigger>
                                                     <SelectContent>
-                                                        {phoneNumbers.length > 0 ? (
-                                                            phoneNumbers.map((phone) => (
-                                                                <SelectItem key={phone.phone_number} value={phone.phone_number}>
-                                                                    <div className="flex items-center gap-2">
-                                                                        <span>{phone.phone_number}</span>
-                                                                        {phone.nickname && (
-                                                                            <span className="text-gray-500 text-xs">({phone.nickname})</span>
-                                                                        )}
-                                                                    </div>
-                                                                </SelectItem>
-                                                            ))
-                                                        ) : (
-                                                            <div className="p-2 text-sm text-gray-500 text-center">
-                                                                No hay números disponibles
-                                                            </div>
-                                                        )}
+                                                        <SelectGroup>
+                                                            <SelectLabel>Europa</SelectLabel>
+                                                            <SelectItem value="+34">🇪🇸 España (+34)</SelectItem>
+                                                            <SelectItem value="+44">🇬🇧 Reino Unido (+44)</SelectItem>
+                                                            <SelectItem value="+33">🇫🇷 Francia (+33)</SelectItem>
+                                                            <SelectItem value="+49">🇩🇪 Alemania (+49)</SelectItem>
+                                                            <SelectItem value="+39">🇮🇹 Italia (+39)</SelectItem>
+                                                        </SelectGroup>
+                                                        <SelectGroup>
+                                                            <SelectLabel>América</SelectLabel>
+                                                            <SelectItem value="+1">🇺🇸 Estados Unidos (+1)</SelectItem>
+                                                            <SelectItem value="+52">🇲🇽 México (+52)</SelectItem>
+                                                            <SelectItem value="+57">🇨🇴 Colombia (+57)</SelectItem>
+                                                            <SelectItem value="+54">🇦🇷 Argentina (+54)</SelectItem>
+                                                            <SelectItem value="+56">🇨🇱 Chile (+56)</SelectItem>
+                                                            <SelectItem value="+51">🇵🇪 Perú (+51)</SelectItem>
+                                                        </SelectGroup>
                                                     </SelectContent>
                                                 </Select>
+                                                <p className="text-[10px] text-gray-400 mt-1">
+                                                    <Globe className="inline h-3 w-3 mr-1" />
+                                                    Se usará para normalizar números sin prefijo (ej: 600... → +34600...)
+                                                </p>
                                             </div>
-                                            <p className="text-[10px] text-gray-400 mt-1">Número de Retell utilizado para realizar las llamadas.</p>
                                         </div>
+                                    </div>
 
-                                        {/* Concurrency Limit */}
-                                        <div>
-                                            <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1.5">
-                                                Llamadas Simultáneas
-                                            </label>
-                                            <div className="flex items-center gap-3">
-                                                <input
-                                                    type="range"
-                                                    min="1"
-                                                    max="5"
-                                                    value={campaign.calling_config?.concurrency_limit || 1}
-                                                    onChange={(e) => {
-                                                        const newConfig: CallingConfig = {
-                                                            from_number: campaign.calling_config?.from_number || "+34877450708",
-                                                            concurrency_limit: parseInt(e.target.value),
-                                                            retry_failed: campaign.calling_config?.retry_failed || false
-                                                        };
-                                                        debouncedSave({ calling_config: newConfig });
-                                                    }}
-                                                    className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-700"
-                                                />
-                                                <span className="text-lg font-bold text-gray-900 dark:text-white w-8 text-center">
-                                                    {campaign.calling_config?.concurrency_limit || 1}
-                                                </span>
+                                    {/* Danger Zone */}
+                                    <div className="border-t border-gray-200 dark:border-gray-800 pt-6 mt-6">
+                                        <h3 className="text-sm font-semibold text-red-600 dark:text-red-400 flex items-center gap-2 mb-4">
+                                            Zona de Peligro
+                                        </h3>
+                                        <div className="bg-red-50 dark:bg-red-900/10 rounded-lg p-4 flex items-center justify-between border border-red-100 dark:border-red-900/30">
+                                            <div className="mr-4">
+                                                <p className="text-sm font-medium text-red-900 dark:text-red-200">
+                                                    Restablecer datos de campaña
+                                                </p>
+                                                <p className="text-xs text-red-700 dark:text-red-300 mt-1">
+                                                    Elimina todo el historial de llamadas y estadísticas asociadas a esta campaña.
+                                                </p>
                                             </div>
-                                            <p className="text-[10px] text-gray-400 mt-1">Máximo de llamadas en paralelo (recomendado: 1-2)</p>
-                                        </div>
-
-
-
-                                        {/* Country Selector */}
-                                        <div className="pt-2 border-t border-gray-100 dark:border-gray-800">
-                                            <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1.5">
-                                                País de los teléfonos
-                                            </label>
-                                            <Select
-                                                value={campaign.calling_config?.target_country_code || "+34"}
-                                                onValueChange={(value) => {
-                                                    const newConfig: CallingConfig = {
-                                                        ...campaign.calling_config!,
-                                                        target_country_code: value
-                                                    };
-                                                    debouncedSave({ calling_config: newConfig });
-                                                }}
-                                            >
-                                                <SelectTrigger className="w-full">
-                                                    <SelectValue placeholder="Seleccionar país..." />
-                                                </SelectTrigger>
-                                                <SelectContent>
-                                                    <SelectGroup>
-                                                        <SelectLabel>Europa</SelectLabel>
-                                                        <SelectItem value="+34">🇪🇸 España (+34)</SelectItem>
-                                                        <SelectItem value="+44">🇬🇧 Reino Unido (+44)</SelectItem>
-                                                        <SelectItem value="+33">🇫🇷 Francia (+33)</SelectItem>
-                                                        <SelectItem value="+49">🇩🇪 Alemania (+49)</SelectItem>
-                                                        <SelectItem value="+39">🇮🇹 Italia (+39)</SelectItem>
-                                                    </SelectGroup>
-                                                    <SelectGroup>
-                                                        <SelectLabel>América</SelectLabel>
-                                                        <SelectItem value="+1">🇺🇸 Estados Unidos (+1)</SelectItem>
-                                                        <SelectItem value="+52">🇲🇽 México (+52)</SelectItem>
-                                                        <SelectItem value="+57">🇨🇴 Colombia (+57)</SelectItem>
-                                                        <SelectItem value="+54">🇦🇷 Argentina (+54)</SelectItem>
-                                                        <SelectItem value="+56">🇨🇱 Chile (+56)</SelectItem>
-                                                        <SelectItem value="+51">🇵🇪 Perú (+51)</SelectItem>
-                                                    </SelectGroup>
-                                                </SelectContent>
-                                            </Select>
-                                            <p className="text-[10px] text-gray-400 mt-1">
-                                                <Globe className="inline h-3 w-3 mr-1" />
-                                                Se usará para normalizar números sin prefijo (ej: 600... → +34600...)
-                                            </p>
+                                            <DataResetButton type="campaign" id={campaignId} />
                                         </div>
                                     </div>
                                 </div>
+                            </TabsContent>
 
-                                {/* Danger Zone */}
-                                <div className="border-t border-gray-200 dark:border-gray-800 pt-6 mt-6">
-                                    <h3 className="text-sm font-semibold text-red-600 dark:text-red-400 flex items-center gap-2 mb-4">
-                                        Zona de Peligro
-                                    </h3>
-                                    <div className="bg-red-50 dark:bg-red-900/10 rounded-lg p-4 flex items-center justify-between border border-red-100 dark:border-red-900/30">
-                                        <div className="mr-4">
-                                            <p className="text-sm font-medium text-red-900 dark:text-red-200">
-                                                Restablecer datos de campaña
-                                            </p>
-                                            <p className="text-xs text-red-700 dark:text-red-300 mt-1">
-                                                Elimina todo el historial de llamadas y estadísticas asociadas a esta campaña.
-                                            </p>
-                                        </div>
-                                        <DataResetButton type="campaign" id={campaignId} />
+                            {/* HISTORY TAB */}
+                            <TabsContent value="history">
+                                <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
+                                    <div className="flex justify-between items-center mb-4">
+                                        <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                                            <HistoryIcon className="h-5 w-5 text-gray-500" />
+                                            Historial de Llamadas
+                                        </h3>
+                                        {userData?.role === 'superadmin' && (
+                                            <DataResetButton
+                                                type="campaign"
+                                                id={campaignId}
+                                                variant="outline"
+                                                className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20"
+                                            />
+                                        )}
                                     </div>
+                                    <CallHistoryTable
+                                        initialCampaignId={campaignId}
+                                        subworkspaceId={activeSubworkspaceId}
+                                    />
                                 </div>
-                            </div>
-                        </TabsContent>
+                            </TabsContent>
 
-                        {/* HISTORY TAB */}
-                        <TabsContent value="history">
-                            <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
-                                <div className="flex justify-between items-center mb-4">
-                                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
-                                        <HistoryIcon className="h-5 w-5 text-gray-500" />
-                                        Historial de Llamadas
-                                    </h3>
-                                    {userData?.role === 'superadmin' && (
-                                        <DataResetButton
-                                            type="campaign"
-                                            id={campaignId}
-                                            variant="outline"
-                                            className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20"
-                                        />
-                                    )}
+                            {/* STATS TAB */}
+                            <TabsContent value="stats">
+                                <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
+                                    <div className="flex justify-end mb-4">
+                                        {userData?.role === 'superadmin' && (
+                                            <DataResetButton
+                                                type="campaign"
+                                                id={campaignId}
+                                                variant="outline"
+                                                className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20"
+                                            />
+                                        )}
+                                    </div>
+                                    {/* Wrap Stats in explicit height if needed or just block */}
+                                    <StatsDashboard
+                                        initialCampaignId={campaignId}
+                                        subworkspaceId={activeSubworkspaceId}
+                                        showWorkspaceSelector={false}
+                                    />
                                 </div>
-                                <CallHistoryTable
-                                    initialCampaignId={campaignId}
-                                    subworkspaceId={activeSubworkspaceId}
-                                />
-                            </div>
-                        </TabsContent>
-
-                        {/* STATS TAB */}
-                        <TabsContent value="stats">
-                            <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
-                                <div className="flex justify-end mb-4">
-                                    {userData?.role === 'superadmin' && (
-                                        <DataResetButton
-                                            type="campaign"
-                                            id={campaignId}
-                                            variant="outline"
-                                            className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20"
-                                        />
-                                    )}
-                                </div>
-                                {/* Wrap Stats in explicit height if needed or just block */}
-                                <StatsDashboard
-                                    initialCampaignId={campaignId}
-                                    subworkspaceId={activeSubworkspaceId}
-                                    showWorkspaceSelector={false}
-                                />
-                            </div>
-                        </TabsContent>
+                            </TabsContent>
                     </Tabs>
                 </div >
             </div >

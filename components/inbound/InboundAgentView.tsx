@@ -112,12 +112,7 @@ export function InboundAgentView({ subworkspaceId, agentId }: InboundAgentViewPr
                         >
                             <Settings2 className="h-4 w-4" /> Configuración
                         </TabsTrigger>
-                        <TabsTrigger
-                            value="tools"
-                            className="gap-2 text-gray-900 dark:text-gray-300 data-[state=active]:bg-white dark:data-[state=active]:bg-gray-700 data-[state=active]:text-gray-900 dark:data-[state=active]:text-white data-[state=active]:shadow-sm transition-all"
-                        >
-                            <Database className="h-4 w-4" /> Herramientas
-                        </TabsTrigger>
+
                         <TabsTrigger
                             value="knowledge"
                             className="gap-2 text-gray-900 dark:text-gray-300 data-[state=active]:bg-white dark:data-[state=active]:bg-gray-700 data-[state=active]:text-gray-900 dark:data-[state=active]:text-white data-[state=active]:shadow-sm transition-all"
@@ -228,17 +223,7 @@ export function InboundAgentView({ subworkspaceId, agentId }: InboundAgentViewPr
                     </div>
                 </TabsContent>
 
-                <TabsContent value="tools" forceMount className="mt-0 data-[state=inactive]:hidden text-gray-900 dark:text-gray-100">
-                    <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-800 p-10 flex flex-col items-center justify-center text-center min-h-[300px]">
-                        <div className="p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-full mb-4">
-                            <Database className="h-8 w-8 text-yellow-600 dark:text-yellow-400" />
-                        </div>
-                        <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">Herramientas y APIs</h3>
-                        <p className="text-gray-500 max-w-sm">
-                            Todavía no funciona, estoy en ello.
-                        </p>
-                    </div>
-                </TabsContent>
+
 
                 {/* KNOWLEDGE BASE TAB */}
                 <TabsContent value="knowledge" forceMount className="mt-0 data-[state=inactive]:hidden text-gray-900 dark:text-gray-100">
