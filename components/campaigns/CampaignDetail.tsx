@@ -12,6 +12,7 @@ import { CampaignPrompt } from "./CampaignPrompt";
 import { CampaignAnalysis } from "./CampaignAnalysis";
 import { AgentToolsConfig } from "@/components/tools/AgentToolsConfig";
 import { AgentTool } from "@/types/tools";
+import { CampaignKnowledgeBase } from "./CampaignKnowledgeBase";
 import { DataResetButton } from "@/components/common/DataResetButton";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -768,15 +769,7 @@ export function CampaignDetail({ campaignId, subworkspaceId, onBack }: CampaignD
                         </TabsContent>
 
                         <TabsContent value="knowledge">
-                            <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-10 flex flex-col items-center justify-center text-center min-h-[300px]">
-                                <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-full mb-4">
-                                    <BookOpen className="h-8 w-8 text-purple-600 dark:text-purple-400" />
-                                </div>
-                                <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">Base de Conocimiento</h3>
-                                <p className="text-gray-500 max-w-sm">
-                                    Todavía no funciona, estoy en ello.
-                                </p>
-                            </div>
+                            <CampaignKnowledgeBase subworkspaceId={activeSubworkspaceId || null} />
                         </TabsContent>
 
                         <TabsContent value="prompt">
