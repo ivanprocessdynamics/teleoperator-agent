@@ -12,13 +12,28 @@ export async function POST(req: NextRequest) {
         }
 
         const body = await req.json();
-        const { KB_id, agent_id } = body;
+        console.log("[Consult FAQ] Full Body:", JSON.stringify(body, null, 2));
+
+        // Support extraction from different locations (Direct, Retell wrapped, etc)
+        let { KB_id, agent_id } = body;
+
+        // Handle "Args Only = OFF" structure which might wrap args in .args or .arguments
+        if (!KB_id && !agent_id) {
+            if (body.args) {
+                KB_id = body.args.KB_id;
+                agent_id = body.args.agent_id;
+            } else if (body.arguments) {
+                KB_id = body.arguments.KB_id;
+                agent_id = body.arguments.agent_id;
+            }
+        }
+
         const searchId = KB_id || agent_id;
 
-        console.log(`[Consult FAQ] Received request. KB_id: ${KB_id}, agent_id: ${agent_id} -> Searching for: ${searchId}`);
+        console.log(`[Consult FAQ] Extracted IDs -> KB_id: ${KB_id}, agent_id: ${agent_id}. Final Search Term: ${searchId}`);
 
         if (!searchId) {
-            console.warn("[Consult FAQ] Missing KB_id (or agent_id) in request body");
+            console.warn("[Consult FAQ] Missing KB_id (or agent_id) in request body (checked root, .args, and .arguments)");
             return NextResponse.json({ error: "Missing KB_id" }, { status: 400 });
         }
 
