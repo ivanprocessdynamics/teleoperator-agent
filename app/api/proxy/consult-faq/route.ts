@@ -12,19 +12,19 @@ export async function POST(req: NextRequest) {
         }
 
         const body = await req.json();
-        const { agent_id } = body;
+        const { KB_id, agent_id } = body; // Aceptamos KB_id como principal, fallback a agent_id
+        const searchId = KB_id || agent_id;
 
-        console.log(`[Consult FAQ] Received request for agent_id: ${agent_id}`);
+        console.log(`[Consult FAQ] Received request. KB_id: ${KB_id}, agent_id: ${agent_id} -> Searching for: ${searchId}`);
 
-        if (!agent_id) {
-            console.warn("[Consult FAQ] Missing agent_id in request body");
-            // Según requerimiento: si es desconocido (o no viene), error.
-            return NextResponse.json({ error: "Missing agent_id" }, { status: 400 });
+        if (!searchId) {
+            console.warn("[Consult FAQ] Missing KB_id (or agent_id) in request body");
+            return NextResponse.json({ error: "Missing KB_id" }, { status: 400 });
         }
 
-        // 1. Intentar buscar por campo 'retell_agent_id' (para ID de Retell auténtico)
+        // 1. Intentar buscar por campo 'retell_agent_id'
         let snapshot = await adminDb.collection('subworkspaces')
-            .where('retell_agent_id', '==', agent_id)
+            .where('retell_agent_id', '==', searchId)
             .limit(1)
             .get();
 
@@ -32,36 +32,36 @@ export async function POST(req: NextRequest) {
 
         if (!snapshot.empty) {
             docData = snapshot.docs[0].data();
-            console.log(`[Consult FAQ] Found by retell_agent_id.`);
+            console.log(`[Consult FAQ] Found by retell_agent_id: ${searchId}`);
         } else {
-            // 2. Fallback: Intentar buscar por ID de documento (por si están usando ID interno o custom como 'satflow')
-            console.log(`[Consult FAQ] Not found by retell_agent_id. Trying Document ID lookup for: ${agent_id}`);
-            const docRef = await adminDb.collection('subworkspaces').doc(agent_id).get();
+            // 2. Fallback: Intentar buscar por ID de documento
+            console.log(`[Consult FAQ] Not found by retell_agent_id. Trying Document ID lookup for: ${searchId}`);
+            // NOTA: Si 'satflow' es un slug o un ID custom en otro campo, habría que buscar por ese campo. 
+            // Asumimos que si no es retell_agent_id, podría ser el ID del documento.
+            const docRef = await adminDb.collection('subworkspaces').doc(searchId).get();
 
             if (docRef.exists) {
                 docData = docRef.data();
-                console.log(`[Consult FAQ] Found by valid Document ID.`);
+                console.log(`[Consult FAQ] Found by Document ID: ${searchId}`);
             }
         }
 
         if (!docData) {
-            console.warn(`[Consult FAQ] Agent ID '${agent_id}' not found in subworkspaces (neither as field nor ID).`);
-            // Requerimiento explícito: devolver 404 si es desconocido
-            return NextResponse.json({ error: "Agent not found" }, { status: 404 });
+            console.warn(`[Consult FAQ] ID '${searchId}' not found in subworkspaces.`);
+            return NextResponse.json({ error: "ID not found" }, { status: 404 });
         }
 
         const content = docData.knowledge_base;
 
         if (!content) {
-            console.log(`[Consult FAQ] Agent '${agent_id}' found, but has no knowledge_base content.`);
-            // Devolvemos info vacía o un mensaje por defecto, pero con success true porque el agente existe
+            console.log(`[Consult FAQ] Agent/Workspace found, but has no knowledge_base content.`);
             return NextResponse.json({
                 success: true,
-                info: "No hay información adicional configurada para este agente."
+                info: "No hay información adicional configurada."
             });
         }
 
-        console.log(`[Consult FAQ] Serving content for '${agent_id}' (${content.length} chars)`);
+        console.log(`[Consult FAQ] Serving content (${content.length} chars)`);
 
         return NextResponse.json({
             success: true,
