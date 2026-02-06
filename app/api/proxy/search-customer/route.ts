@@ -1,3 +1,4 @@
+
 import { NextRequest, NextResponse } from 'next/server';
 
 export async function POST(req: NextRequest) {
@@ -12,26 +13,42 @@ export async function POST(req: NextRequest) {
 
         // VARIABLES DE BÚSQUEDA
         const bodyPhone = body.phone;
-        const bodyName = body.name; // <--- Nuevo campo
+        const bodyName = body.name;
+        // 1. PRIORIDAD ABSOLUTA AL HEADER (Caller ID)
         const headerPhone = req.headers.get('x-user-number');
 
         console.log(`[Search Proxy] Inputs -> Name: '${bodyName}', BodyPhone: '${bodyPhone}', HeaderPhone: '${headerPhone}'`);
 
         const satflowUrl = new URL("https://us-central1-satflow-d3744.cloudfunctions.net/api/v1/customers/search");
 
-        // LÓGICA DE PRIORIDAD:
-        // 1. Si la IA nos manda un NOMBRE, buscamos por nombre (prioridad manual).
-        // 2. Si la IA nos manda un TELÉFONO, buscamos por ese teléfono (prioridad manual).
-        // 3. Si la IA no manda nada, usamos el TELÉFONO DEL LLAMANTE (automático).
+        let searchPhone = bodyPhone;
+
+        // LÓGICA DE PRIORIDAD CORREGIDA:
+        // Si hay headerPhone y es válido (no UNREGISTERED/null), tiene preferencia si el bodyPhone es null/UNREGISTERED
+        // O simplemente, si hay headerPhone, usémoslo como fuente confiable si bodyPhone falla.
+        // Pero el requerimiento dice: "Si body.phone viene vacío (null) PERO existe x-user-number -> EJECUTA la búsqueda usando el número del header."
+
+        // Vamos a definir 'finalPhone' como la fuente de verdad para teléfono.
+        // Asumimos que x-user-number es lo más fiable si está disponible.
+        // Pero si el usuario manual (IA) pasó un nombre, buscamos nombre.
+
+        if (headerPhone && headerPhone !== 'UNREGISTERED' && headerPhone !== 'null') {
+            // Si el body está vacío o es unregistered, usamos header.
+            if (!bodyPhone || bodyPhone === 'UNREGISTERED' || bodyPhone === 'null') {
+                searchPhone = headerPhone;
+            }
+        }
+
+        // DEPURACIÓN
+        console.log(`[Search Proxy] Resolved Search Phone: '${searchPhone}'`);
 
         if (bodyName) {
             satflowUrl.searchParams.set("name", bodyName);
-        } else if (bodyPhone) {
-            satflowUrl.searchParams.set("phone", bodyPhone);
-        } else if (headerPhone) {
-            satflowUrl.searchParams.set("phone", headerPhone);
+        } else if (searchPhone && searchPhone !== 'UNREGISTERED' && searchPhone !== 'null') {
+            satflowUrl.searchParams.set("phone", searchPhone);
         } else {
-            return NextResponse.json({ error: "No search criteria provided" }, { status: 400 });
+            console.log("[Search Proxy] No valid criteria found (Phone is null/UNREGISTERED and Name is empty). Returning found: false.");
+            return NextResponse.json({ found: false });
         }
 
         console.log(`[Search Proxy] URL Generada: ${satflowUrl.toString()}`);
