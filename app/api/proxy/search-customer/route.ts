@@ -2,6 +2,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 export async function POST(req: NextRequest) {
+    // Objeto para acumular trazas de depuración y devolverlas en el JSON
+    const debugTrace: any = {
+        step: 'init',
+        sources: {}
+    };
+
     try {
         let body: any = {};
         try {
@@ -9,6 +15,7 @@ export async function POST(req: NextRequest) {
             if (rawBody) body = JSON.parse(rawBody);
         } catch (e) {
             console.log("[Search Proxy] Body vacío o inválido");
+            debugTrace.bodyError = "Empty or invalid JSON body";
         }
 
         console.log("[Search Proxy] Full Body / Headers Debug:", {
@@ -21,36 +28,53 @@ export async function POST(req: NextRequest) {
         const retellFromNumber = body.call?.from_number || body.from_number;
         const argsPhone = body.phone || body.args?.phone || body.arguments?.phone;
 
+        debugTrace.sources = {
+            header: headerPhone,
+            metadata: retellFromNumber,
+            args: argsPhone
+        };
+
         let searchPhone = headerPhone;
+        let phoneSource = 'header';
 
         if (!searchPhone || searchPhone === 'UNREGISTERED' || searchPhone === 'null') {
             searchPhone = retellFromNumber;
+            phoneSource = 'metadata';
         }
 
         if (!searchPhone || searchPhone === 'UNREGISTERED' || searchPhone === 'null') {
             searchPhone = argsPhone;
+            phoneSource = 'args';
         }
 
         if (searchPhone === 'null' || searchPhone === 'undefined') searchPhone = null;
 
         const bodyName = body.name || body.args?.name || body.arguments?.name;
 
-        // --- LOG 1: Teléfono Final ---
-        console.log(`[Search Proxy] 🔎 FINAL PHONE TO USE: '${searchPhone}' (Source Header: '${headerPhone}', Meta: '${retellFromNumber}', Args: '${argsPhone}')`);
+        debugTrace.finalPhone = searchPhone;
+        debugTrace.phoneSource = phoneSource;
+        debugTrace.finalName = bodyName;
+
+        console.log(`[Search Proxy] 🔎 FINAL PHONE TO USE: '${searchPhone}' (Source ${phoneSource})`);
 
         const satflowUrl = new URL("https://us-central1-satflow-d3744.cloudfunctions.net/api/v1/customers/search");
 
         if (bodyName && bodyName.length > 2) {
             satflowUrl.searchParams.set("name", bodyName);
+            debugTrace.searchCriteria = 'name';
         } else if (searchPhone && searchPhone.length > 5) {
             satflowUrl.searchParams.set("phone", searchPhone);
+            debugTrace.searchCriteria = 'phone';
         } else {
             console.log("[Search Proxy] ⚠️ No valid search criteria found.");
-            return NextResponse.json({ found: false });
+            return NextResponse.json({
+                found: false,
+                _debug: debugTrace // Devolvemos el debug para que el usuario lo vea en Retell
+            });
         }
 
-        // --- LOG 2: URL Completa ---
         console.log(`[Search Proxy] 🚀 CALLING SATFLOW URL: ${satflowUrl.toString()}`);
+        debugTrace.satflowUrl = satflowUrl.toString();
 
         const authHeader = req.headers.get('authorization');
         const apiResponse = await fetch(satflowUrl.toString(), {
@@ -63,16 +87,21 @@ export async function POST(req: NextRequest) {
 
         const data = await apiResponse.json();
 
-        // --- LOG 3: Respuesta SatFlow ---
+        debugTrace.satflowStatus = apiResponse.status;
+        // debugTrace.satflowBody = data; // Opcional: comentar si es muy grande
+
         console.log(`[Search Proxy] 📥 SATFLOW RESPONSE Status: ${apiResponse.status}`);
-        console.log(`[Search Proxy] 📦 SATFLOW BODY:`, JSON.stringify(data, null, 2));
 
         if (!apiResponse.ok) {
             console.warn(`[Search Proxy] SatFlow Error ${apiResponse.status}`);
-            return NextResponse.json({ found: false }, { status: apiResponse.status });
+            return NextResponse.json({
+                found: false,
+                _debug: debugTrace
+            }, { status: apiResponse.status });
         }
 
         const customers = data.data || [];
+        debugTrace.resultsCount = customers.length;
 
         if (customers.length > 0) {
             const client = customers[0];
@@ -86,16 +115,23 @@ export async function POST(req: NextRequest) {
                 name: client.fullName || client.name,
                 address: fullAddress,
                 city: client.city,
-                email: client.email
+                email: client.email,
+                _debug: debugTrace // Debug info included
             });
         } else {
             console.log(`[Search Proxy] ❌ CLIENT NOT FOUND (Empty array returned)`);
-            return NextResponse.json({ found: false });
+            return NextResponse.json({
+                found: false,
+                _debug: debugTrace
+            });
         }
 
     } catch (error: any) {
-        // --- LOG 4: Error Catch ---
         console.error("[Search Proxy] 🔥 INTERNAL ERROR:", error);
-        return NextResponse.json({ error: "Internal Error" }, { status: 500 });
+        return NextResponse.json({
+            error: "Internal Error",
+            details: String(error),
+            _debug: debugTrace
+        }, { status: 500 });
     }
 }
