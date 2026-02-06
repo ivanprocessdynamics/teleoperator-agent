@@ -49,27 +49,45 @@ export async function POST(req: NextRequest) {
 
         if (searchPhone === 'null' || searchPhone === 'undefined') searchPhone = null;
 
-        const bodyName = body.name || body.args?.name || body.arguments?.name;
+        let bodyName = body.name || body.args?.name || body.arguments?.name;
+
+        // --- FIX CRÍTICO: Limpieza de Nombre "Basura" ---
+        // A veces llega "search_customer" o "null" como nombre. Lo ignoramos.
+        if (bodyName) {
+            const lowerName = bodyName.toLowerCase().trim();
+            const invalidNames = ['search_customer', 'search_client', 'buscar_cliente', 'null', 'undefined', 'string'];
+            if (invalidNames.includes(lowerName) || lowerName.length < 3) {
+                console.warn(`[Search Proxy] 🚮 Ignoring valid-looking garbage name: '${bodyName}'`);
+                bodyName = null;
+            }
+        }
 
         debugTrace.finalPhone = searchPhone;
         debugTrace.phoneSource = phoneSource;
-        debugTrace.finalName = bodyName;
+        debugTrace.finalName = bodyName; // Puede ser null ahora si se limpió
 
         console.log(`[Search Proxy] 🔎 FINAL PHONE TO USE: '${searchPhone}' (Source ${phoneSource})`);
 
         const satflowUrl = new URL("https://us-central1-satflow-d3744.cloudfunctions.net/api/v1/customers/search");
 
-        if (bodyName && bodyName.length > 2) {
-            satflowUrl.searchParams.set("name", bodyName);
-            debugTrace.searchCriteria = 'name';
-        } else if (searchPhone && searchPhone.length > 5) {
+        // LÓGICA DE PRIORIDAD CORREGIDA: 
+        // Si tenemos un teléfono válido (del header/meta), SIEMPRE intentamos buscar por teléfono primero 
+        // porque es un identificador único. Solo buscamos por nombre si NO hay teléfono o si el nombre es muy explícito.
+
+        // CASO 1: Hay teléfono -> Buscar por Teléfono (Prioridad Real)
+        if (searchPhone && searchPhone.length > 5) {
             satflowUrl.searchParams.set("phone", searchPhone);
             debugTrace.searchCriteria = 'phone';
+        }
+        // CASO 2: Solo hay nombre -> Buscar por Nombre
+        else if (bodyName && bodyName.length > 2) {
+            satflowUrl.searchParams.set("name", bodyName);
+            debugTrace.searchCriteria = 'name';
         } else {
             console.log("[Search Proxy] ⚠️ No valid search criteria found.");
             return NextResponse.json({
                 found: false,
-                _debug: debugTrace // Devolvemos el debug para que el usuario lo vea en Retell
+                _debug: debugTrace
             });
         }
 
