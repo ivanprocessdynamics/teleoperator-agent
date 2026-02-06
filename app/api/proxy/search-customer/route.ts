@@ -11,47 +11,56 @@ export async function POST(req: NextRequest) {
             console.log("[Search Proxy] Body vacío o inválido");
         }
 
-        // VARIABLES DE BÚSQUEDA
-        const bodyPhone = body.phone;
-        const bodyName = body.name;
-        // 1. PRIORIDAD ABSOLUTA AL HEADER (Caller ID)
+        console.log("[Search Proxy] Full Body / Headers Debug:", {
+            headers: Object.fromEntries(req.headers),
+            bodyKeys: Object.keys(body),
+            // No logueamos todo el body por privacidad/ruido, pero sí claves
+        });
+
+        // ESTRATEGIA SUPRA-ROBUSTA DE EXTRACCIÓN DE TELÉFONO
+        // 1. Header (configurado explícitamente)
         const headerPhone = req.headers.get('x-user-number');
 
-        console.log(`[Search Proxy] Inputs -> Name: '${bodyName}', BodyPhone: '${bodyPhone}', HeaderPhone: '${headerPhone}'`);
+        // 2. Metadatos de Retell (si Args Only = OFF)
+        // Retell suele enviar: { args: {...}, call: { from_number: "..." } }
+        const retellFromNumber = body.call?.from_number || body.from_number;
 
-        const satflowUrl = new URL("https://us-central1-satflow-d3744.cloudfunctions.net/api/v1/customers/search");
+        // 3. Argumentos de la función (si la IA lo adivinó)
+        const argsPhone = body.phone || body.args?.phone || body.arguments?.phone;
 
-        let searchPhone = bodyPhone;
+        // SELECCIÓN DEL TELÉFONO REAL
+        // Prioridad: Header > Retell Metadata > IA Args
+        let searchPhone = headerPhone;
 
-        // LÓGICA DE PRIORIDAD CORREGIDA:
-        // Si hay headerPhone y es válido (no UNREGISTERED/null), tiene preferencia si el bodyPhone es null/UNREGISTERED
-        // O simplemente, si hay headerPhone, usémoslo como fuente confiable si bodyPhone falla.
-        // Pero el requerimiento dice: "Si body.phone viene vacío (null) PERO existe x-user-number -> EJECUTA la búsqueda usando el número del header."
-
-        // Vamos a definir 'finalPhone' como la fuente de verdad para teléfono.
-        // Asumimos que x-user-number es lo más fiable si está disponible.
-        // Pero si el usuario manual (IA) pasó un nombre, buscamos nombre.
-
-        if (headerPhone && headerPhone !== 'UNREGISTERED' && headerPhone !== 'null') {
-            // Si el body está vacío o es unregistered, usamos header.
-            if (!bodyPhone || bodyPhone === 'UNREGISTERED' || bodyPhone === 'null') {
-                searchPhone = headerPhone;
-            }
+        if (!searchPhone || searchPhone === 'UNREGISTERED' || searchPhone === 'null') {
+            searchPhone = retellFromNumber;
         }
 
-        // DEPURACIÓN
-        console.log(`[Search Proxy] Resolved Search Phone: '${searchPhone}'`);
+        if (!searchPhone || searchPhone === 'UNREGISTERED' || searchPhone === 'null') {
+            searchPhone = argsPhone;
+        }
 
-        if (bodyName) {
+        // Limpieza final
+        if (searchPhone === 'null' || searchPhone === 'undefined') searchPhone = null;
+
+        const bodyName = body.name || body.args?.name || body.arguments?.name;
+
+        console.log(`[Search Proxy] Extraction Result -> Header: '${headerPhone}', RetellMeta: '${retellFromNumber}', AIArgs: '${argsPhone}' => FINAL USED: '${searchPhone}'`);
+
+        // CONSTRUCCIÓN DE LA LLAMADA A SATFLOW
+        const satflowUrl = new URL("https://us-central1-satflow-d3744.cloudfunctions.net/api/v1/customers/search");
+
+        if (bodyName && bodyName.length > 2) {
             satflowUrl.searchParams.set("name", bodyName);
-        } else if (searchPhone && searchPhone !== 'UNREGISTERED' && searchPhone !== 'null') {
+        } else if (searchPhone && searchPhone.length > 5) { // Mínimo de longitud para no buscar mierda
             satflowUrl.searchParams.set("phone", searchPhone);
         } else {
-            console.log("[Search Proxy] No valid criteria found (Phone is null/UNREGISTERED and Name is empty). Returning found: false.");
+            console.log("[Search Proxy] ⚠️ No valid search criteria found.");
+            // Si no hay nada, devolvemos success:false pero sin error 500 para no romper el flujo
             return NextResponse.json({ found: false });
         }
 
-        console.log(`[Search Proxy] URL Generada: ${satflowUrl.toString()}`);
+        console.log(`[Search Proxy] Buscando en SatFlow: ${satflowUrl.toString()}`);
 
         const authHeader = req.headers.get('authorization');
         const apiResponse = await fetch(satflowUrl.toString(), {
@@ -63,6 +72,7 @@ export async function POST(req: NextRequest) {
         });
 
         if (!apiResponse.ok) {
+            console.warn(`[Search Proxy] SatFlow Error ${apiResponse.status}`);
             return NextResponse.json({ found: false }, { status: apiResponse.status });
         }
 
@@ -70,7 +80,7 @@ export async function POST(req: NextRequest) {
         const customers = data.data || [];
 
         if (customers.length > 0) {
-            const client = customers[0]; // Cogemos el primero que coincida
+            const client = customers[0];
             const fullAddress = `${client.street || ''}, ${client.city || ''}`.replace(/^, |, $/g, '');
 
             return NextResponse.json({

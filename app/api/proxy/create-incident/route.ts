@@ -9,30 +9,40 @@ export async function POST(req: NextRequest) {
         console.log("[Create Incident] Body recibido:", body);
 
         // --- 1. GESTIÓN DE FECHA y HORA (Robustez Extrema) ---
-        // Fecha: Si no hay, HOY.
         const finalDate = body.scheduledDate || new Date().toISOString().split('T')[0];
-
-        // Hora: Si no hay, 09:00.
         const finalTime = body.scheduledTime || "09:00";
 
-        // --- 2. GESTIÓN DE TELÉFONO (Robustez Extrema) ---
+        // --- 2. GESTIÓN DE TELÉFONO (SUPRA-ROBUSTA) ---
+        // 1. Header X (Prioridad alta manual)
         const headerPhone = req.headers.get('x-user-number');
-        const bodyPhone = body.contactPhone || body.phone;
 
-        let finalPhone = headerPhone || bodyPhone;
+        // 2. Metadatos Retell (si Args Only = OFF)
+        const retellFromNumber = body.call?.from_number || body.from_number;
 
-        // Limpieza básica: si llega como string "null", "undefined" o "UNREGISTERED", lo tratamos como vacío
+        // 3. Argumentos IA
+        const argsPhone = body.contactPhone || body.phone;
+
+        let finalPhone = headerPhone;
+
+        if (!finalPhone || finalPhone === 'UNREGISTERED' || finalPhone === 'null') {
+            finalPhone = retellFromNumber;
+        }
+        if (!finalPhone || finalPhone === 'UNREGISTERED' || finalPhone === 'null') {
+            finalPhone = argsPhone;
+        }
+
+        // Limpieza final
         if (finalPhone === 'null' || finalPhone === 'undefined' || finalPhone === 'UNREGISTERED') {
             finalPhone = null;
         }
 
-        // FALLBACK FINAL: Si tras todo esto no hay teléfono, usamos dummy para pasar la validación
+        // FALLBACK DUMMY (Si falla todo, evitar 400)
         if (!finalPhone || finalPhone.trim() === "") {
-            console.warn("[Create Incident] ⚠️ NO phone detected (Header/Body empty). Using fallback '000000000' to pass validation.");
+            console.warn("[Create Incident] ⚠️ NO phone detected (Header/Body/Meta empty). Using fallback '000000000'.");
             finalPhone = "000000000";
         }
 
-        console.log(`[Create Incident] Inputs -> Header: ${headerPhone}, Body: ${bodyPhone}`);
+        console.log(`[Create Incident] Inputs -> Header: ${headerPhone}, RetellMeta: ${retellFromNumber}, Args: ${argsPhone}`);
         console.log(`[Create Incident] Final Sanitized -> Phone: ${finalPhone}, Date: ${finalDate}, Time: ${finalTime}`);
 
         // --- 3. GESTIÓN DE DIRECCIÓN ---
@@ -62,8 +72,7 @@ export async function POST(req: NextRequest) {
             ...(authHeader ? { 'Authorization': authHeader } : {})
         };
 
-        // Si clientId es "UNREGISTERED" (o null/empty), PERO tenemos un teléfono válido (y no es el dummy total),
-        // intentamos crear el lead/cliente primero para obtener un ID válido.
+        // Si clientId es "UNREGISTERED", intenta crear Lead con el teléfono detectado
         if ((!clientId || clientId === 'UNREGISTERED') && finalPhone !== "000000000") {
             console.log(`[Create Incident] Client ID is missing/unregistered. Attempting to create Lead for ${finalPhone}...`);
             try {
@@ -71,10 +80,9 @@ export async function POST(req: NextRequest) {
                     method: 'POST',
                     headers: headers,
                     body: JSON.stringify({
-                        name: body.clientName || "Cliente Web/Voces", // Default name if missing
+                        name: body.clientName || "Cliente Web/Voces",
                         phone: finalPhone,
                         address: finalAddress,
-                        // Añadir más campos si SatFlow los requiere
                     })
                 });
 
@@ -94,7 +102,6 @@ export async function POST(req: NextRequest) {
         }
 
         // --- 5. ENVIAR A SATFLOW (POST) ---
-        // Excluimos los campos originales que ya hemos saneado
         const { address, location, status, phone, contactPhone, scheduledDate, scheduledTime, ...restOfBody } = body;
 
         const satflowPayload = {
