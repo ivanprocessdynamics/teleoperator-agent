@@ -125,13 +125,25 @@ export async function POST(req: NextRequest) {
             const client = customers[0];
             const fullAddress = `${client.street || ''}, ${client.city || ''}`.replace(/^, |, $/g, '');
 
-            console.log(`[Search Proxy] ✅ FOUND CUSTOMER: ${client.id} - ${client.fullName}`);
+            // --- FIX PRONUNCIACIÓN ---
+            let spokenAddress = fullAddress;
+            try {
+                // Importación dinámica para asegurar que funciona sin tocar imports globales
+                const { formatAddressForSpeech } = require('@/app/lib/addressFormatter');
+                spokenAddress = formatAddressForSpeech(fullAddress);
+            } catch (e) {
+                console.error("[Search Proxy] Error formatting address:", e);
+            }
+
+            console.log(`[Search Proxy] ✅ FOUND CUSTOMER: ${client.id}`);
+            console.log(`[Search Proxy] 🗣️ Spoken Address: '${spokenAddress}' (Original: '${fullAddress}')`);
 
             return NextResponse.json({
                 found: true,
                 id: client.id,
                 name: client.fullName || client.name,
-                address: fullAddress,
+                address: spokenAddress, // DEVOLVEMOS LA VERSIÓN LEÍBLE PARA LA IA
+                original_address: fullAddress, // Por si acaso
                 city: client.city,
                 email: client.email,
                 _debug: debugTrace // Debug info included
