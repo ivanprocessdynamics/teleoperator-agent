@@ -1,11 +1,12 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { SATFLOW_BASE_URL } from '@/lib/constants';
+import { adminDb } from '@/lib/firebase-admin';
 
 export async function POST(req: NextRequest) {
     try {
         const body = await req.json();
-        const { incidentId, address } = body;
+        const { incidentId, address, token } = body;
 
         // 1. Validaciones
         if (!incidentId || !address) {
@@ -15,15 +16,31 @@ export async function POST(req: NextRequest) {
             );
         }
 
-        // 2. Construir URL SatFlow
-        // Usamos el mismo endpoint que 'update-incident'
-        const targetUrl = `${SATFLOW_BASE_URL}/incidents/${incidentId}`;
+        // 2. Verify OTP token
+        if (!token || !adminDb) {
+            return NextResponse.json(
+                { error: "Verification required" },
+                { status: 403 }
+            );
+        }
 
-        // Auth Header fijo o variable de entorno (depende de cómo gestionéis la seguridad "pública")
-        // Como es un endpoint web público (el formulario), idealmente deberíamos tener una Service Key.
-        // Por ahora, asumimos que SatFlow acepta updates sin Auth o usamos una genérica si existe.
-        // NOTA: Si SatFlow requiere Auth de usuario, este endpoint fallará sin un token.
-        // Asumiremos que funciona como proxy seguro o que el ID es suficiente "secreto" por ahora.
+        const sessionDoc = await adminDb.collection('otp_sessions').doc(incidentId).get();
+        if (!sessionDoc.exists) {
+            return NextResponse.json({ error: "Session not found" }, { status: 403 });
+        }
+
+        const session = sessionDoc.data()!;
+        const tokenExpiry = session.token_expires_at?.toDate?.() || new Date(session.token_expires_at);
+
+        if (session.verified_token !== token || new Date() > tokenExpiry) {
+            return NextResponse.json(
+                { error: "Invalid or expired verification. Please verify again." },
+                { status: 403 }
+            );
+        }
+
+        // 3. Build SatFlow URL
+        const targetUrl = `${SATFLOW_BASE_URL}/incidents/${incidentId}`;
 
         const satflowPayload = {
             location: address,

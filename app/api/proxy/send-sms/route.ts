@@ -1,6 +1,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import twilio from 'twilio';
+import { adminDb } from '@/lib/firebase-admin';
 
 // Initialize Twilio Client
 // Ensure these env vars are set in Vercel
@@ -67,6 +68,20 @@ export async function POST(req: NextRequest) {
         // Generamos el enlace único y lo acortamos
         const longLink = `${BASE_URL}/corregir-direccion?id=${incidentId}`;
         const correctionLink = await shortenUrl(longLink);
+
+        // Store phone number in Firestore for OTP verification later
+        if (incidentId && adminDb) {
+            try {
+                await adminDb.collection('otp_sessions').doc(incidentId).set({
+                    phone: targetPhone,
+                    created_at: new Date(),
+                }, { merge: true });
+                console.log(`[SMS Proxy] Stored phone for OTP session: ${incidentId}`);
+            } catch (dbErr) {
+                console.error('[SMS Proxy] Failed to store OTP session:', dbErr);
+                // Non-blocking: SMS still gets sent even if storage fails
+            }
+        }
 
         // 2. Message Construction
         const refId = incidentId || "N/A";
