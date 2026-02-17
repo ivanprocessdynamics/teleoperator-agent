@@ -41,6 +41,26 @@ function normalizeTranscript(transcript: any[]) {
 }
 
 // Helper to update campaign row status
+// Shared status determination logic
+function determineFinalStatus(data: any, callId: string): 'completed' | 'failed' | 'no_answer' {
+    const disconnectionReason = data.disconnection_reason;
+    const failedReasons = ['dial_failed', 'dial_busy', 'error_unknown', 'error_retell', 'scam_detected', 'error_llm_websocket_open', 'error_llm_websocket_lost_connection'];
+    const noAnswerReasons = ['dial_no_answer', 'voicemail_reached', 'user_not_joined', 'registered_call_timeout'];
+
+    if (disconnectionReason && failedReasons.includes(disconnectionReason)) {
+        // HEURISTIC: If call lasted > 10 seconds, it's likely NOT a complete failure
+        if (data.duration_ms && data.duration_ms > 10000) {
+            console.log(`[Campaign Row] Call ${callId} has failure reason '${disconnectionReason}' but duration ${data.duration_ms}ms > 10s. Marking as COMPLETED.`);
+            return 'completed';
+        }
+        return 'failed';
+    } else if (disconnectionReason && noAnswerReasons.includes(disconnectionReason)) {
+        return 'no_answer';
+    }
+    return 'completed';
+}
+
+// Helper to update campaign row status
 async function updateCampaignRowStatus(callId: string, data: any, eventType: 'started' | 'ended') {
     const result = { success: false, method: 'none', error: null as any };
     try {
@@ -54,151 +74,113 @@ async function updateCampaignRowStatus(callId: string, data: any, eventType: 'st
             }));
         }
 
+        const rowId = data.metadata?.row_id;
+
         // 1. Try with Admin SDK (Preferred for permissions)
         if (adminDb) {
             console.log("[Campaign Row] Using Admin SDK");
             try {
-                // 1. Try with Admin SDK (Preferred for permissions)
-                if (adminDb) {
-                    console.log("[Campaign Row] Using Admin SDK");
-                    try {
-                        let rowDoc = null;
-                        const rowId = data.metadata?.row_id;
-
-                        if (rowId) {
-                            console.log(`[Campaign Row] Using direct row_id from metadata: ${rowId}`);
-                            const directDoc = await adminDb.collection("campaign_rows").doc(rowId).get();
-                            if (directDoc.exists) {
-                                rowDoc = directDoc;
-                            } else {
-                                console.warn(`[Campaign Row] Row ${rowId} not found by ID (Admin). Falling back to query.`);
-                            }
-                        }
-
-                        if (!rowDoc) {
-                            const rowsSnapshot = await adminDb.collection("campaign_rows").where("call_id", "==", callId).get();
-                            if (!rowsSnapshot.empty) {
-                                rowDoc = rowsSnapshot.docs[0];
-                            }
-                        }
-
-                        if (rowDoc) {
-                            console.log(`[Campaign Row] Found row ${rowDoc.id} (Admin)`);
-
-                            if (eventType === 'started') {
-                                await rowDoc.ref.update({
-                                    status: 'calling',
-                                    called_at: new Date(), // Admin SDK uses calling Date or Firestore Timestamp
-                                });
-                            } else if (eventType === 'ended') {
-                                let finalStatus = 'completed';
-                                const disconnectionReason = data.disconnection_reason;
-                                const failedReasons = ['dial_failed', 'dial_busy', 'error_unknown', 'error_retell', 'scam_detected', 'error_llm_websocket_open', 'error_llm_websocket_lost_connection'];
-                                const noAnswerReasons = ['dial_no_answer', 'voicemail_reached', 'user_not_joined', 'registered_call_timeout'];
-
-                                if (disconnectionReason && failedReasons.includes(disconnectionReason)) {
-                                    // HEURISTIC: If call lasted > 10 seconds, it's likely NOT a complete failure 
-                                    // (e.g., error at end of conversation). Mark as completed.
-                                    if (data.duration_ms && data.duration_ms > 10000) {
-                                        console.log(`[Campaign Row] Call ${callId} has failure reason '${disconnectionReason}' but duration ${data.duration_ms}ms > 10s. Marking as COMPLETED.`);
-                                        finalStatus = 'completed';
-                                    } else {
-                                        finalStatus = 'failed';
-                                    }
-                                } else if (disconnectionReason && noAnswerReasons.includes(disconnectionReason)) {
-                                    finalStatus = 'no_answer';
-                                }
-
-                                await rowDoc.ref.update({
-                                    status: finalStatus,
-                                    last_error: finalStatus === 'failed' ? disconnectionReason : null,
-                                });
-                            }
-                            console.log(`[Campaign Row] Updated successfully (Admin)`);
-                            result.success = true;
-                            result.method = 'admin-sdk';
-                            return result; // Done
-                        } else {
-                            result.error = 'row-not-found-admin';
-                        }
-                    } catch (adminErr: any) {
-                        console.error("[Campaign Row] Admin SDK error:", adminErr);
-                        result.error = `admin-error: ${adminErr.message}`;
-                        // Fallthrough to client SDK
-                    }
-                } else {
-                    result.error = 'admin-sdk-not-initialized';
-                }
-
-                // 2. Fallback to Client SDK (Local dev / Misconfigured Admin)
                 let rowDoc = null;
-                const rowId = data.metadata?.row_id;
 
                 if (rowId) {
-                    console.log(`[Campaign Row] Using direct row_id from metadata: ${rowId} (Client)`);
-                    const directDoc = await getDoc(doc(db, "campaign_rows", rowId));
-                    if (directDoc.exists()) {
+                    console.log(`[Campaign Row] Using direct row_id from metadata: ${rowId}`);
+                    const directDoc = await adminDb.collection("campaign_rows").doc(rowId).get();
+                    if (directDoc.exists) {
                         rowDoc = directDoc;
+                    } else {
+                        console.warn(`[Campaign Row] Row ${rowId} not found by ID (Admin). Falling back to query.`);
                     }
                 }
 
                 if (!rowDoc) {
-                    const q = query(collection(db, "campaign_rows"), where("call_id", "==", callId));
-                    const snapshot = await getDocs(q);
-                    if (!snapshot.empty) {
-                        rowDoc = snapshot.docs[0];
+                    const rowsSnapshot = await adminDb.collection("campaign_rows").where("call_id", "==", callId).get();
+                    if (!rowsSnapshot.empty) {
+                        rowDoc = rowsSnapshot.docs[0];
                     }
                 }
 
                 if (rowDoc) {
-                    console.log(`[Campaign Row] Found row ${rowDoc.id} (Client SDK)`);
+                    console.log(`[Campaign Row] Found row ${rowDoc.id} (Admin)`);
 
                     if (eventType === 'started') {
-                        await updateDoc(doc(db, "campaign_rows", rowDoc.id), {
+                        await rowDoc.ref.update({
                             status: 'calling',
-                            called_at: Timestamp.now(),
+                            called_at: new Date(),
                         });
                     } else if (eventType === 'ended') {
-                        let finalStatus: 'completed' | 'failed' | 'no_answer' = 'completed';
-                        const disconnectionReason = data.disconnection_reason;
-                        const failedReasons = ['dial_failed', 'dial_busy', 'error_unknown', 'error_retell', 'scam_detected', 'error_llm_websocket_open', 'error_llm_websocket_lost_connection'];
-                        const noAnswerReasons = ['dial_no_answer', 'voicemail_reached', 'user_not_joined', 'registered_call_timeout'];
-
-                        if (disconnectionReason && failedReasons.includes(disconnectionReason)) {
-                            // HEURISTIC: If call lasted > 10 seconds, it's likely NOT a complete failure 
-                            if (data.duration_ms && data.duration_ms > 10000) {
-                                console.log(`[Campaign Row] Call ${callId} has failure reason '${disconnectionReason}' but duration ${data.duration_ms}ms > 10s. Marking as COMPLETED (Client SDK).`);
-                                finalStatus = 'completed';
-                            } else {
-                                finalStatus = 'failed';
-                            }
-                        } else if (disconnectionReason && noAnswerReasons.includes(disconnectionReason)) {
-                            finalStatus = 'no_answer';
-                        }
-
-                        await updateDoc(doc(db, "campaign_rows", rowDoc.id), {
+                        const finalStatus = determineFinalStatus(data, callId);
+                        await rowDoc.ref.update({
                             status: finalStatus,
-                            last_error: finalStatus === 'failed' ? disconnectionReason : null,
+                            last_error: finalStatus === 'failed' ? data.disconnection_reason : null,
                         });
                     }
-                    console.log(`[Campaign Row] Updated successfully (Client SDK)`);
+                    console.log(`[Campaign Row] Updated successfully (Admin)`);
                     result.success = true;
-                    result.method = 'client-sdk';
+                    result.method = 'admin-sdk';
+                    return result;
                 } else {
-                    console.log(`[Campaign Row] No row found for call_id ${callId}`);
-                    if (!result.error) result.error = 'row-not-found-client';
+                    result.error = 'row-not-found-admin';
                 }
-            } catch (error: any) {
-                console.error(`[Campaign Row] Error updating row for call ${callId}:`, error);
-                result.error = `client-error: ${error.message}`;
+            } catch (adminErr: any) {
+                console.error("[Campaign Row] Admin SDK error:", adminErr);
+                result.error = `admin-error: ${adminErr.message}`;
+                // Fallthrough to client SDK
             }
-            return result;
+        }
+
+        // 2. Fallback to Client SDK (Local dev / Admin SDK not initialized)
+        console.log("[Campaign Row] Falling back to Client SDK");
+        try {
+            let rowDoc = null;
+
+            if (rowId) {
+                console.log(`[Campaign Row] Using direct row_id from metadata: ${rowId} (Client)`);
+                const directDoc = await getDoc(doc(db, "campaign_rows", rowId));
+                if (directDoc.exists()) {
+                    rowDoc = directDoc;
+                }
+            }
+
+            if (!rowDoc) {
+                const q = query(collection(db, "campaign_rows"), where("call_id", "==", callId));
+                const snapshot = await getDocs(q);
+                if (!snapshot.empty) {
+                    rowDoc = snapshot.docs[0];
+                }
+            }
+
+            if (rowDoc) {
+                console.log(`[Campaign Row] Found row ${rowDoc.id} (Client SDK)`);
+
+                if (eventType === 'started') {
+                    await updateDoc(doc(db, "campaign_rows", rowDoc.id), {
+                        status: 'calling',
+                        called_at: Timestamp.now(),
+                    });
+                } else if (eventType === 'ended') {
+                    const finalStatus = determineFinalStatus(data, callId);
+                    await updateDoc(doc(db, "campaign_rows", rowDoc.id), {
+                        status: finalStatus,
+                        last_error: finalStatus === 'failed' ? data.disconnection_reason : null,
+                    });
+                }
+                console.log(`[Campaign Row] Updated successfully (Client SDK)`);
+                result.success = true;
+                result.method = 'client-sdk';
+            } else {
+                console.log(`[Campaign Row] No row found for call_id ${callId}`);
+                if (!result.error) result.error = 'row-not-found-client';
+            }
+        } catch (clientErr: any) {
+            console.error(`[Campaign Row] Client SDK error for call ${callId}:`, clientErr);
+            result.error = `client-error: ${clientErr.message}`;
         }
     } catch (error) {
         console.error("Error in updateCampaignRowStatus:", error);
     }
     return result;
 }
+
 
 export async function POST(req: Request) {
     try {
@@ -597,18 +579,20 @@ async function handleCallAnalyzed(callId: string, data: any) {
         event_type: 'call_analyzed',
         post_call_analysis_done: true,
         updated_at: serverTimestamp(),
-        ...(resolvedSubworkspaceId && { subworkspace_id: resolvedSubworkspaceId }), // Ensure subworkspace is set for stats
-        _debug: {
-            adminDbInitialized: !!adminDb,
-            configuredFieldsCount: customFields?.length || 0, // Fields found in subworkspace config
-            activeFieldsCount: activeFields?.length || 0,     // Fields after filtering archived
-            extractedFieldsCount: analysis.custom_analysis_data?.length || 0, // Fields extracted by AI
-            hasCustomFields: analysis.custom_analysis_data?.length > 0 || false,
-            customFieldsCount: analysis.custom_analysis_data?.length || 0,
-            resolvedSubworkspaceId: resolvedSubworkspaceId || 'NONE',
-            configSource: configSource || 'NONE',
-            timestampProcessed: new Date().toISOString()
-        }
+        ...(resolvedSubworkspaceId && { subworkspace_id: resolvedSubworkspaceId }),
+        ...(process.env.NODE_ENV !== 'production' && {
+            _debug: {
+                adminDbInitialized: !!adminDb,
+                configuredFieldsCount: customFields?.length || 0,
+                activeFieldsCount: activeFields?.length || 0,
+                extractedFieldsCount: analysis.custom_analysis_data?.length || 0,
+                hasCustomFields: analysis.custom_analysis_data?.length > 0 || false,
+                customFieldsCount: analysis.custom_analysis_data?.length || 0,
+                resolvedSubworkspaceId: resolvedSubworkspaceId || 'NONE',
+                configSource: configSource || 'NONE',
+                timestampProcessed: new Date().toISOString()
+            }
+        })
     };
 
     if (transcriptNodes) {

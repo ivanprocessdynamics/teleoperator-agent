@@ -22,9 +22,6 @@ export const RETELL_AGENT_SLOTS: RetellAgentSlot[] = [
     { slot: 10, agentId: "agent_c23eba4ca9342855a408f0f694", name: "Agent Slot 10" },
 ];
 
-// 5 pre-configured Retell INBOUND agent slots
-// 5 pre-configured Retell INBOUND agent slots (DEPRECATED - Use main pool)
-// export const RETELL_INBOUND_AGENT_SLOTS: RetellAgentSlot[] = [];
 
 // Helper function to get a slot by number
 export function getSlotByNumber(slotNumber: number): RetellAgentSlot | undefined {

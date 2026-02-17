@@ -1,11 +1,13 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { validateAddress } from '@/app/lib/googleMaps';
+import { SATFLOW_BASE_URL } from '@/lib/constants';
 import { cleanAddressWithAI } from '@/app/lib/addressCleaner';
 
 export async function POST(req: NextRequest) {
     try {
         const body = await req.json();
+        const isDev = process.env.NODE_ENV !== 'production';
         console.log("[Create Incident] Body recibido:", body);
 
         // --- 1. GESTIÓN DE FECHA y HORA (Robustez Extrema) ---
@@ -36,10 +38,13 @@ export async function POST(req: NextRequest) {
             finalPhone = null;
         }
 
-        // FALLBACK DUMMY (Si falla todo, evitar 400)
+        // Si no tenemos teléfono válido, devolvemos error en vez de crear datos basura
         if (!finalPhone || finalPhone.trim() === "") {
-            console.warn("[Create Incident] ⚠️ NO phone detected (Header/Body/Meta empty). Using fallback '000000000'.");
-            finalPhone = "000000000";
+            console.warn("[Create Incident] ⚠️ NO phone detected (Header/Body/Meta empty). Returning error.");
+            return NextResponse.json({
+                error: "No se pudo detectar un número de teléfono válido. Pide al cliente su número.",
+                code: "MISSING_PHONE"
+            }, { status: 400 });
         }
 
         console.log(`[Create Incident] Inputs -> Header: ${headerPhone}, RetellMeta: ${retellFromNumber}, Args: ${argsPhone}`);
@@ -65,7 +70,7 @@ export async function POST(req: NextRequest) {
 
         // --- 4. GESTIÓN DE CLIENTE (LEAD) ---
         let clientId = body.clientId;
-        const satflowBaseUrl = "https://us-central1-satflow-d3744.cloudfunctions.net/api/v1";
+        const satflowBaseUrl = SATFLOW_BASE_URL;
         const authHeader = req.headers.get('authorization');
         const headers = {
             'Content-Type': 'application/json',
@@ -73,7 +78,7 @@ export async function POST(req: NextRequest) {
         };
 
         // Si clientId es "UNREGISTERED", intenta crear Lead con el teléfono detectado
-        if ((!clientId || clientId === 'UNREGISTERED') && finalPhone !== "000000000") {
+        if (!clientId || clientId === 'UNREGISTERED') {
             console.log(`[Create Incident] Client ID is missing/unregistered. Attempting to create Lead for ${finalPhone}...`);
             try {
                 const createClientRes = await fetch(`${satflowBaseUrl}/customers`, {
@@ -160,7 +165,7 @@ export async function POST(req: NextRequest) {
                 scheduledDate: finalDate,
                 scheduledTime: finalTime
             },
-            validationDebug,
+            ...(isDev && { validationDebug }),
             message: finalStatus === 'resolved' ? "Incident created and resolved successfully" : "Incident created successfully"
         });
 

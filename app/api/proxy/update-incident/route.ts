@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { SATFLOW_BASE_URL } from '@/lib/constants';
 
 export async function POST(req: NextRequest) {
     try {
@@ -14,7 +15,7 @@ export async function POST(req: NextRequest) {
         }
 
         const authHeader = req.headers.get('authorization');
-        const targetUrl = `https://us-central1-satflow-d3744.cloudfunctions.net/api/v1/incidents/${id}`;
+        const targetUrl = `${SATFLOW_BASE_URL}/incidents/${id}`;
 
         // --- LÓGICA DE CONCATENACIÓN (APPEND) ---
 

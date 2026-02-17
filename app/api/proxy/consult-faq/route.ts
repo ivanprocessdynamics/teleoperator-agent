@@ -118,25 +118,3 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
     }
 }
-
-// MÉTODO DE DEBUG TEMPORAL: Listar todos los agentes disponibles
-export async function GET() {
-    try {
-        if (!adminDb) return NextResponse.json({ error: "No DB" }, { status: 500 });
-
-        const snapshot = await adminDb.collection('subworkspaces').get();
-        const agents = snapshot.docs.map(doc => ({
-            id: doc.id,
-            retell_agent_id: doc.data().retell_agent_id,
-            name: doc.data().name,
-            kb_length: doc.data().knowledge_base?.length || 0
-        }));
-
-        return NextResponse.json({
-            count: agents.length,
-            agents: agents
-        });
-    } catch (e) {
-        return NextResponse.json({ error: String(e) }, { status: 500 });
-    }
-}

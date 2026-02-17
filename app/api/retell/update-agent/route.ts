@@ -25,42 +25,44 @@ export async function POST(req: Request) {
 
         const updates: any = {};
 
-        // 1. Handle Prompt Update (Push to LLM)
-        if (prompt) {
+        // Retrieve agent once if we need prompt or tools update
+        let agent: any = null;
+        let llmId: string | null = null;
+        if (prompt || body.tools) {
             console.log("Retrieving agent to find LLM ID...");
-            let agent;
             try {
                 agent = await retell.agent.retrieve(agent_id);
             } catch (err: any) {
                 console.error("Failed to retrieve agent:", err);
                 throw new Error(`Agent retrieval failed: ${err.message}`);
             }
-
             console.log("Agent response_engine:", JSON.stringify(agent.response_engine));
 
             if (agent.response_engine?.type === 'retell-llm' && agent.response_engine.llm_id) {
-                const llmId = agent.response_engine.llm_id;
+                llmId = agent.response_engine.llm_id;
                 console.log("Found LLM ID:", llmId);
-                console.log("Updating LLM with new prompt...");
+            } else {
+                console.warn("Agent does not use Retell LLM or LLM ID not found");
+                console.warn("Response engine type:", agent.response_engine?.type);
+            }
+        }
 
+        // 1. Handle Prompt Update (Push to LLM)
+        if (prompt) {
+            if (llmId) {
+                console.log("Updating LLM with new prompt...");
                 try {
-                    // CRITICAL FIX: Use the actual prompt provided by the client.
-                    // This allows Inbound Agents to have their specific instructions.
-                    // If dynamic behavior is needed, the client should send "{{campaign_prompt}}" as the prompt string.
                     const llmUpdateResult = await retell.llm.update(llmId, {
                         general_prompt: prompt
                     });
-                    console.log("LLM update successful (configured for dynamic prompt):", llmUpdateResult.llm_id);
+                    console.log("LLM update successful:", llmUpdateResult.llm_id);
                     updates.prompt_updated = true;
                     updates.llm_id = llmId;
                 } catch (llmError: any) {
                     console.error("LLM update FAILED:", llmError);
                     updates.prompt_error = `LLM Update Error: ${llmError.message}`;
-                    // Don't throw entire request, just mark failure
                 }
             } else {
-                console.warn("Agent does not use Retell LLM or LLM ID not found");
-                console.warn("Response engine type:", agent.response_engine?.type);
                 updates.prompt_error = "Agent does not use Retell LLM";
             }
         }
@@ -90,24 +92,17 @@ export async function POST(req: Request) {
                 }
             }));
 
-            // Reuse existing agent/llm retrieval logic if available, or fetch if not
-            // For simplicity, we fetch again or assume prompt logic fetched it? 
-            // Better to consolidate retrieval.
-
-            // REFACTOR: Retrieve agent once if either prompt OR tools is present
-            if (!agent_id) throw new Error("Agent ID missing");
-
-            const agent = await retell.agent.retrieve(agent_id);
-            if (agent.response_engine?.type === 'retell-llm' && agent.response_engine.llm_id) {
-                const llmId = agent.response_engine.llm_id;
+            if (llmId) {
                 console.log("Updating LLM Tools...", llmId);
-
                 await retell.llm.update(llmId, {
                     tools: retellTools
                 } as any);
                 updates.tools_updated = true;
+            } else {
+                updates.tools_error = "Agent does not use Retell LLM, cannot update tools";
             }
         }
+
 
 
         // 2. Handle Analysis Config Update
@@ -189,9 +184,7 @@ export async function POST(req: Request) {
     } catch (error: any) {
         console.error("Critical Error updating Retell agent:", error);
         return NextResponse.json({
-            error: error.message || "Failed to update Agent",
-            stack: error.stack,
-            details: JSON.stringify(error)
+            error: error.message || "Failed to update Agent"
         }, { status: 500 });
     }
 }

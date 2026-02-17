@@ -1,5 +1,6 @@
 
 import { NextRequest, NextResponse } from 'next/server';
+import { SATFLOW_BASE_URL } from '@/lib/constants';
 
 export async function POST(req: NextRequest) {
     try {
@@ -16,7 +17,7 @@ export async function POST(req: NextRequest) {
 
         // 2. Construir URL SatFlow
         // Usamos el mismo endpoint que 'update-incident'
-        const targetUrl = `https://us-central1-satflow-d3744.cloudfunctions.net/api/v1/incidents/${incidentId}`;
+        const targetUrl = `${SATFLOW_BASE_URL}/incidents/${incidentId}`;
 
         // Auth Header fijo o variable de entorno (depende de cómo gestionéis la seguridad "pública")
         // Como es un endpoint web público (el formulario), idealmente deberíamos tener una Service Key.

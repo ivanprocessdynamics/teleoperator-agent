@@ -6,7 +6,7 @@ import twilio from 'twilio';
 // Ensure these env vars are set in Vercel
 const accountSid = process.env.TWILIO_ACCOUNT_SID;
 const authToken = process.env.TWILIO_AUTH_TOKEN;
-const twilioNumber = process.env.TWILIO_PHONE_NUMBER || '+447366333475';
+const twilioNumber = process.env.TWILIO_PHONE_NUMBER;
 
 // "SatFlow" sender ID logic:
 // Alphanumeric Sender IDs are supported in many countries (e.g. UK, Spain) but not US/Canada usually.

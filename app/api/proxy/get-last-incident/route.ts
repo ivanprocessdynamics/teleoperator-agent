@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { SATFLOW_BASE_URL } from '@/lib/constants';
 
 export async function POST(req: NextRequest) {
     try {
@@ -10,7 +11,7 @@ export async function POST(req: NextRequest) {
         }
 
         // 1. Buscamos TODOS los tickets de ese cliente
-        const targetUrl = new URL("https://us-central1-satflow-d3744.cloudfunctions.net/api/v1/incidents");
+        const targetUrl = new URL(`${SATFLOW_BASE_URL}/incidents`);
         targetUrl.searchParams.set("clientId", clientId);
 
         // Opcional: Filtramos para que no traiga los cancelados si no te interesan

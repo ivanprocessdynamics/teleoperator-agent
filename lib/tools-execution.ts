@@ -23,6 +23,11 @@ export async function executeToolCall(request: ToolExecutionRequest) {
     let contextId = null; // campaignId or subworkspaceId
     let contextType = null; // 'campaign' or 'subworkspace'
 
+    if (!adminDb) {
+        console.error("[Tool Service] adminDb not initialized. Cannot execute tool.");
+        return { error: "Database not available", status: 500 };
+    }
+
     // Search in campaigns
     const campaignsSnapshot = await adminDb.collection('campaigns').where('retell_agent_id', '==', agent_id).limit(1).get();
     if (!campaignsSnapshot.empty) {

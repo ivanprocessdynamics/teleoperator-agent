@@ -1,12 +1,16 @@
 
 import { NextRequest, NextResponse } from 'next/server';
+import { SATFLOW_BASE_URL } from '@/lib/constants';
+import { formatAddressForSpeech } from '@/app/lib/addressFormatter';
 
 export async function POST(req: NextRequest) {
-    // Objeto para acumular trazas de depuración y devolverlas en el JSON
-    const debugTrace: any = {
+    const isDev = process.env.NODE_ENV !== 'production';
+
+    // Objeto para acumular trazas de depuración (solo en desarrollo)
+    const debugTrace: any = isDev ? {
         step: 'init',
         sources: {}
-    };
+    } : null;
 
     try {
         let body: any = {};
@@ -15,7 +19,7 @@ export async function POST(req: NextRequest) {
             if (rawBody) body = JSON.parse(rawBody);
         } catch (e) {
             console.log("[Search Proxy] Body vacío o inválido");
-            debugTrace.bodyError = "Empty or invalid JSON body";
+            if (isDev) debugTrace.bodyError = "Empty or invalid JSON body";
         }
 
         console.log("[Search Proxy] Full Body / Headers Debug:", {
@@ -28,11 +32,13 @@ export async function POST(req: NextRequest) {
         const retellFromNumber = body.call?.from_number || body.from_number;
         const argsPhone = body.phone || body.args?.phone || body.arguments?.phone;
 
-        debugTrace.sources = {
-            header: headerPhone,
-            metadata: retellFromNumber,
-            args: argsPhone
-        };
+        if (isDev) {
+            debugTrace.sources = {
+                header: headerPhone,
+                metadata: retellFromNumber,
+                args: argsPhone
+            };
+        }
 
         let searchPhone = headerPhone;
         let phoneSource = 'header';
@@ -62,13 +68,15 @@ export async function POST(req: NextRequest) {
             }
         }
 
-        debugTrace.finalPhone = searchPhone;
-        debugTrace.phoneSource = phoneSource;
-        debugTrace.finalName = bodyName; // Puede ser null ahora si se limpió
+        if (isDev) {
+            debugTrace.finalPhone = searchPhone;
+            debugTrace.phoneSource = phoneSource;
+            debugTrace.finalName = bodyName;
+        }
 
         console.log(`[Search Proxy] 🔎 FINAL PHONE TO USE: '${searchPhone}' (Source ${phoneSource})`);
 
-        const satflowUrl = new URL("https://us-central1-satflow-d3744.cloudfunctions.net/api/v1/customers/search");
+        const satflowUrl = new URL(`${SATFLOW_BASE_URL}/customers/search`);
 
         // LÓGICA DE PRIORIDAD CORREGIDA: 
         // Si tenemos un teléfono válido (del header/meta), SIEMPRE intentamos buscar por teléfono primero 
@@ -77,22 +85,22 @@ export async function POST(req: NextRequest) {
         // CASO 1: Hay teléfono -> Buscar por Teléfono (Prioridad Real)
         if (searchPhone && searchPhone.length > 5) {
             satflowUrl.searchParams.set("phone", searchPhone);
-            debugTrace.searchCriteria = 'phone';
+            if (isDev) debugTrace.searchCriteria = 'phone';
         }
         // CASO 2: Solo hay nombre -> Buscar por Nombre
         else if (bodyName && bodyName.length > 2) {
             satflowUrl.searchParams.set("name", bodyName);
-            debugTrace.searchCriteria = 'name';
+            if (isDev) debugTrace.searchCriteria = 'name';
         } else {
             console.log("[Search Proxy] ⚠️ No valid search criteria found.");
             return NextResponse.json({
                 found: false,
-                _debug: debugTrace
+                ...(isDev && { _debug: debugTrace })
             });
         }
 
         console.log(`[Search Proxy] 🚀 CALLING SATFLOW URL: ${satflowUrl.toString()}`);
-        debugTrace.satflowUrl = satflowUrl.toString();
+        if (isDev) debugTrace.satflowUrl = satflowUrl.toString();
 
         const authHeader = req.headers.get('authorization');
         const apiResponse = await fetch(satflowUrl.toString(), {
@@ -105,8 +113,7 @@ export async function POST(req: NextRequest) {
 
         const data = await apiResponse.json();
 
-        debugTrace.satflowStatus = apiResponse.status;
-        // debugTrace.satflowBody = data; // Opcional: comentar si es muy grande
+        if (isDev) debugTrace.satflowStatus = apiResponse.status;
 
         console.log(`[Search Proxy] 📥 SATFLOW RESPONSE Status: ${apiResponse.status}`);
 
@@ -114,12 +121,12 @@ export async function POST(req: NextRequest) {
             console.warn(`[Search Proxy] SatFlow Error ${apiResponse.status}`);
             return NextResponse.json({
                 found: false,
-                _debug: debugTrace
+                ...(isDev && { _debug: debugTrace })
             }, { status: apiResponse.status });
         }
 
         const customers = data.data || [];
-        debugTrace.resultsCount = customers.length;
+        if (isDev) debugTrace.resultsCount = customers.length;
 
         if (customers.length > 0) {
             const client = customers[0];
@@ -129,7 +136,7 @@ export async function POST(req: NextRequest) {
             let spokenAddress = fullAddress;
             try {
                 // Importación dinámica para asegurar que funciona sin tocar imports globales
-                const { formatAddressForSpeech } = require('@/app/lib/addressFormatter');
+
                 spokenAddress = formatAddressForSpeech(fullAddress);
             } catch (e) {
                 console.error("[Search Proxy] Error formatting address:", e);
@@ -142,17 +149,17 @@ export async function POST(req: NextRequest) {
                 found: true,
                 id: client.id,
                 name: client.fullName || client.name,
-                address: spokenAddress, // DEVOLVEMOS LA VERSIÓN LEÍBLE PARA LA IA
-                original_address: fullAddress, // Por si acaso
+                address: spokenAddress,
+                original_address: fullAddress,
                 city: client.city,
                 email: client.email,
-                _debug: debugTrace // Debug info included
+                ...(isDev && { _debug: debugTrace })
             });
         } else {
             console.log(`[Search Proxy] ❌ CLIENT NOT FOUND (Empty array returned)`);
             return NextResponse.json({
                 found: false,
-                _debug: debugTrace
+                ...(isDev && { _debug: debugTrace })
             });
         }
 
@@ -161,7 +168,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({
             error: "Internal Error",
             details: String(error),
-            _debug: debugTrace
+            ...(isDev && { _debug: debugTrace })
         }, { status: 500 });
     }
 }
