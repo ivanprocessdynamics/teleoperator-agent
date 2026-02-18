@@ -31,8 +31,8 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType>({} as AuthContextType);
 
-// Hardcoded Super Admin Email
-const SUPER_ADMIN_EMAIL = process.env.SUPER_ADMIN_EMAIL || "cezarvalentinivan@gmail.com";
+// Super Admin Email — must be set in environment variables
+const SUPER_ADMIN_EMAIL = process.env.SUPER_ADMIN_EMAIL || "";
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
     const [user, setUser] = useState<User | null>(null);

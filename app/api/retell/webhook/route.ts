@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/firebase";
 import { adminDb } from "@/lib/firebase-admin";
+import * as admin from "firebase-admin";
 import { doc, setDoc, serverTimestamp, getDoc, query, collection, where, getDocs, updateDoc, Timestamp } from "firebase/firestore";
 import crypto from 'crypto';
 import OpenAI from "openai";
@@ -239,11 +240,15 @@ export async function POST(req: Request) {
         else if (body.interaction_type === "tool_call" || event === "tool_call_invocation") {
             console.log(`[Webhook] Tool Call detected for ${callId}`);
             const toolCall = body.tool_call || body; // Retell structure varies slightly by version
+            // Extract from_number from call data (available for real inbound calls)
+            const callerPhone = callData?.from_number || body.from_number || null;
+            console.log(`[Webhook] Tool Call from_number: ${callerPhone}`);
             const response = await executeToolCall({
                 agent_id: body.agent_id || callData?.agent_id,
                 name: toolCall.name,
                 args: toolCall.arguments || {}, // Usually parsed JSON object
-                call_id: callId
+                call_id: callId,
+                from_number: callerPhone
             });
             // Return result to Retell immediately
             return NextResponse.json(response);
@@ -309,6 +314,7 @@ async function handleCallEnded(callId: string, data: any) {
         subworkspace_id: resolvedSubworkspaceId, // Critical for stats filtering
         transcript_object: transcriptNodes, // Structured chat
         recording_url: data.recording_url || null,
+        caller_phone: data.from_number || null, // Caller's phone (inbound)
         duration: data.duration_ms ? data.duration_ms / 1000 :
             (data.end_timestamp - data.start_timestamp) / 1000,
         start_timestamp: data.start_timestamp,
@@ -316,20 +322,18 @@ async function handleCallEnded(callId: string, data: any) {
         disconnection_reason: data.disconnection_reason,
         event_type: 'call_ended',
         metadata: data.metadata || null,
-        timestamp: serverTimestamp(), // Required for CallHistoryTable sorting
-        updated_at: serverTimestamp(),
+        timestamp: adminDb ? admin.firestore.FieldValue.serverTimestamp() : serverTimestamp(),
+        updated_at: adminDb ? admin.firestore.FieldValue.serverTimestamp() : serverTimestamp(),
     };
 
-    // If this is the FIRST time we see this call, add creation timestamp
-    // If it exists, we just update the transcript/status
-    const docRef = doc(db, "calls", callId);
-    /* 
-       We use setDoc with merge: true. 
-       If document doesn't exist, it creates it.
-       If it exists (maybe from call_started?), it updates it.
-    */
-
-    await setDoc(docRef, docData, { merge: true });
+    // Save to Firestore (prefer Admin SDK for server-side writes)
+    if (adminDb) {
+        await adminDb.collection('calls').doc(callId).set(docData, { merge: true });
+    } else {
+        // Fallback to Client SDK for local dev
+        const docRef = doc(db, "calls", callId);
+        await setDoc(docRef, docData, { merge: true });
+    }
     console.log(`[call_ended] Saved for ${callId}`);
 }
 
@@ -574,12 +578,144 @@ async function handleCallAnalyzed(callId: string, data: any) {
         }
     }
 
+    // ─── Inbound Analysis: Lead Detection + Training (PARALLEL) ─────────
+    // Cache subworkspace data to avoid redundant Firestore reads
+    let cachedSubData: any = null;
+    let isInbound = false;
+    let leadAnalysis: any = null;
+    let trainingFlags: any = null;
+
+    if (transcriptText && resolvedSubworkspaceId && process.env.OPENAI_API_KEY && adminDb) {
+        try {
+            // Single read for both lead detection and training
+            const subDoc = await adminDb.collection('subworkspaces').doc(resolvedSubworkspaceId).get();
+            if (subDoc.exists) {
+                cachedSubData = subDoc.data()!;
+                // Check if inbound
+                const parentWorkspaceId = cachedSubData.workspace_id;
+                if (parentWorkspaceId) {
+                    const wsDoc = await adminDb.collection('workspaces').doc(parentWorkspaceId).get();
+                    isInbound = wsDoc.exists && wsDoc.data()?.type === 'inbound';
+                }
+                if (!isInbound) {
+                    isInbound = cachedSubData.type === 'inbound';
+                }
+            }
+        } catch (err) {
+            console.error('[Inbound Analysis] Error fetching subworkspace:', err);
+        }
+    }
+
+    // Run lead detection and training in PARALLEL (they're independent)
+    if (isInbound && cachedSubData && transcriptText && process.env.OPENAI_API_KEY) {
+        const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+        const leadDetectionTask = (async () => {
+            try {
+                console.log(`[Lead Detection] Running for call ${callId}...`);
+                const leadPrompt = `Analyze this inbound customer call transcript and determine if the caller is a potential lead — someone who called with interest but did NOT schedule or complete a booking/appointment.
+
+Return ONLY a valid JSON object with:
+- "is_potential_lead": boolean (true if they showed interest but didn't schedule/convert)
+- "score": number 1-10 (how likely they are to convert if contacted by a human)
+- "reason": string (brief explanation in Spanish, max 2 sentences)
+- "interest_topic": string (what they were interested in, in Spanish)
+- "recommended_action": string (what a human agent should do, in Spanish)
+
+If the caller DID schedule/complete their goal, set is_potential_lead to false.
+If the call was too short, spam, or irrelevant, set is_potential_lead to false with score 0.
+
+Transcript:
+${transcriptText}`;
+
+                const completion = await openai.chat.completions.create({
+                    messages: [
+                        { role: 'system', content: 'You are a CRM lead qualification specialist.' },
+                        { role: 'user', content: leadPrompt }
+                    ],
+                    model: 'gpt-4o-mini',
+                    response_format: { type: 'json_object' }
+                });
+
+                const result = JSON.parse(completion.choices[0].message.content || '{}');
+                console.log(`[Lead Detection] Result: is_potential_lead=${result.is_potential_lead}, score=${result.score}`);
+                return result;
+            } catch (err) {
+                console.error('[Lead Detection] Error:', err);
+                return null;
+            }
+        })();
+
+        const trainingTask = (async () => {
+            try {
+                const agentPrompt = cachedSubData.active_prompt || cachedSubData.prompt_editable_text || '';
+                const knowledgeBase = cachedSubData.knowledge_base || '';
+                if (!agentPrompt && !knowledgeBase) return null;
+
+                console.log(`[Training] Analyzing call ${callId} for errors...`);
+                const trainingPrompt = `You are a QA auditor for an AI phone agent. Analyze the conversation below and identify any errors the AI agent made.
+
+AGENT'S INSTRUCTIONS (Prompt):
+${agentPrompt || '(No prompt configured)'}
+
+KNOWLEDGE BASE:
+${knowledgeBase || '(No knowledge base configured)'}
+
+CONVERSATION:
+${transcriptText}
+
+Evaluate the agent's performance and return ONLY a valid JSON object with:
+- "has_errors": boolean (true if the agent made meaningful mistakes)
+- "overall_score": number 1-10 (10 = perfect, 1 = terrible)
+- "errors": array of objects, each with:
+  - "type": one of "kb_contradiction" | "instruction_violation" | "incorrect_info" | "poor_handling" | "missed_opportunity"
+  - "description": string (brief description in Spanish, max 2 sentences)
+  - "severity": "low" | "medium" | "high"
+  - "transcript_excerpt": string (the relevant part of the conversation)
+
+If the agent performed well with no errors, return has_errors: false with an empty errors array.
+Ignore minor issues like slightly informal language. Focus on factual errors, KB contradictions, and instruction violations.`;
+
+                const completion = await openai.chat.completions.create({
+                    messages: [
+                        { role: 'system', content: 'You are a strict but fair QA auditor for AI phone agents.' },
+                        { role: 'user', content: trainingPrompt }
+                    ],
+                    model: 'gpt-4o-mini',
+                    response_format: { type: 'json_object' }
+                });
+
+                const result = JSON.parse(completion.choices[0].message.content || '{}');
+                console.log(`[Training] Result: has_errors=${result.has_errors}, score=${result.overall_score}, errors=${result.errors?.length || 0}`);
+                return result;
+            } catch (err) {
+                console.error('[Training] Error:', err);
+                return null;
+            }
+        })();
+
+        // Wait for both in parallel
+        const [leadResult, trainingResult] = await Promise.all([leadDetectionTask, trainingTask]);
+        leadAnalysis = leadResult;
+        trainingFlags = trainingResult;
+    }
+
     const updates: any = {
         analysis: analysis, // The full analysis object
         event_type: 'call_analyzed',
         post_call_analysis_done: true,
-        updated_at: serverTimestamp(),
+        updated_at: adminDb ? admin.firestore.FieldValue.serverTimestamp() : serverTimestamp(),
         ...(resolvedSubworkspaceId && { subworkspace_id: resolvedSubworkspaceId }),
+        // Lead detection fields
+        ...(leadAnalysis && {
+            is_potential_lead: leadAnalysis.is_potential_lead || false,
+            lead_analysis: leadAnalysis,
+            ...(leadAnalysis.is_potential_lead && { lead_status: 'new' }),
+        }),
+        // Training error detection fields
+        ...(trainingFlags && {
+            training_flags: trainingFlags,
+        }),
         ...(process.env.NODE_ENV !== 'production' && {
             _debug: {
                 adminDbInitialized: !!adminDb,
@@ -599,7 +735,11 @@ async function handleCallAnalyzed(callId: string, data: any) {
         updates.transcript_object = transcriptNodes;
     }
 
-    // Merge these updates
-    await setDoc(doc(db, "calls", callId), updates, { merge: true });
+    // Merge these updates (prefer Admin SDK)
+    if (adminDb) {
+        await adminDb.collection('calls').doc(callId).set(updates, { merge: true });
+    } else {
+        await setDoc(doc(db, "calls", callId), updates, { merge: true });
+    }
     console.log(`[call.analyzed] Analysis updated for ${callId}. Debug: ${JSON.stringify(updates._debug)}`);
 }

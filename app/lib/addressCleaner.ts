@@ -1,10 +1,6 @@
 
 import OpenAI from "openai";
 
-const openai = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY,
-});
-
 // Helper para asegurar conversión de números comunes (Español y Catalán)
 function textToDigits(text: string): string {
     const map: { [key: string]: string } = {
@@ -40,6 +36,9 @@ export async function cleanAddressWithAI(dirtyAddress: string): Promise<string> 
         console.warn("[AI Cleaner] Missing OPENAI_API_KEY, skipping AI cleaning.");
         return textToDigits(dirtyAddress); // Al menos aplicamos la limpieza manual
     }
+
+    // Instantiate inside function (not module level) to avoid build-time crashes
+    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
     console.log(`[AI Cleaner] Limpiando: "${dirtyAddress}"`);
 

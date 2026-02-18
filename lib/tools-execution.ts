@@ -6,10 +6,11 @@ interface ToolExecutionRequest {
     name: string;
     args: any;
     call_id?: string;
+    from_number?: string | null;
 }
 
 export async function executeToolCall(request: ToolExecutionRequest) {
-    const { agent_id, name, args, call_id } = request;
+    const { agent_id, name, args, call_id, from_number } = request;
     const startTime = Date.now();
 
     console.log(`[Tool Service] Executing tool: ${name} for agent: ${agent_id}`);
@@ -90,6 +91,12 @@ export async function executeToolCall(request: ToolExecutionRequest) {
     } else {
         bodyPayload = JSON.stringify(args);
         headers['Content-Type'] = 'application/json';
+    }
+
+    // Inject caller phone as x-user-number header (used by search-customer, create-incident)
+    if (from_number) {
+        headers['x-user-number'] = from_number;
+        console.log(`[Tool Service] Injecting x-user-number: ${from_number}`);
     }
 
     // 3. Execute Request

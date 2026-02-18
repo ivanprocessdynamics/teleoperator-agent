@@ -1,8 +1,14 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase-admin";
+import { verifyAuth } from "@/lib/auth-middleware";
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
     try {
+        const user = await verifyAuth(req);
+        if (!user) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+
         const { type, id } = await req.json();
 
         if (!id || !['campaign', 'subworkspace'].includes(type)) {

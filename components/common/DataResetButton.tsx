@@ -12,6 +12,7 @@ import {
     DialogTrigger,
 } from "@/components/ui/dialog";
 import { Trash2, Loader2 } from "lucide-react";
+import { authFetch } from "@/lib/auth-fetch";
 
 interface DataResetButtonProps {
     type: 'campaign' | 'subworkspace';
@@ -28,9 +29,8 @@ export function DataResetButton({ type, id, className, variant = "destructive", 
     const handleReset = async () => {
         setIsDeleting(true);
         try {
-            const res = await fetch('/api/data/reset', {
+            const res = await authFetch('/api/data/reset', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ type, id })
             });
 

@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { doc, updateDoc, onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { FlaskConical, BarChart3, History, Settings2, Mic, Phone, Database, BookOpen } from "lucide-react";
+import { FlaskConical, BarChart3, History, Settings2, Mic, Phone, Database, BookOpen, UserPlus, GraduationCap } from "lucide-react";
 import { TestingEnvironment } from "@/components/TestingEnvironment";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
@@ -18,6 +18,8 @@ import { AgentToolsConfig } from "@/components/tools/AgentToolsConfig";
 import { AgentTool } from "@/types/tools";
 import { DataResetButton } from "@/components/common/DataResetButton";
 import { useAuth } from "@/contexts/AuthContext";
+import { PotentialClients } from "@/components/inbound/PotentialClients";
+import { AgentTraining } from "@/components/inbound/AgentTraining";
 
 interface InboundAgentViewProps {
     subworkspaceId: string;
@@ -105,7 +107,7 @@ export function InboundAgentView({ subworkspaceId, agentId }: InboundAgentViewPr
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
                 <div className="flex flex-col xl:flex-row items-center justify-between gap-4 mb-6">
                     <h1 className="text-2xl font-bold text-gray-900 dark:text-white shrink-0">Configuración del Agente</h1>
-                    <TabsList className="grid w-full max-w-[750px] grid-cols-5 bg-gray-100 dark:bg-gray-800 p-1 rounded-lg">
+                    <TabsList className="grid w-full max-w-[1050px] grid-cols-7 bg-gray-100 dark:bg-gray-800 p-1 rounded-lg">
                         <TabsTrigger
                             value="config"
                             className="gap-2 text-gray-900 dark:text-gray-300 data-[state=active]:bg-white dark:data-[state=active]:bg-gray-700 data-[state=active]:text-gray-900 dark:data-[state=active]:text-white data-[state=active]:shadow-sm transition-all"
@@ -130,6 +132,18 @@ export function InboundAgentView({ subworkspaceId, agentId }: InboundAgentViewPr
                             className="gap-2 text-gray-900 dark:text-gray-300 data-[state=active]:bg-white dark:data-[state=active]:bg-gray-700 data-[state=active]:text-gray-900 dark:data-[state=active]:text-white data-[state=active]:shadow-sm transition-all"
                         >
                             <BarChart3 className="h-4 w-4" /> Estadísticas
+                        </TabsTrigger>
+                        <TabsTrigger
+                            value="leads"
+                            className="gap-2 text-gray-900 dark:text-gray-300 data-[state=active]:bg-white dark:data-[state=active]:bg-gray-700 data-[state=active]:text-gray-900 dark:data-[state=active]:text-white data-[state=active]:shadow-sm transition-all"
+                        >
+                            <UserPlus className="h-4 w-4" /> Leads
+                        </TabsTrigger>
+                        <TabsTrigger
+                            value="training"
+                            className="gap-2 text-gray-900 dark:text-gray-300 data-[state=active]:bg-white dark:data-[state=active]:bg-gray-700 data-[state=active]:text-gray-900 dark:data-[state=active]:text-white data-[state=active]:shadow-sm transition-all"
+                        >
+                            <GraduationCap className="h-4 w-4" /> Entrenamiento
                         </TabsTrigger>
                     </TabsList>
 
@@ -257,6 +271,28 @@ export function InboundAgentView({ subworkspaceId, agentId }: InboundAgentViewPr
                         </div>
                         {agentId ? (
                             <StatsDashboard agentId={agentId} subworkspaceId={subworkspaceId} />
+                        ) : (
+                            <div className="text-center py-10 text-gray-500">Cargando agente...</div>
+                        )}
+                    </div>
+                </TabsContent>
+
+                {/* LEADS TAB */}
+                <TabsContent value="leads" forceMount className="mt-6 data-[state=inactive]:hidden">
+                    <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-800 p-6">
+                        {agentId ? (
+                            <PotentialClients agentId={agentId} />
+                        ) : (
+                            <div className="text-center py-10 text-gray-500">Cargando agente...</div>
+                        )}
+                    </div>
+                </TabsContent>
+
+                {/* TRAINING TAB */}
+                <TabsContent value="training" forceMount className="mt-6 data-[state=inactive]:hidden">
+                    <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-800 p-6">
+                        {agentId ? (
+                            <AgentTraining agentId={agentId} subworkspaceId={subworkspaceId} />
                         ) : (
                             <div className="text-center py-10 text-gray-500">Cargando agente...</div>
                         )}
