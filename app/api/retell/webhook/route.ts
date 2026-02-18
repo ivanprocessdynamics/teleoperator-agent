@@ -240,8 +240,22 @@ export async function POST(req: Request) {
         else if (body.interaction_type === "tool_call" || event === "tool_call_invocation") {
             console.log(`[Webhook] Tool Call detected for ${callId}`);
             const toolCall = body.tool_call || body; // Retell structure varies slightly by version
-            // Extract from_number from call data (available for real inbound calls)
-            const callerPhone = callData?.from_number || body.from_number || null;
+
+            // Extract from_number: try body first, then fetch from Retell API
+            let callerPhone = callData?.from_number || body.from_number || null;
+
+            if (!callerPhone && callId && process.env.RETELL_API_KEY) {
+                try {
+                    const Retell = (await import("retell-sdk")).default;
+                    const retellClient = new Retell({ apiKey: process.env.RETELL_API_KEY });
+                    const callDetails = await retellClient.call.retrieve(callId) as any;
+                    callerPhone = callDetails.from_number || null;
+                    console.log(`[Webhook] Fetched from_number from Retell API: ${callerPhone}`);
+                } catch (retellErr) {
+                    console.error(`[Webhook] Could not fetch call details from Retell:`, retellErr);
+                }
+            }
+
             console.log(`[Webhook] Tool Call from_number: ${callerPhone}`);
             const response = await executeToolCall({
                 agent_id: body.agent_id || callData?.agent_id,
