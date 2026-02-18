@@ -23,7 +23,7 @@ export async function POST(req: NextRequest) {
         }
 
         // LOG EVERYTHING for debugging
-        debugTrace.rawBodyPreview = rawBodyStr.substring(0, 500);
+        debugTrace.rawBodyPreview = rawBodyStr.substring(0, 1500);
         debugTrace.bodyKeys = Object.keys(body);
         debugTrace.userAgent = req.headers.get('user-agent');
         debugTrace.allHeaders = Object.fromEntries(req.headers);
@@ -106,12 +106,15 @@ export async function POST(req: NextRequest) {
             debugTrace.searchCriteria = 'NONE';
             return NextResponse.json({
                 found: false,
+                _phoneUsed: String(searchPhone),
+                _satflowUrl: 'NONE - no criteria',
                 _debug: debugTrace
             });
         }
 
-        console.log(`[Search Proxy] 🚀 CALLING SATFLOW URL: ${satflowUrl.toString()}`);
-        debugTrace.satflowUrl = satflowUrl.toString();
+        const satflowUrlStr = satflowUrl.toString();
+        console.log(`[Search Proxy] 🚀 CALLING SATFLOW URL: ${satflowUrlStr}`);
+        debugTrace.satflowUrl = satflowUrlStr;
 
         const authHeader = req.headers.get('authorization');
         const apiResponse = await fetch(satflowUrl.toString(), {
@@ -131,6 +134,8 @@ export async function POST(req: NextRequest) {
             console.warn(`[Search Proxy] SatFlow Error ${apiResponse.status}`);
             return NextResponse.json({
                 found: false,
+                _phoneUsed: `PHONE:[${searchPhone}]`,
+                _satflowUrl: `URL:[${satflowUrlStr}]`,
                 _debug: debugTrace
             }, { status: apiResponse.status });
         }
@@ -161,12 +166,16 @@ export async function POST(req: NextRequest) {
                 original_address: fullAddress,
                 city: client.city,
                 email: client.email,
+                _phoneUsed: `PHONE:[${searchPhone}]`,
+                _satflowUrl: `URL:[${satflowUrlStr}]`,
                 _debug: debugTrace
             });
         } else {
             console.log(`[Search Proxy] ❌ CLIENT NOT FOUND (Empty array returned)`);
             return NextResponse.json({
                 found: false,
+                _phoneUsed: `PHONE:[${searchPhone}]`,
+                _satflowUrl: `URL:[${satflowUrlStr}]`,
                 _debug: debugTrace
             });
         }
