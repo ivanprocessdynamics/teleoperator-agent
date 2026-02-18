@@ -97,10 +97,19 @@ export async function executeToolCall(request: ToolExecutionRequest) {
     if (from_number) {
         headers['x-user-number'] = from_number;
         console.log(`[Tool Service] Injecting x-user-number: ${from_number}`);
+    } else {
+        console.log(`[Tool Service] WARNING: No from_number available to inject`);
     }
 
     // 3. Execute Request
-    console.log(`[Tool Service] Calling External API: ${method} ${finalUrl}`);
+    console.log(`[Tool Service] ========== TOOL EXECUTION DEBUG ==========`);
+    console.log(`[Tool Service] Tool Config URL: ${url}`);
+    console.log(`[Tool Service] Method: ${method}`);
+    console.log(`[Tool Service] Final URL: ${finalUrl}`);
+    console.log(`[Tool Service] Headers: ${JSON.stringify(headers)}`);
+    console.log(`[Tool Service] Body: ${bodyPayload}`);
+    console.log(`[Tool Service] from_number received: ${from_number}`);
+    console.log(`[Tool Service] ========================================`);
     let responseData;
     let status;
     let success = false;
