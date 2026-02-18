@@ -4,41 +4,52 @@ import { SATFLOW_BASE_URL } from '@/lib/constants';
 import { formatAddressForSpeech } from '@/app/lib/addressFormatter';
 
 export async function POST(req: NextRequest) {
-    const isDev = process.env.NODE_ENV !== 'production';
-
-    // Objeto para acumular trazas de depuración (solo en desarrollo)
-    const debugTrace: any = isDev ? {
+    // TEMP: Always enable debug trace to diagnose tool call issues
+    const debugTrace: any = {
         step: 'init',
-        sources: {}
-    } : null;
+        sources: {},
+        timestamp: new Date().toISOString()
+    };
 
     try {
         let body: any = {};
+        let rawBodyStr = '';
         try {
-            const rawBody = await req.text();
-            if (rawBody) body = JSON.parse(rawBody);
+            rawBodyStr = await req.text();
+            if (rawBodyStr) body = JSON.parse(rawBodyStr);
         } catch (e) {
             console.log("[Search Proxy] Body vacío o inválido");
-            if (isDev) debugTrace.bodyError = "Empty or invalid JSON body";
+            debugTrace.bodyError = "Empty or invalid JSON body";
         }
 
-        console.log("[Search Proxy] Full Body / Headers Debug:", {
-            headers: Object.fromEntries(req.headers),
-            bodyKeys: Object.keys(body),
-        });
+        // LOG EVERYTHING for debugging
+        debugTrace.rawBodyPreview = rawBodyStr.substring(0, 500);
+        debugTrace.bodyKeys = Object.keys(body);
+        debugTrace.userAgent = req.headers.get('user-agent');
+        debugTrace.allHeaders = Object.fromEntries(req.headers);
+
+        console.log("[Search Proxy] ===== DEBUG START =====");
+        console.log("[Search Proxy] Raw body preview:", rawBodyStr.substring(0, 500));
+        console.log("[Search Proxy] Body keys:", JSON.stringify(Object.keys(body)));
+        console.log("[Search Proxy] User-Agent:", req.headers.get('user-agent'));
 
         // ESTRATEGIA SUPRA-ROBUSTA DE EXTRACCIÓN DE TELÉFONO
         const headerPhone = req.headers.get('x-user-number');
         const retellFromNumber = body.call?.from_number || body.from_number;
         const argsPhone = body.phone || body.args?.phone || body.arguments?.phone;
 
-        if (isDev) {
-            debugTrace.sources = {
-                header: headerPhone,
-                metadata: retellFromNumber,
-                args: argsPhone
-            };
-        }
+        debugTrace.sources = {
+            header: headerPhone,
+            metadata: retellFromNumber,
+            args: argsPhone,
+            body_call_from_number: body.call?.from_number,
+            body_from_number: body.from_number,
+            body_phone: body.phone,
+            body_args_phone: body.args?.phone,
+            body_arguments_phone: body.arguments?.phone,
+        };
+
+        console.log("[Search Proxy] Phone sources:", JSON.stringify(debugTrace.sources));
 
         let searchPhone = headerPhone;
         let phoneSource = 'header';
@@ -68,13 +79,12 @@ export async function POST(req: NextRequest) {
             }
         }
 
-        if (isDev) {
-            debugTrace.finalPhone = searchPhone;
-            debugTrace.phoneSource = phoneSource;
-            debugTrace.finalName = bodyName;
-        }
+        debugTrace.finalPhone = searchPhone;
+        debugTrace.phoneSource = phoneSource;
+        debugTrace.finalName = bodyName;
 
-        console.log(`[Search Proxy] 🔎 FINAL PHONE TO USE: '${searchPhone}' (Source ${phoneSource})`);
+        console.log(`[Search Proxy] 🔎 FINAL: phone='${searchPhone}' (${phoneSource}), name='${bodyName}'`);
+        console.log("[Search Proxy] ===== DEBUG END =====");
 
         const satflowUrl = new URL(`${SATFLOW_BASE_URL}/customers/search`);
 
@@ -85,22 +95,23 @@ export async function POST(req: NextRequest) {
         // CASO 1: Hay teléfono -> Buscar por Teléfono (Prioridad Real)
         if (searchPhone && searchPhone.length > 5) {
             satflowUrl.searchParams.set("phone", searchPhone);
-            if (isDev) debugTrace.searchCriteria = 'phone';
+            debugTrace.searchCriteria = 'phone';
         }
         // CASO 2: Solo hay nombre -> Buscar por Nombre
         else if (bodyName && bodyName.length > 2) {
             satflowUrl.searchParams.set("name", bodyName);
-            if (isDev) debugTrace.searchCriteria = 'name';
+            debugTrace.searchCriteria = 'name';
         } else {
             console.log("[Search Proxy] ⚠️ No valid search criteria found.");
+            debugTrace.searchCriteria = 'NONE';
             return NextResponse.json({
                 found: false,
-                ...(isDev && { _debug: debugTrace })
+                _debug: debugTrace
             });
         }
 
         console.log(`[Search Proxy] 🚀 CALLING SATFLOW URL: ${satflowUrl.toString()}`);
-        if (isDev) debugTrace.satflowUrl = satflowUrl.toString();
+        debugTrace.satflowUrl = satflowUrl.toString();
 
         const authHeader = req.headers.get('authorization');
         const apiResponse = await fetch(satflowUrl.toString(), {
@@ -112,8 +123,7 @@ export async function POST(req: NextRequest) {
         });
 
         const data = await apiResponse.json();
-
-        if (isDev) debugTrace.satflowStatus = apiResponse.status;
+        debugTrace.satflowStatus = apiResponse.status;
 
         console.log(`[Search Proxy] 📥 SATFLOW RESPONSE Status: ${apiResponse.status}`);
 
@@ -121,12 +131,12 @@ export async function POST(req: NextRequest) {
             console.warn(`[Search Proxy] SatFlow Error ${apiResponse.status}`);
             return NextResponse.json({
                 found: false,
-                ...(isDev && { _debug: debugTrace })
+                _debug: debugTrace
             }, { status: apiResponse.status });
         }
 
         const customers = data.data || [];
-        if (isDev) debugTrace.resultsCount = customers.length;
+        debugTrace.resultsCount = customers.length;
 
         if (customers.length > 0) {
             const client = customers[0];
@@ -135,8 +145,6 @@ export async function POST(req: NextRequest) {
             // --- FIX PRONUNCIACIÓN ---
             let spokenAddress = fullAddress;
             try {
-                // Importación dinámica para asegurar que funciona sin tocar imports globales
-
                 spokenAddress = formatAddressForSpeech(fullAddress);
             } catch (e) {
                 console.error("[Search Proxy] Error formatting address:", e);
@@ -153,13 +161,13 @@ export async function POST(req: NextRequest) {
                 original_address: fullAddress,
                 city: client.city,
                 email: client.email,
-                ...(isDev && { _debug: debugTrace })
+                _debug: debugTrace
             });
         } else {
             console.log(`[Search Proxy] ❌ CLIENT NOT FOUND (Empty array returned)`);
             return NextResponse.json({
                 found: false,
-                ...(isDev && { _debug: debugTrace })
+                _debug: debugTrace
             });
         }
 
@@ -168,7 +176,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({
             error: "Internal Error",
             details: String(error),
-            ...(isDev && { _debug: debugTrace })
+            _debug: debugTrace
         }, { status: 500 });
     }
 }
