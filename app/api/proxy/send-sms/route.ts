@@ -62,6 +62,13 @@ export async function POST(req: NextRequest) {
             );
         }
 
+        if (!incidentId) {
+            return NextResponse.json(
+                { error: "A valid incidentId is required to generate the correction link." },
+                { status: 400 }
+            );
+        }
+
         // Obtén tu dominio base
         const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || "https://teleoperator-agent.vercel.app";
 

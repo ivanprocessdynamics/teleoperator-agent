@@ -19,7 +19,7 @@ import { AgentTool } from "@/types/tools";
 import { DataResetButton } from "@/components/common/DataResetButton";
 import { useAuth } from "@/contexts/AuthContext";
 import { PotentialClients } from "@/components/inbound/PotentialClients";
-import { AgentTraining } from "@/components/inbound/AgentTraining";
+import { AgentFeedback } from "@/components/inbound/AgentFeedback";
 
 interface InboundAgentViewProps {
     subworkspaceId: string;
@@ -140,10 +140,10 @@ export function InboundAgentView({ subworkspaceId, agentId }: InboundAgentViewPr
                             <UserPlus className="h-4 w-4" /> Leads
                         </TabsTrigger>
                         <TabsTrigger
-                            value="training"
+                            value="resenas"
                             className="gap-2 text-gray-900 dark:text-gray-300 data-[state=active]:bg-white dark:data-[state=active]:bg-gray-700 data-[state=active]:text-gray-900 dark:data-[state=active]:text-white data-[state=active]:shadow-sm transition-all"
                         >
-                            <GraduationCap className="h-4 w-4" /> Entrenamiento
+                            <UserPlus className="h-4 w-4" /> Reseñas
                         </TabsTrigger>
                     </TabsList>
 
@@ -288,11 +288,11 @@ export function InboundAgentView({ subworkspaceId, agentId }: InboundAgentViewPr
                     </div>
                 </TabsContent>
 
-                {/* TRAINING TAB */}
-                <TabsContent value="training" forceMount className="mt-6 data-[state=inactive]:hidden">
+                {/* RESEÑAS TAB */}
+                <TabsContent value="resenas" forceMount className="mt-6 data-[state=inactive]:hidden">
                     <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-800 p-6">
                         {agentId ? (
-                            <AgentTraining agentId={agentId} subworkspaceId={subworkspaceId} />
+                            <AgentFeedback agentId={agentId} subworkspaceId={subworkspaceId} />
                         ) : (
                             <div className="text-center py-10 text-gray-500">Cargando agente...</div>
                         )}

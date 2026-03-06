@@ -154,6 +154,30 @@ export async function POST(req: NextRequest) {
             }
         }
 
+        // --- 6.5 SINCRO DE INCIDENTES PARA EL CRON (Firebase CRM) ---
+        // Guardamos rápidamente el incidente en Firebase para no tener que scrapear la API de SatFlow
+        // en el cron a la hora de enviar el SMS a las 4 horas de la cita programada
+        try {
+            const { adminDb } = await import('@/lib/firebase-admin');
+            if (adminDb && incidentId) {
+                await adminDb.collection('incidents').doc(String(incidentId)).set({
+                    call_id: body.call?.id || 'manual',
+                    client_name: satflowPayload.name || 'Cliente',
+                    address: finalAddress,
+                    scheduled_date: finalDate, // "2024-05-10"
+                    scheduled_time: finalTime, // "14:00"
+                    issue_details: body.description || '',
+                    contact_phone: finalPhone,
+                    act_status: finalStatus,
+                    created_at: Date.now(),
+                    feedback_sms_sent: false
+                }, { merge: true });
+                console.log(`[Create Incident] Synced logically to Firebase CRM as well.`);
+            }
+        } catch(fbErr) {
+            console.warn(`[Create Incident] Failed persisting to CRM Firebase`, fbErr);
+        }
+
         // --- 7. RESPUESTA ---
         return NextResponse.json({
             success: true,
